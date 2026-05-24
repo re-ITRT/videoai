@@ -1,0 +1,1804 @@
+openapi: 3.0.3
+info:
+  title: Video-AI 电商AIGC带货视频生成系统
+  description: |
+    完整REST API接口文档，覆盖素材/剧本/创作三大模块。
+    所有接口通过 APISIX 网关访问，需携带 JWT Token。
+  version: 1.0.0
+  contact:
+    name: Video-AI Team
+
+servers:
+  - url: http://19404h.top:9080/api/v1
+    description: 生产环境(APISIX)
+  - url: http://localhost:8000/api/v1
+    description: 本地开发(FastAPI直连)
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: auth
+    description: 认证服务
+  - name: products
+    description: 商品管理
+  - name: materials
+    description: 素材管理
+  - name: reference-videos
+    description: 参考视频库
+  - name: inspiration-templates
+    description: 灵感模板
+  - name: scripts
+    description: 剧本管理
+  - name: tasks
+    description: 视频任务(创作)
+
+# ============================================================
+# Components
+# ============================================================
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # ---------- 通用 ----------
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: "参数错误"
+        detail:
+          type: string
+
+    PaginatedMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+          example: 42
+        page:
+          type: integer
+          example: 1
+        page_size:
+          type: integer
+          example: 20
+
+    # ---------- 认证 ----------
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          example: "admin"
+        password:
+          type: string
+          format: password
+          example: "admin123"
+
+    RegisterRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 32
+          example: "demo"
+        password:
+          type: string
+          format: password
+          minLength: 6
+          example: "demo123"
+        nickname:
+          type: string
+          example: "演示用户"
+
+    AuthResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiIs..."
+        token_type:
+          type: string
+          example: "bearer"
+        user:
+          $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        username:
+          type: string
+          example: "admin"
+        nickname:
+          type: string
+          example: "管理员"
+        created_at:
+          type: string
+          format: date-time
+
+    # ---------- 商品 ----------
+    ProductCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          example: "白色低帮运动鞋"
+        description:
+          type: string
+          example: "透气网面轻量跑步鞋"
+        category:
+          type: string
+          example: "运动鞋"
+        brand:
+          type: string
+          example: "某品牌"
+        price:
+          type: number
+          example: 299.00
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        brand:
+          type: string
+        price:
+          type: number
+        user_id:
+          type: integer
+        material_count:
+          type: integer
+          description: 关联素材数量
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # ---------- 素材 ----------
+    MaterialUpload:
+      type: object
+      required: [product_id, material_type, input_type]
+      properties:
+        product_id:
+          type: integer
+          example: 1
+        material_type:
+          type: string
+          enum: [product, general, reference]
+          description: "product=商品素材, general=通用素材, reference=参考素材"
+          example: "product"
+        input_type:
+          type: string
+          enum: [image, video]
+          example: "image"
+        image_url:
+          type: string
+          description: 图片URL(image类型必填)
+          example: "https://example.com/shoe.jpg"
+        video_url:
+          type: string
+          description: 视频URL(video类型必填)
+          example: "https://example.com/shoe.mp4"
+        text_content:
+          type: string
+          description: 文字描述(图片素材可选)
+          example: "白色低帮运动鞋侧面特写"
+        brief_description:
+          type: string
+          description: 简短描述(图片素材可选，用于嵌入)
+          example: "白色运动鞋"
+        category:
+          type: string
+          description: 素材分类标签
+          example: "产品展示"
+
+    Material:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        user_id:
+          type: integer
+        product_id:
+          type: integer
+        material_type:
+          type: string
+          enum: [product, general, reference]
+        input_type:
+          type: string
+          enum: [image, video]
+        image_url:
+          type: string
+        video_url:
+          type: string
+        text_content:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+          example: ["运动鞋", "白色", "透气"]
+        source:
+          type: string
+          enum: [upload, ai_generated, external]
+          description: 来源声明(课题强制要求)
+          example: "upload"
+        category:
+          type: string
+        slice_count:
+          type: integer
+          description: 切片数量
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    MaterialSlice:
+      type: object
+      properties:
+        id:
+          type: integer
+        material_id:
+          type: integer
+        slice_type:
+          type: string
+          enum: [video_scene, keyframe, audio_segment]
+        scene_id:
+          type: integer
+        time_range:
+          type: string
+          example: "<0s-3s>"
+        description:
+          type: string
+          example: "智能手表360度旋转展示"
+        script:
+          type: string
+          example: "全新智能手表，精致外观"
+        image_url:
+          type: string
+          description: 关键帧图片URL
+        tags:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+
+    SimilaritySearchRequest:
+      type: object
+      required: [product_id]
+      properties:
+        product_id:
+          type: integer
+          example: 1
+        product_queries:
+          type: array
+          items:
+            type: string
+          description: 自定义产品查询词(为空则自动生成)
+          example: ["白色低帮运动鞋侧面", "透气网面细节"]
+        general_queries:
+          type: array
+          items:
+            type: object
+            properties:
+              category:
+                type: string
+                example: "场景"
+              queries:
+                type: array
+                items:
+                  type: string
+                example: ["公园绿道晨跑"]
+          description: 自定义通用查询(为空则自动生成)
+        similarity_threshold:
+          type: number
+          minimum: 0.3
+          maximum: 0.95
+          default: 0.6
+          description: 相似度阈值，前端滑块控制
+          example: 0.6
+        search_level:
+          type: string
+          enum: [material, slice, both]
+          default: both
+          description: "material=仅素材级, slice=仅切片级, both=两层检索"
+        material_type:
+          type: string
+          enum: [product, general, reference, all]
+          default: all
+        max_results:
+          type: integer
+          default: 50
+          maximum: 100
+          description: 兜底LIMIT
+
+    SimilaritySearchResult:
+      type: object
+      properties:
+        materials:
+          type: array
+          items:
+            type: object
+            properties:
+              material_id:
+                type: integer
+              similarity:
+                type: number
+                example: 0.87
+              material:
+                $ref: '#/components/schemas/Material'
+        slices:
+          type: array
+          items:
+            type: object
+            properties:
+              slice_id:
+                type: integer
+              material_id:
+                type: integer
+              similarity:
+                type: number
+              slice:
+                $ref: '#/components/schemas/MaterialSlice'
+
+    ImageGenerateRequest:
+      type: object
+      required: [prompt]
+      properties:
+        prompt:
+          type: string
+          example: "白色运动鞋放在公园长椅上"
+        style:
+          type: string
+          enum: [product_photo, lifestyle, creative]
+          default: product_photo
+          description: "产品照/生活方式/创意合成"
+        width:
+          type: integer
+          default: 1024
+        height:
+          type: integer
+          default: 1024
+        product_id:
+          type: integer
+          description: 关联商品
+
+    # ---------- 参考视频 ----------
+    ReferenceVideoCreate:
+      type: object
+      required: [video_url, title]
+      properties:
+        video_url:
+          type: string
+          example: "https://example.com/hit-video.mp4"
+        title:
+          type: string
+          example: "爆款运动鞋带货视频"
+        platform:
+          type: string
+          example: "抖音"
+        product_category:
+          type: string
+          example: "运动鞋"
+
+    ReferenceVideo:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        video_url:
+          type: string
+        platform:
+          type: string
+        product_category:
+          type: string
+        hook_method:
+          type: string
+          description: Hook手法(video-analyze输出)
+          example: "第一人称沉浸式开箱"
+        selling_points:
+          type: array
+          items:
+            type: string
+          example: ["轻量化", "透气网面", "减震"]
+        style:
+          type: string
+          example: "动感节奏"
+        bgm_type:
+          type: string
+          example: "电子节奏"
+        overall_rating:
+          type: string
+          example: "A"
+        storyboard:
+          type: array
+          items:
+            type: object
+            properties:
+              scene_id:
+                type: integer
+              time_range:
+                type: string
+              description:
+                type: string
+              camera_movement:
+                type: string
+        analysis_status:
+          type: string
+          enum: [pending, analyzing, completed, failed]
+        created_at:
+          type: string
+          format: date-time
+
+    # ---------- 灵感模板 ----------
+    InspirationTemplate:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          example: "第一人称BGM沉浸模板"
+        strategy:
+          type: string
+          description: 创作策略名称
+          example: "first_person_bgm_immersion"
+        strategy_description:
+          type: string
+          example: "第一人称视角配合BGM节奏，沉浸式体验产品"
+        factors:
+          type: object
+          description: 策略因子(可局部替换)
+          properties:
+            opening:
+              type: string
+              example: "产品特写慢推入"
+            exit_style:
+              type: string
+              example: "产品logo定格"
+            visual_focus:
+              type: string
+              example: "产品细节特写"
+            narration_style:
+              type: string
+              example: "第一人称口语化"
+            bgm_style:
+              type: string
+              example: "轻快电子"
+        reference_count:
+          type: integer
+          description: 基于多少爆款视频归纳
+        usage_count:
+          type: integer
+          description: 被使用次数
+        created_at:
+          type: string
+          format: date-time
+
+    # ---------- 剧本 ----------
+    ScriptGenerateRequest:
+      type: object
+      required: [product_id]
+      properties:
+        product_id:
+          type: integer
+          example: 1
+        mode:
+          type: string
+          enum: [auto, hit_imitation, template, manual]
+          default: auto
+          description: |
+            auto=自动生成(策略+因子由LLM选择)
+            hit_imitation=爆款仿写(需reference_video_id)
+            template=灵感模板(需template_id)
+            manual=手动指定策略+因子
+        reference_video_id:
+          type: integer
+          description: 爆款仿写模式必填
+        template_id:
+          type: integer
+          description: 灵感模板模式必填
+        strategy:
+          type: string
+          description: manual模式指定策略
+          example: "first_person_bgm_immersion"
+        factors:
+          type: object
+          description: manual模式指定因子(同InspirationTemplate.factors结构)
+        selected_material_ids:
+          type: array
+          items:
+            type: integer
+          description: 指定使用的素材ID列表
+        video_style:
+          type: string
+          example: "动感活力"
+        target_duration:
+          type: number
+          default: 15
+          maximum: 15
+          description: 目标时长(秒)，不超过15s
+        num_variants:
+          type: integer
+          default: 1
+          maximum: 3
+          description: 一次生成几套不同风格剧本
+        additional_instructions:
+          type: string
+          description: Prompt微调，用户额外指令
+          example: "强调透气性，画面多用绿色自然元素"
+
+    ScriptScene:
+      type: object
+      properties:
+        scene_id:
+          type: integer
+          example: 1
+        line_type:
+          type: string
+          enum: [narration, dialogue, silence]
+          example: "narration"
+        narration:
+          type: string
+          example: "全新透气跑鞋，让你每一步都轻盈自如"
+        dialogue:
+          type: string
+          description: 对话内容(line_type=dialogue时)
+        visual_desc:
+          type: string
+          example: "低帮运动鞋特写，镜头从鞋面缓缓推到透气网面"
+        duration:
+          type: number
+          example: 5.0
+          description: 场景时长(秒)
+        has_speaking:
+          type: boolean
+          default: false
+          description: 是否有口型(影响video-generate)
+        transition:
+          type: string
+          enum: [cut, fade, dissolve, wipe, zoom]
+          default: cut
+          description: 到下一场景的转场
+        tts_config:
+          type: object
+          properties:
+            voice_id:
+              type: string
+              example: "zh_female_qingxin"
+            speed:
+              type: number
+              default: 1.0
+            language:
+              type: string
+              default: "zh"
+              description: 语种(多语种TTS支持)
+        material_ids:
+          type: array
+          items:
+            type: integer
+          description: 该场景使用的素材ID
+
+    Script:
+      type: object
+      properties:
+        id:
+          type: integer
+        product_id:
+          type: integer
+        mode:
+          type: string
+          enum: [auto, hit_imitation, template, manual]
+        strategy:
+          type: string
+        factors:
+          type: object
+        video_style:
+          type: string
+        total_duration:
+          type: number
+          example: 15.0
+        scenes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScriptScene'
+        reference_video_id:
+          type: integer
+          nullable: true
+        template_id:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # ---------- 视频任务 ----------
+    TaskCreate:
+      type: object
+      required: [script_id]
+      properties:
+        script_id:
+          type: integer
+          example: 1
+        aspect_ratio:
+          type: string
+          enum: ["9:16", "16:9", "1:1"]
+          default: "9:16"
+          description: 画幅比例
+        auto_mode:
+          type: boolean
+          default: true
+          description: true=一键成片(全自动), false=手动逐步
+
+    TaskState:
+      type: string
+      enum: [created, embedding, querying, searching, scripting, tts_generating, video_generating, composing, completed, failed]
+      description: |
+        created=已创建
+        embedding=素材嵌入中
+        querying=查询生成中
+        searching=素材检索中
+        scripting=剧本生成中
+        tts_generating=TTS生成中
+        video_generating=视频生成中
+        composing=合成中
+        completed=已完成
+        failed=失败
+
+    Task:
+      type: object
+      properties:
+        id:
+          type: integer
+        script_id:
+          type: integer
+        user_id:
+          type: integer
+        state:
+          $ref: '#/components/schemas/TaskState'
+        current_step:
+          type: integer
+          description: 当前执行到第几步(共8步)
+          example: 3
+        total_steps:
+          type: integer
+          example: 8
+        aspect_ratio:
+          type: string
+        auto_mode:
+          type: boolean
+        video_url:
+          type: string
+          nullable: true
+          description: 最终视频URL(completed时可用)
+        duration:
+          type: number
+          nullable: true
+          description: 最终视频时长
+        error_message:
+          type: string
+          nullable: true
+        retry_count:
+          type: integer
+          example: 0
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    TaskLog:
+      type: object
+      properties:
+        id:
+          type: integer
+        task_id:
+          type: integer
+        step:
+          type: string
+          description: 步骤名
+          example: "video_generating"
+        model_name:
+          type: string
+          example: "Seedance-1.5-pro"
+        tokens_used:
+          type: integer
+          description: Token消耗
+        duration_ms:
+          type: integer
+          description: 步骤耗时(毫秒)
+          example: 5200
+        detail:
+          type: object
+          description: 步骤详情(请求/响应摘要)
+        created_at:
+          type: string
+          format: date-time
+
+    SceneRegenerateRequest:
+      type: object
+      properties:
+        visual_desc:
+          type: string
+          description: 修改后的画面描述(为空则用原描述)
+        duration:
+          type: number
+          description: 修改后的时长
+        has_speaking:
+          type: boolean
+
+    SceneReplaceMaterialRequest:
+      type: object
+      required: [material_id]
+      properties:
+        material_id:
+          type: integer
+          description: 替换的素材ID
+        use_image_to_video:
+          type: boolean
+          default: false
+          description: 是否用图生视频模式(替代文生视频)
+
+    SceneDurationRequest:
+      type: object:
+      required: [duration]
+      properties:
+        duration:
+          type: number
+          minimum: 2
+          maximum: 10
+          example: 5.0
+
+    ExportRequest:
+      type: object
+      properties:
+        aspect_ratio:
+          type: string
+          enum: ["9:16", "16:9", "1:1"]
+          description: 导出画幅(可与生成时不同)
+        include_subtitles:
+          type: boolean
+          default: true
+        include_bgm:
+          type: boolean
+          default: true
+        bgm_type:
+          type: string
+          enum: [energetic, calm, emotional, none]
+          default: energetic
+          description: BGM风格
+
+# ============================================================
+# Paths
+# ============================================================
+paths:
+  # ==================== 认证 ====================
+  /auth/register:
+    post:
+      tags: [auth]
+      summary: 用户注册
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: 注册成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: 用户名已存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: 用户登录
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: 用户名或密码错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/me:
+    get:
+      tags: [auth]
+      summary: 获取当前用户信息
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  # ==================== 商品 ====================
+  /products:
+    post:
+      tags: [products]
+      summary: 创建商品
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductCreate'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+
+    get:
+      tags: [products]
+      summary: 商品列表
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: category
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Product'
+                  meta:
+                    $ref: '#/components/schemas/PaginatedMeta'
+
+  /products/{product_id}:
+    get:
+      tags: [products]
+      summary: 商品详情
+      parameters:
+        - name: product_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '404':
+          description: 商品不存在
+
+    put:
+      tags: [products]
+      summary: 更新商品
+      parameters:
+        - name: product_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductCreate'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+
+    delete:
+      tags: [products]
+      summary: 删除商品
+      parameters:
+        - name: product_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: 删除成功
+
+  # ==================== 素材 ====================
+  /materials:
+    post:
+      tags: [materials]
+      summary: 上传素材(触发material-embed)
+      description: |
+        上传图片或视频素材，后端自动调用material-embed工作流进行嵌入。
+        图片素材：需提供image_url；视频素材：需提供video_url。
+        视频会自动进行场景分割，生成material_slices。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaterialUpload'
+      responses:
+        '201':
+          description: 素材创建成功(嵌入异步进行)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  material_id:
+                    type: integer
+                  status:
+                    type: string
+                    enum: [embedding, completed, failed]
+                  message:
+                    type: string
+
+    get:
+      tags: [materials]
+      summary: 素材列表
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: product_id
+          in: query
+          schema:
+            type: integer
+          description: 按商品筛选
+        - name: material_type
+          in: query
+          schema:
+            type: string
+            enum: [product, general, reference, all]
+            default: all
+        - name: input_type
+          in: query
+          schema:
+            type: string
+            enum: [image, video]
+        - name: keyword
+          in: query
+          schema:
+            type: string
+          description: 全文检索(搜索text_content)
+        - name: tags
+          in: query
+          schema:
+            type: string
+          description: 标签筛选，逗号分隔
+          example: "运动鞋,白色"
+        - name: category
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Material'
+                  meta:
+                    $ref: '#/components/schemas/PaginatedMeta'
+
+  /materials/{material_id}:
+    get:
+      tags: [materials]
+      summary: 素材详情
+      parameters:
+        - name: material_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Material'
+        '404':
+          description: 素材不存在
+
+    delete:
+      tags: [materials]
+      summary: 删除素材
+      parameters:
+        - name: material_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: 删除成功(同时删除关联slices)
+
+  /materials/{material_id}/slices:
+    get:
+      tags: [materials]
+      summary: 获取素材的切片列表
+      parameters:
+        - name: material_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MaterialSlice'
+
+  /materials/search:
+    post:
+      tags: [materials]
+      summary: 向量相似度检索
+      description: |
+        基于embedding的相似度检索，支持阈值筛选。
+        如果未提供自定义queries，自动调用query-generate生成。
+        两层检索：material级(整素材embedding) + slice级(场景embedding)。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SimilaritySearchRequest'
+      responses:
+        '200':
+          description: 检索结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimilaritySearchResult'
+
+  /materials/tags:
+    get:
+      tags: [materials]
+      summary: 获取所有标签(用于标签检索和筛选)
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    tag:
+                      type: string
+                    count:
+                      type: integer
+
+  /materials/generate-image:
+    post:
+      tags: [materials]
+      summary: AI生成图片(文生图)
+      description: 素材不足时，用image-generate工作流补充素材
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImageGenerateRequest'
+      responses:
+        '201':
+          description: 图片生成任务已创建
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  material_id:
+                    type: integer
+                  image_url:
+                    type: string
+                  source:
+                    type: string
+                    example: "ai_generated"
+
+  # ==================== 参考视频 ====================
+  /reference-videos:
+    post:
+      tags: [reference-videos]
+      summary: 添加参考视频(触发video-analyze)
+      description: 添加爆款视频，后端自动调用video-analyze进行结构化拆解
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReferenceVideoCreate'
+      responses:
+        '201':
+          description: 参考视频创建成功(分析异步进行)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  analysis_status:
+                    type: string
+                    enum: [pending, analyzing]
+
+    get:
+      tags: [reference-videos]
+      summary: 参考视频列表
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: product_category
+          in: query
+          schema:
+            type: string
+        - name: style
+          in: query
+          schema:
+            type: string
+        - name: rating
+          in: query
+          schema:
+            type: string
+            description: 按评级筛选(A/B/C)
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ReferenceVideo'
+                  meta:
+                    $ref: '#/components/schemas/PaginatedMeta'
+
+  /reference-videos/{video_id}:
+    get:
+      tags: [reference-videos]
+      summary: 参考视频详情(含拆解报告)
+      parameters:
+        - name: video_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReferenceVideo'
+
+    delete:
+      tags: [reference-videos]
+      summary: 删除参考视频
+      parameters:
+        - name: video_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: 删除成功
+
+  # ==================== 灵感模板 ====================
+  /inspiration-templates:
+    get:
+      tags: [inspiration-templates]
+      summary: 灵感模板列表
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: strategy
+          in: query
+          schema:
+            type: string
+          description: 按策略筛选
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/InspirationTemplate'
+                  meta:
+                    $ref: '#/components/schemas/PaginatedMeta'
+
+    post:
+      tags: [inspiration-templates]
+      summary: 创建自定义灵感模板
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, strategy, factors]
+              properties:
+                name:
+                  type: string
+                strategy:
+                  type: string
+                strategy_description:
+                  type: string
+                factors:
+                  type: object
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspirationTemplate'
+
+  /inspiration-templates/{template_id}:
+    get:
+      tags: [inspiration-templates]
+      summary: 模板详情
+      parameters:
+        - name: template_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspirationTemplate'
+
+  # ==================== 剧本 ====================
+  /scripts/generate:
+    post:
+      tags: [scripts]
+      summary: 生成剧本
+      description: |
+        支持4种模式：
+        - auto: LLM自动选择策略+因子
+        - hit_imitation: 爆款仿写，需reference_video_id
+        - template: 灵感模板，需template_id
+        - manual: 手动指定strategy+factors
+        
+        生成后可多次调整(prompt微调/分镜增删/台词改写/因子替换)。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScriptGenerateRequest'
+      responses:
+        '201':
+          description: 剧本生成成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Script'
+
+  /scripts:
+    get:
+      tags: [scripts]
+      summary: 剧本列表
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: product_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Script'
+                  meta:
+                    $ref: '#/components/schemas/PaginatedMeta'
+
+  /scripts/{script_id}:
+    get:
+      tags: [scripts]
+      summary: 剧本详情(含场景列表)
+      parameters:
+        - name: script_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Script'
+
+    put:
+      tags: [scripts]
+      summary: 更新剧本(增删场景/修改台词/Prompt微调)
+      description: |
+        支持操作：
+        - 修改整体属性(video_style, additional_instructions等)
+        - 增删场景(scenes数组整体替换)
+        - 修改单个场景台词/画面描述
+        修改后可重新生成受影响部分。
+      parameters:
+        - name: script_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                video_style:
+                  type: string
+                additional_instructions:
+                  type: string
+                  description: Prompt微调指令
+                scenes:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/ScriptScene'
+                  description: 替换全部场景(增删改)
+                regenerate:
+                  type: boolean
+                  default: false
+                  description: 是否立即重新生成受影响部分
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Script'
+
+  /scripts/{script_id}/scenes/{scene_id}:
+    put:
+      tags: [scripts]
+      summary: 修改单个场景(台词改写/因子替换)
+      parameters:
+        - name: script_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: scene_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                narration:
+                  type: string
+                  description: 修改旁白
+                visual_desc:
+                  type: string
+                  description: 修改画面描述
+                duration:
+                  type: number
+                  description: 修改时长
+                transition:
+                  type: string
+                  description: 修改转场
+                tts_config:
+                  type: object
+                  description: 修改TTS配置
+      responses:
+        '200':
+          description: 修改成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScriptScene'
+
+    delete:
+      tags: [scripts]
+      summary: 删除场景
+      parameters:
+        - name: script_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: scene_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 删除成功，返回更新后的剧本
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Script'
+
+  # ==================== 视频任务 ====================
+  /tasks:
+    post:
+      tags: [tasks]
+      summary: 创建视频任务(一键成片/手动模式)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskCreate'
+      responses:
+        '201':
+          description: 任务创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+
+    get:
+      tags: [tasks]
+      summary: 任务列表
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: state
+          in: query
+          schema:
+            $ref: '#/components/schemas/TaskState'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Task'
+                  meta:
+                    $ref: '#/components/schemas/PaginatedMeta'
+
+  /tasks/{task_id}:
+    get:
+      tags: [tasks]
+      summary: 任务详情(含当前状态和进度)
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+
+  /tasks/{task_id}/retry:
+    post:
+      tags: [tasks]
+      summary: 重试失败任务
+      description: 从失败的步骤继续，不重头开始(断点续传)
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 重试已启动
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+
+  /tasks/{task_id}/scenes/{scene_id}/regenerate:
+    post:
+      tags: [tasks]
+      summary: 重新生成单个场景(分镜级干预)
+      description: 只重跑该场景的video-generate，不影响其他场景
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: scene_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SceneRegenerateRequest'
+      responses:
+        '200':
+          description: 场景重新生成中
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  scene_id:
+                    type: integer
+                  status:
+                    type: string
+                    enum: [regenerating]
+
+  /tasks/{task_id}/scenes/{scene_id}/replace-material:
+    post:
+      tags: [tasks]
+      summary: 替换场景素材(分镜级干预)
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: scene_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SceneReplaceMaterialRequest'
+      responses:
+        '200':
+          description: 素材替换成功，重新生成中
+
+  /tasks/{task_id}/scenes/{scene_id}/duration:
+    put:
+      tags: [tasks]
+      summary: 调整场景时长
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: scene_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [duration]
+              properties:
+                duration:
+                  type: number
+                  minimum: 2
+                  maximum: 10
+      responses:
+        '200':
+          description: 时长已调整
+
+  /tasks/{task_id}/export:
+    post:
+      tags: [tasks]
+      summary: 导出视频(多画幅)
+      description: 支持不同画幅比例重新合成导出
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExportRequest'
+      responses:
+        '200':
+          description: 导出成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  video_url:
+                    type: string
+                  duration:
+                    type: number
+                  aspect_ratio:
+                    type: string
+                  source_declaration:
+                    type: string
+                    description: 来源声明文本(课题强制要求)
+
+  /tasks/{task_id}/logs:
+    get:
+      tags: [tasks]
+      summary: 获取任务执行日志(trace)
+      description: 每步记录耗时+模型调用+token消耗
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TaskLog'
+
+  # ==================== WebSocket ====================
+  # WebSocket端点不在OpenAPI标准内，此处仅作说明
+  # ws://19404h.top:9080/ws/tasks/{task_id}
+  # 消息格式: {"state": "video_generating", "current_step": 6, "total_steps": 8, "detail": "生成场景2视频..."}
