@@ -1,9 +1,38 @@
-from typing import AsyncGenerator
-from fastapi import Depends
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from app.core.database import get_db
+from app.core.security import decode_access_token
+from app.auth.models import User
+
+security = HTTPBearer()
 
 
-async def get_current_user(db: AsyncSession = Depends(get_db)):
-    # TODO: implement JWT verification
-    pass
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: AsyncSession = Depends(get_db)
+) -> User:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail={"code": 401, "message": "Could not validate credentials", "detail": "Invalid or expired token"},
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    token = credentials.credentials
+    payload = decode_access_token(token)
+    
+    if payload is None:
+        raise credentials_exception
+    
+    user_id = payload.get("sub")
+    if user_id is None:
+        raise credentials_exception
+    
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    
+    if user is None:
+        raise credentials_exception
+    
+    return user
