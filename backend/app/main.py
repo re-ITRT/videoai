@@ -1,6 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.auth.router import router as auth_router
+from app.material.router import router as material_router
+from app.script.router import router as script_router
+from app.creation.router import router as creation_router
+
 app = FastAPI(title="Video-AI API", version="0.1.0", docs_url="/docs")
 
 app.add_middleware(
@@ -11,10 +16,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router)
+app.include_router(material_router)
+app.include_router(script_router)
+app.include_router(creation_router)
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
 
+
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)
