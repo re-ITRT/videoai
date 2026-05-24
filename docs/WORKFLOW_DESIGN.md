@@ -56,3 +56,24 @@
   - `overall_rating` (string)：整体评价
 - **模型**：Seed-2.0-pro（视频理解）
 - **用途**：爆款视频库的结构化分析，方法论提炼的数据来源
+
+## API凭证与配置
+
+### 火山引擎方舟（Ark）
+- APIKEY: ark-4126af52-1fda-4c17-8561-8db89e066502-95563
+- Base URL: https://ark.cn-beijing.volces.com/api/v3
+- Doubao-Seed-2.0-pro EP: ep-20260514115629-vhldw | 100RPM 50WTPM
+- Doubao-Seedance-1.5-pro EP: ep-20260514120705-pqv86 | 5并发
+- Doubao-embedding-large-text 纯文本嵌入 1024维
+- Doubao-embedding-vision 多模态嵌入(图片+文本) 1024维
+
+### 扣子编程平台（Coze）
+- API Base: https://api.coze.cn/v3
+- PAT: 扣子平台API密钥获取
+- 工作流调用: POST /v1/workflow/run
+- 限流: 20QPS / 300RPM
+
+### 工作流Bot ID（待创建）
+- image-generate: 待创建
+- image-to-video: 待创建
+- video-analyze: 待创建
