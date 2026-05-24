@@ -1,10 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
-from app.core.database import get_db
-from app.core.security import create_access_token
-from app.auth.schemas import RegisterRequest, LoginRequest, TokenResponse, UserResponse, ErrorResponse
+from app.core.database import get_db, get_redis
+from app.core.deps import get_current_user
+from app.core.security import create_access_token, create_refresh_token, decode_refresh_token
+from app.auth.schemas import (
+    RegisterRequest, LoginRequest, TokenResponse, UserResponse, ErrorResponse,
+    TokenRefreshRequest, RefreshTokenResponse, LogoutResponse
+)
 from app.auth.service import create_user, get_user_by_username, authenticate_user
+from app.auth.models import User
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -29,7 +34,7 @@ async def register(
             status_code=status.HTTP_409_CONFLICT,
             detail={"code": 409, "message": "Username already exists", "detail": f"Username '{request.username}' is already taken"}
         )
-    
+
     try:
         # Create new user
         user = await create_user(
@@ -43,12 +48,14 @@ async def register(
             status_code=status.HTTP_409_CONFLICT,
             detail={"code": 409, "message": "Username already exists", "detail": "Registration failed due to duplicate username"}
         )
-    
-    # Generate access token
+
+    # Generate access token and refresh token
     access_token = create_access_token(data={"sub": user.id})
-    
+    refresh_token = create_refresh_token(data={"sub": user.id})
+
     return TokenResponse(
         access_token=access_token,
+        refresh_token=refresh_token,
         token_type="bearer",
         user=UserResponse.model_validate(user)
     )
@@ -67,18 +74,26 @@ async def login(
 ):
     """Login with username and password"""
     user = await authenticate_user(db, request.username, request.password)
-    
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={"code": 401, "message": "Invalid credentials", "detail": "Incorrect username or password"}
         )
-    
-    # Generate access token
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": 403, "message": "Inactive user", "detail": "User account is disabled"}
+        )
+
+    # Generate access token and refresh token
     access_token = create_access_token(data={"sub": user.id})
-    
+    refresh_token = create_refresh_token(data={"sub": user.id})
+
     return TokenResponse(
         access_token=access_token,
+        refresh_token=refresh_token,
         token_type="bearer",
         user=UserResponse.model_validate(user)
     )
@@ -92,8 +107,63 @@ async def login(
     }
 )
 async def get_current_user_info(
-    db: AsyncSession = Depends(get_db),
-    current_user = Depends(__import__("app.core.deps", fromlist=["get_current_user"]).get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     """Get current authenticated user information"""
     return UserResponse.model_validate(current_user)
+
+
+@router.post(
+    "/logout",
+    response_model=LogoutResponse,
+    responses={
+        401: {"model": ErrorResponse, "description": "Not authenticated"},
+    }
+)
+async def logout(
+    current_user: User = Depends(get_current_user),
+    redis_client=Depends(get_redis)
+):
+    """Logout by blacklisting the current token"""
+    await redis_client.set(f"token_blacklist:{current_user.id}", "true", ex=1440 * 60)
+    return LogoutResponse(message="Logged out successfully")
+
+
+@router.post(
+    "/refresh",
+    response_model=RefreshTokenResponse,
+    responses={
+        401: {"model": ErrorResponse, "description": "Invalid refresh token"},
+    }
+)
+async def refresh(
+    request: TokenRefreshRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Refresh access token using a refresh token"""
+    payload = decode_refresh_token(request.refresh_token)
+    if payload is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"code": 401, "message": "Invalid refresh token", "detail": "Token is invalid or expired"}
+        )
+
+    user_id = payload.get("sub")
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"code": 401, "message": "Invalid refresh token", "detail": "Token payload is invalid"}
+        )
+
+    from sqlalchemy import select
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+
+    if user is None or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"code": 401, "message": "User not found", "detail": "User associated with this token no longer exists"}
+        )
+
+    new_access_token = create_access_token(data={"sub": user.id})
+    return RefreshTokenResponse(access_token=new_access_token, token_type="bearer")

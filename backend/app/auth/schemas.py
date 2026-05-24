@@ -21,10 +21,24 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class TokenRefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class RefreshTokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+class LogoutResponse(BaseModel):
+    message: str = "Logged out successfully"
+
+
 class UserResponse(BaseModel):
     id: int
     username: str
     nickname: Optional[str] = None
+    email: Optional[str] = None
     created_at: datetime
 
     class Config:
@@ -33,6 +47,7 @@ class UserResponse(BaseModel):
 
 class TokenResponse(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
     user: UserResponse
 

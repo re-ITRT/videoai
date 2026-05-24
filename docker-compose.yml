@@ -37,6 +37,18 @@ services:
       - redis
       - minio
 
+  apisix:
+    image: apache/apisix:3.9.0-debian
+    ports:
+      - "9080:9080"
+      - "9180:9180"
+    volumes:
+      - ./gateway/apisix/apisix.yaml:/opt/apisix/conf/config.yaml:ro
+    depends_on:
+      - backend
+    environment:
+      - APISIX_STANDALONE=true
+
   celery-worker:
     build: ./backend
     command: celery -A app.workers.celery_app worker --loglevel=info

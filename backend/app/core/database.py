@@ -11,3 +11,15 @@ async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit
 async def get_db():
     async with async_session() as session:
         yield session
+
+
+import redis.asyncio as redis
+
+redis_client = None
+
+
+async def get_redis() -> redis.Redis:
+    global redis_client
+    if redis_client is None:
+        redis_client = redis.from_url(settings.REDIS_URL or "redis://redis:6379/0", decode_responses=True)
+    return redis_client

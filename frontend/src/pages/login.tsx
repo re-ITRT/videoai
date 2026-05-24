@@ -11,7 +11,9 @@ export default function Login() {
       localStorage.setItem('token', res.access_token)
       message.success('登录成功')
       navigate('/')
-    } catch {}
+    } catch (error: any) {
+      message.error(error.response?.data?.detail?.message || error.response?.data?.detail || '登录失败')
+    }
   }
   return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#f5f5f5' }}>

@@ -5,6 +5,7 @@ from app.auth.router import router as auth_router
 from app.material.router import router as material_router
 from app.script.router import router as script_router
 from app.creation.router import router as creation_router
+from app.user.router import router as user_router
 
 app = FastAPI(title="Video-AI API", version="0.1.0", docs_url="/docs")
 
@@ -20,6 +21,7 @@ app.include_router(auth_router)
 app.include_router(material_router)
 app.include_router(script_router)
 app.include_router(creation_router)
+app.include_router(user_router)
 
 
 @app.get("/health")

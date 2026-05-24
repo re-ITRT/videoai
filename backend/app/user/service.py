@@ -1,0 +1,95 @@
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.auth.models import User
+from app.core.security import verify_password, get_password_hash
+from app.user.schemas import UserUpdateRequest, UserAdminUpdateRequest
+
+
+async def get_user_by_id(db: AsyncSession, user_id: int) -> User | None:
+    """Get user by ID"""
+    result = await db.execute(select(User).where(User.id == user_id))
+    return result.scalar_one_or_none()
+
+
+async def update_user_profile(
+    db: AsyncSession,
+    user_id: int,
+    data: UserUpdateRequest
+) -> User:
+    """Update user nickname and/or email"""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise ValueError("User not found")
+
+    update_data = data.model_dump(exclude_none=True)
+    for field, value in update_data.items():
+        setattr(user, field, value)
+
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+
+async def change_user_password(
+    db: AsyncSession,
+    user_id: int,
+    old_password: str,
+    new_password: str
+) -> User:
+    """Change user password after verifying old password"""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise ValueError("User not found")
+
+    if not verify_password(old_password, user.hashed_password):
+        raise ValueError("Old password is incorrect")
+
+    user.hashed_password = get_password_hash(new_password)
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+
+async def get_all_users(
+    db: AsyncSession,
+    skip: int = 0,
+    limit: int = 100
+) -> list[User]:
+    """Get all users with pagination"""
+    result = await db.execute(
+        select(User).offset(skip).limit(limit).order_by(User.id)
+    )
+    return result.scalars().all()
+
+
+async def admin_update_user(
+    db: AsyncSession,
+    user_id: int,
+    data: UserAdminUpdateRequest
+) -> User:
+    """Admin update a user's profile fields"""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise ValueError("User not found")
+
+    update_data = data.model_dump(exclude_none=True)
+    for field, value in update_data.items():
+        setattr(user, field, value)
+
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+
+async def delete_user(db: AsyncSession, user_id: int) -> None:
+    """Delete a user by ID"""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise ValueError("User not found")
+
+    await db.delete(user)
+    await db.commit()

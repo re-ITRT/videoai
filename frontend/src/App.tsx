@@ -13,6 +13,8 @@ import ScriptGenerate from './modules/script/generate'
 import ScriptDetail from './modules/script/detail'
 import CreationList from './modules/creation/index'
 import CreationDetail from './modules/creation/detail'
+import Profile from './pages/profile'
+import AdminUsers from './pages/admin/users'
 
 function App() {
   return (
@@ -31,6 +33,8 @@ function App() {
           <Route path="script/:id" element={<ScriptDetail />} />
           <Route path="creation" element={<CreationList />} />
           <Route path="creation/:id" element={<CreationDetail />} />
+          <Route path="profile" element={<Profile />} />
+          <Route path="admin/users" element={<AdminUsers />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

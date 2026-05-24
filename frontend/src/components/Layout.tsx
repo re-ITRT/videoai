@@ -1,4 +1,4 @@
-import { Layout as AntLayout, Menu } from 'antd'
+import { Layout as AntLayout, Menu, Dropdown, Space } from 'antd'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import {
   DashboardOutlined,
@@ -7,6 +7,8 @@ import {
   ThunderboltOutlined,
   PlayCircleOutlined,
   BookOutlined,
+  UserOutlined,
+  TeamOutlined,
   LogoutOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../hooks/useAuth'
@@ -20,12 +22,34 @@ const menuItems = [
   { key: '/creation', icon: <ThunderboltOutlined />, label: '视频创作' },
   { key: '/reference', icon: <PlayCircleOutlined />, label: '参考视频' },
   { key: '/templates', icon: <BookOutlined />, label: '灵感模板' },
+  { key: '/profile', icon: <UserOutlined />, label: '个人中心' },
+]
+
+const adminMenus = [
+  { key: '/admin/users', icon: <TeamOutlined />, label: '用户管理' },
 ]
 
 export default function Layout() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout } = useAuth()
+
+  const allItems = (user as any)?.role === 'admin'
+    ? [...menuItems, { type: 'divider' as const }, { key: 'admin-group', type: 'group' as const, label: '管理后台', children: adminMenus }]
+    : menuItems
+
+  const userMenuItems = [
+    { key: 'profile', icon: <UserOutlined />, label: '个人中心' },
+    { key: 'logout', icon: <LogoutOutlined />, label: '退出登录' },
+  ]
+
+  const handleUserMenuClick = ({ key }: { key: string }) => {
+    if (key === 'logout') {
+      logout()
+    } else if (key === 'profile') {
+      navigate('/profile')
+    }
+  }
 
   return (
     <AntLayout style={{ minHeight: '100vh' }}>
@@ -36,14 +60,20 @@ export default function Layout() {
         <Menu
           mode="inline"
           selectedKeys={[location.pathname]}
-          items={menuItems}
+          items={allItems}
           onClick={({ key }) => navigate(key)}
         />
       </Sider>
       <AntLayout>
         <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', borderBottom: '1px solid #f0f0f0' }}>
-          <span style={{ marginRight: 16 }}>{user?.nickname || user?.username}</span>
-          <LogoutOutlined style={{ cursor: 'pointer' }} onClick={logout} />
+          <Dropdown menu={{ items: userMenuItems, onClick: handleUserMenuClick }} placement="bottomRight">
+            <span style={{ cursor: 'pointer' }}>
+              <Space>
+                <UserOutlined />
+                {user?.nickname || user?.username}
+              </Space>
+            </span>
+          </Dropdown>
         </Header>
         <Content style={{ margin: 24, padding: 24, background: '#fff', borderRadius: 8, minHeight: 280 }}>
           <Outlet />

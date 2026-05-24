@@ -1,0 +1,171 @@
+# ============================================================
+# Video-AI APISIX 网关路由配置
+# 部署: http://19404h.top:9180/apisix/admin
+# 本地: docker-compose up -d apisix
+# ============================================================
+routes:
+  # ---------- Auth (公开: 注册/登录) ----------
+  - uri: /api/v1/auth/register
+    upstream_id: backend
+    methods: ["POST"]
+    plugins:
+      cors:
+        allow_origins: "*"
+        allow_methods: "POST,OPTIONS"
+        allow_headers: "Content-Type,Authorization"
+      rate-limit:
+        count: 10
+        time_window: 60
+        key_type: var
+        key: remote_addr
+
+  - uri: /api/v1/auth/login
+    upstream_id: backend
+    methods: ["POST"]
+    plugins:
+      cors:
+        allow_origins: "*"
+        allow_methods: "POST,OPTIONS"
+        allow_headers: "Content-Type,Authorization"
+      rate-limit:
+        count: 10
+        time_window: 60
+        key_type: var
+        key: remote_addr
+
+  - uri: /api/v1/auth/refresh
+    upstream_id: backend
+    methods: ["POST"]
+    plugins:
+      cors:
+        allow_origins: "*"
+        allow_methods: "POST,OPTIONS"
+        allow_headers: "Content-Type,Authorization"
+
+  # ---------- Auth (需JWT) ----------
+  - uri: /api/v1/auth/me
+    upstream_id: backend
+    methods: ["GET"]
+    plugins:
+      cors:
+        allow_origins: "*"
+        allow_headers: "Content-Type,Authorization"
+      jwt-auth:
+        _meta:
+          disable: false
+
+  - uri: /api/v1/auth/logout
+    upstream_id: backend
+    methods: ["POST"]
+    plugins:
+      cors:
+        allow_origins: "*"
+        allow_headers: "Content-Type,Authorization"
+      jwt-auth:
+        _meta:
+          disable: false
+
+  # ---------- User (需JWT) ----------
+  - uri: /api/v1/users/me
+    upstream_id: backend
+    methods: ["GET", "PUT"]
+    plugins:
+      cors:
+        allow_origins: "*"
+        allow_headers: "Content-Type,Authorization"
+      jwt-auth:
+        _meta:
+          disable: false
+
+  - uri: /api/v1/users/me/password
+    upstream_id: backend
+    methods: ["PUT"]
+    plugins:
+      cors:
+        allow_origins: "*"
+        allow_headers: "Content-Type,Authorization"
+      jwt-auth:
+        _meta:
+          disable: false
+
+  # ---------- User Admin (需JWT+Admin) ----------
+  - uri: /api/v1/users/*
+    upstream_id: backend
+    methods: ["GET", "PATCH", "DELETE"]
+    plugins:
+      cors:
+        allow_origins: "*"
+        allow_headers: "Content-Type,Authorization"
+      jwt-auth:
+        _meta:
+          disable: false
+
+  # ---------- Materials (需JWT) ----------
+  - uri: /api/v1/materials*
+    upstream_id: backend
+    plugins:
+      cors:
+        allow_origins: "*"
+        allow_headers: "Content-Type,Authorization"
+      jwt-auth:
+        _meta:
+          disable: false
+
+  # ---------- Scripts (需JWT) ----------
+  - uri: /api/v1/scripts*
+    upstream_id: backend
+    plugins:
+      cors:
+        allow_origins: "*"
+        allow_headers: "Content-Type,Authorization"
+      jwt-auth:
+        _meta:
+          disable: false
+
+  # ---------- Tasks/Creation (需JWT) ----------
+  - uri: /api/v1/tasks*
+    upstream_id: backend
+    plugins:
+      cors:
+        allow_origins: "*"
+        allow_headers: "Content-Type,Authorization"
+      jwt-auth:
+        _meta:
+          disable: false
+
+  # ---------- Health (公开) ----------
+  - uri: /health
+    upstream_id: backend
+    methods: ["GET"]
+    plugins:
+      cors:
+        allow_origins: "*"
+
+  # ---------- Swagger Docs (公开, 本地开发) ----------
+  - uri: /docs*
+    upstream_id: backend
+    methods: ["GET"]
+    plugins:
+      cors:
+        allow_origins: "*"
+
+  - uri: /openapi.json
+    upstream_id: backend
+    methods: ["GET"]
+    plugins:
+      cors:
+        allow_origins: "*"
+
+upstreams:
+  - id: backend
+    nodes:
+      "backend:8000": 1
+    type: roundrobin
+
+# Plugins
+plugin_attr:
+  jwt-auth:
+    access_header: Authorization
+    header: Authorization
+    query: jwt
+    cookie: jwt
