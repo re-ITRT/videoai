@@ -1,137 +1,171 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<mxfile host="lf-coze-web-cdn.coze.cn" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0" version="@DRAWIO-VERSION@">
-  <diagram id="video-ai-arch" name="Video-AI 系统架构">
-    <mxGraphModel dx="1579" dy="1388" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" background="#ffffff" math="0" shadow="0">
+<mxfile host="app.diagrams.net" version="24.0.0">
+  <diagram id="video-ai-arch" name="Video-AI System Architecture">
+    <mxGraphModel dx="1579" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1400" background="#ffffff" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="lbl_user" value="用户层" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#333333;" parent="1" vertex="1">
+
+        
+        <mxCell id="lbl_user" value="User Layer" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#333333;" vertex="1" parent="1">
           <mxGeometry x="40" y="80" width="120" height="40" as="geometry" />
         </mxCell>
-        <mxCell id="lbl_gateway" value="网关层" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#333333;" parent="1" vertex="1">
+        <mxCell id="lbl_gateway" value="Gateway" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#333333;" vertex="1" parent="1">
           <mxGeometry x="40" y="235" width="120" height="40" as="geometry" />
         </mxCell>
-        <mxCell id="lbl_service" value="业务层" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#333333;" parent="1" vertex="1">
+        <mxCell id="lbl_service" value="Service" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#333333;" vertex="1" parent="1">
           <mxGeometry x="40" y="440" width="120" height="40" as="geometry" />
         </mxCell>
-        <mxCell id="lbl_ai" value="AI编排层" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#333333;" parent="1" vertex="1">
-          <mxGeometry x="40" y="700" width="120" height="40" as="geometry" />
+        <mxCell id="lbl_ai" value="AI Orchestration" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="720" width="140" height="40" as="geometry" />
         </mxCell>
-        <mxCell id="lbl_data" value="数据层" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#333333;" parent="1" vertex="1">
-          <mxGeometry x="40" y="940" width="120" height="40" as="geometry" />
+        <mxCell id="lbl_data" value="Data Layer" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1040" width="120" height="40" as="geometry" />
         </mxCell>
-        <mxCell id="layer_user" value="用户层 · React + TypeScript + Node.js" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f0fe;strokeColor=#4285f4;strokeWidth=2;verticalAlign=top;align=center;spacingTop=10;fontSize=14;fontStyle=1;fontColor=#1a73e8;" parent="1" vertex="1">
+
+        
+        <mxCell id="layer_user" value="User Layer &amp;middot; React + TypeScript + Node.js" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f0fe;strokeColor=#4285f4;strokeWidth=2;verticalAlign=top;align=center;spacingTop=10;fontSize=14;fontStyle=1;fontColor=#1a73e8;" vertex="1" parent="1">
           <mxGeometry x="200" y="40" width="1360" height="130" as="geometry" />
         </mxCell>
-        <mxCell id="user_pages" value="页面渲染&lt;br&gt;React SPA" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#4285f4;fontSize=12;" parent="layer_user" vertex="1">
-          <mxGeometry x="60" y="50" width="160" height="50" as="geometry" />
+        <mxCell id="user_pages" value="Page Render&lt;br&gt;React SPA" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#4285f4;fontSize=12;" vertex="1" parent="layer_user">
+          <mxGeometry x="40" y="50" width="160" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="user_state" value="状态机驱动&lt;br&gt;全自动/手动切换" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#4285f4;fontSize=12;" parent="layer_user" vertex="1">
-          <mxGeometry x="280" y="50" width="160" height="50" as="geometry" />
+        <mxCell id="user_state" value="State Machine&lt;br&gt;Auto / Manual" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#4285f4;fontSize=12;" vertex="1" parent="layer_user">
+          <mxGeometry x="220" y="50" width="160" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="user_preview" value="视频预览&lt;br&gt;播放器" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#4285f4;fontSize=12;" parent="layer_user" vertex="1">
-          <mxGeometry x="500" y="50" width="160" height="50" as="geometry" />
+        <mxCell id="user_preview" value="Video Preview&lt;br&gt;Player" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#4285f4;fontSize=12;" vertex="1" parent="layer_user">
+          <mxGeometry x="400" y="50" width="160" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="user_edit" value="交互编辑&lt;br&gt;剧本/素材调整" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#4285f4;fontSize=12;" parent="layer_user" vertex="1">
-          <mxGeometry x="720" y="50" width="160" height="50" as="geometry" />
+        <mxCell id="user_edit" value="Interactive Editor&lt;br&gt;Script / Material" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#4285f4;fontSize=12;" vertex="1" parent="layer_user">
+          <mxGeometry x="580" y="50" width="160" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="user_ssr" value="Node.js SSR&lt;br&gt;静态文件托管" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#4285f4;fontSize=12;" parent="layer_user" vertex="1">
+        <mxCell id="user_similar" value="Similarity Slider&lt;br&gt;Threshold 0.3~0.95" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#4285f4;fontSize=12;" vertex="1" parent="layer_user">
+          <mxGeometry x="760" y="50" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="user_ssr" value="Node.js SSR&lt;br&gt;Static Hosting" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#4285f4;fontSize=12;" vertex="1" parent="layer_user">
           <mxGeometry x="940" y="50" width="160" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="layer_gateway" value="网关层 · APISIX (Apache 2.0)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;verticalAlign=top;align=center;spacingTop=10;fontSize=14;fontStyle=1;fontColor=#3b5998;" parent="1" vertex="1">
+
+        
+        <mxCell id="layer_gateway" value="Gateway Layer &amp;middot; APISIX (Apache 2.0)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;verticalAlign=top;align=center;spacingTop=10;fontSize=14;fontStyle=1;fontColor=#3b5998;" vertex="1" parent="1">
           <mxGeometry x="200" y="200" width="1360" height="130" as="geometry" />
         </mxCell>
-        <mxCell id="gw_auth" value="JWT 鉴权&lt;br&gt;key-auth" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12;" parent="layer_gateway" vertex="1">
+        <mxCell id="gw_auth" value="JWT Auth&lt;br&gt;key-auth" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="layer_gateway">
           <mxGeometry x="60" y="50" width="150" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="gw_route" value="路由分发&lt;br&gt;/auth /api/v1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12;" parent="layer_gateway" vertex="1">
-          <mxGeometry x="260" y="50" width="150" height="50" as="geometry" />
+        <mxCell id="gw_route" value="Routing&lt;br&gt;/auth /api/v1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="layer_gateway">
+          <mxGeometry x="240" y="50" width="150" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="gw_limit" value="限流&lt;br&gt;per-path RPM" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12;" parent="layer_gateway" vertex="1">
-          <mxGeometry x="460" y="50" width="150" height="50" as="geometry" />
+        <mxCell id="gw_limit" value="Rate Limit&lt;br&gt;per-path RPM" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="layer_gateway">
+          <mxGeometry x="420" y="50" width="150" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="gw_cors" value="CORS&lt;br&gt;跨域策略" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12;" parent="layer_gateway" vertex="1">
-          <mxGeometry x="660" y="50" width="150" height="50" as="geometry" />
+        <mxCell id="gw_cors" value="CORS&lt;br&gt;Cross-origin" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="layer_gateway">
+          <mxGeometry x="600" y="50" width="150" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="gw_ssl" value="SSL 终止&lt;br&gt;负载均衡" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12;" parent="layer_gateway" vertex="1">
-          <mxGeometry x="860" y="50" width="150" height="50" as="geometry" />
+        <mxCell id="gw_ssl" value="SSL Termination&lt;br&gt;Load Balance" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="layer_gateway">
+          <mxGeometry x="780" y="50" width="150" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="svc_auth" value="认证服务" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;verticalAlign=top;align=center;spacingTop=10;fontSize=14;fontStyle=1;" parent="1" vertex="1">
-          <mxGeometry x="200" y="370" width="300" height="200" as="geometry" />
+
+        
+        <mxCell id="svc_auth" value="Auth Service" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;verticalAlign=top;align=center;spacingTop=10;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="200" y="370" width="280" height="200" as="geometry" />
         </mxCell>
-        <mxCell id="auth_login" value="登录 / 注册" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=12;" parent="svc_auth" vertex="1">
-          <mxGeometry x="40" y="50" width="220" height="40" as="geometry" />
+        <mxCell id="auth_login" value="Login / Register" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="svc_auth">
+          <mxGeometry x="30" y="50" width="220" height="40" as="geometry" />
         </mxCell>
-        <mxCell id="auth_jwt" value="JWT 签发 / 验证" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=12;" parent="svc_auth" vertex="1">
-          <mxGeometry x="40" y="110" width="220" height="40" as="geometry" />
+        <mxCell id="auth_jwt" value="JWT Issue / Verify" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="svc_auth">
+          <mxGeometry x="30" y="110" width="220" height="40" as="geometry" />
         </mxCell>
-        <mxCell id="svc_core" value="FastAPI 核心业务" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;verticalAlign=top;align=center;spacingTop=10;fontSize=14;fontStyle=1;" parent="1" vertex="1">
-          <mxGeometry x="540" y="370" width="570" height="215" as="geometry" />
+
+        <mxCell id="svc_core" value="FastAPI Core Business" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;verticalAlign=top;align=center;spacingTop=10;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="520" y="370" width="560" height="215" as="geometry" />
         </mxCell>
-        <mxCell id="core_sm" value="状态机引擎&lt;br&gt;任务生命周期编排" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=12;fontStyle=1;" parent="svc_core" vertex="1">
-          <mxGeometry x="30" y="50" width="150" height="55" as="geometry" />
+        <mxCell id="core_sm" value="State Machine&lt;br&gt;Task Lifecycle" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=12;fontStyle=1;" vertex="1" parent="svc_core">
+          <mxGeometry x="30" y="50" width="130" height="55" as="geometry" />
         </mxCell>
-        <mxCell id="core_mat" value="素材管理" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=12;" parent="svc_core" vertex="1">
-          <mxGeometry x="200" y="50" width="100" height="55" as="geometry" />
+        <mxCell id="core_mat" value="Material&lt;br&gt;Management" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=12;" vertex="1" parent="svc_core">
+          <mxGeometry x="170" y="50" width="130" height="55" as="geometry" />
         </mxCell>
-        <mxCell id="core_script" value="剧本管理" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=12;" parent="svc_core" vertex="1">
-          <mxGeometry x="320" y="50" width="100" height="55" as="geometry" />
+        <mxCell id="core_script" value="Script&lt;br&gt;Management" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=12;" vertex="1" parent="svc_core">
+          <mxGeometry x="320" y="50" width="130" height="55" as="geometry" />
         </mxCell>
-        <mxCell id="core_task" value="视频任务" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=12;" parent="svc_core" vertex="1">
-          <mxGeometry x="440" y="50" width="100" height="55" as="geometry" />
+        <mxCell id="core_task" value="Video Task&lt;br&gt;Management" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=12;" vertex="1" parent="svc_core">
+          <mxGeometry x="30" y="130" width="130" height="55" as="geometry" />
         </mxCell>
-        <mxCell id="core_product" value="产品管理&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;MD描述/卖点/风格&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=12;fontStyle=1;" parent="svc_core" vertex="1">
-          <mxGeometry x="30" y="130" width="120" height="55" as="geometry" />
+        <mxCell id="core_user" value="User&lt;br&gt;Management" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=12;" vertex="1" parent="svc_core">
+          <mxGeometry x="170" y="130" width="130" height="55" as="geometry" />
         </mxCell>
-        <mxCell id="core_user" value="用户管理" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=12;" parent="svc_core" vertex="1">
-          <mxGeometry x="170" y="130" width="100" height="45" as="geometry" />
+        <mxCell id="core_api" value="REST API /api/v1&lt;br&gt;Auto Docs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=12;" vertex="1" parent="svc_core">
+          <mxGeometry x="320" y="130" width="210" height="55" as="geometry" />
         </mxCell>
-        <mxCell id="core_api" value="REST API&lt;br&gt;自动文档 /api/v1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=12;" parent="svc_core" vertex="1">
-          <mxGeometry x="290" y="130" width="220" height="45" as="geometry" />
+
+        <mxCell id="svc_queue" value="Task Queue" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;verticalAlign=top;align=center;spacingTop=10;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1120" y="370" width="440" height="205" as="geometry" />
         </mxCell>
-        <mxCell id="svc_queue" value="任务队列" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;verticalAlign=top;align=center;spacingTop=10;fontSize=14;fontStyle=1;" parent="1" vertex="1">
-          <mxGeometry x="1140" y="370" width="420" height="205" as="geometry" />
+        <mxCell id="queue_celery" value="Celery Worker&lt;br&gt;Async Task" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="svc_queue">
+          <mxGeometry x="30" y="50" width="160" height="55" as="geometry" />
         </mxCell>
-        <mxCell id="queue_celery" value="Celery Worker&lt;br&gt;异步任务执行" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=12;" parent="svc_queue" vertex="1">
-          <mxGeometry x="40" y="50" width="160" height="55" as="geometry" />
+        <mxCell id="queue_broker" value="Redis&lt;br&gt;Broker + Cache" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="svc_queue">
+          <mxGeometry x="210" y="50" width="160" height="55" as="geometry" />
         </mxCell>
-        <mxCell id="queue_broker" value="Redis&lt;br&gt;Broker + 缓存" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=12;" parent="svc_queue" vertex="1">
-          <mxGeometry x="220" y="50" width="160" height="55" as="geometry" />
-        </mxCell>
-        <mxCell id="queue_callback" value="工作流回调&lt;br&gt;状态更新" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=12;" parent="svc_queue" vertex="1">
+        <mxCell id="queue_callback" value="Workflow Callback&lt;br&gt;State Update" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="svc_queue">
           <mxGeometry x="120" y="130" width="180" height="45" as="geometry" />
         </mxCell>
-        <mxCell id="layer_ai" value="AI 编排层 · 扣子编程 (Coze Code)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;verticalAlign=top;align=center;spacingTop=10;fontSize=14;fontStyle=1;fontColor=#7b1fa2;" parent="1" vertex="1">
-          <mxGeometry x="200" y="630" width="1360" height="230" as="geometry" />
+
+        
+        <mxCell id="layer_ai" value="AI Orchestration Layer &amp;middot; Coze Code (10 Workflows)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;verticalAlign=top;align=center;spacingTop=10;fontSize=14;fontStyle=1;fontColor=#7b1fa2;" vertex="1" parent="1">
+          <mxGeometry x="200" y="640" width="1360" height="310" as="geometry" />
         </mxCell>
-        <mxCell id="wf_embed" value="material-embed&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;双模型嵌入&lt;br&gt;text+vision embedding&lt;br&gt;标签生成&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=12;fontStyle=1;" parent="layer_ai" vertex="1">
-          <mxGeometry x="40" y="45" width="170" height="60" as="geometry" />
+
+        
+        <mxCell id="wf_embed" value="material-embed&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Dual Model (text+vision)&lt;br&gt;Image + Video Input&lt;br&gt;Scene Split + Tags&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=12;fontStyle=1;" vertex="1" parent="layer_ai">
+          <mxGeometry x="30" y="45" width="180" height="65" as="geometry" />
         </mxCell>
-        <mxCell id="wf_query" value="query-generate&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Seed-2.0-pro&lt;br&gt;产品+通用关键词&lt;br&gt;搜索query扩展&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=12;fontStyle=1;" parent="layer_ai" vertex="1">
-          <mxGeometry x="230" y="45" width="170" height="60" as="geometry" />
+        <mxCell id="wf_query" value="query-generate&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Seed-2.0-pro&lt;br&gt;Product + General&lt;br&gt;Query Expansion&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=12;fontStyle=1;" vertex="1" parent="layer_ai">
+          <mxGeometry x="230" y="45" width="180" height="65" as="geometry" />
         </mxCell>
-        <mxCell id="wf_search" value="material-search&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;query→单嵌入&lt;br&gt;vision模型1024维&lt;br&gt;输出embedding向量&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=12;fontStyle=1;" parent="layer_ai" vertex="1">
-          <mxGeometry x="420" y="45" width="170" height="60" as="geometry" />
+        <mxCell id="wf_search" value="material-search&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Single Embedding 1024d&lt;br&gt;Vision Model&lt;br&gt;Threshold Filter &amp;ge;0.6&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=12;fontStyle=1;" vertex="1" parent="layer_ai">
+          <mxGeometry x="430" y="45" width="180" height="65" as="geometry" />
         </mxCell>
-        <mxCell id="wf_script" value="script-generate&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Seed-2.0-pro&lt;br&gt;结构化剧本JSON&lt;br&gt;narration/dialogue&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=12;fontStyle=1;" parent="layer_ai" vertex="1">
-          <mxGeometry x="610" y="45" width="170" height="60" as="geometry" />
+        <mxCell id="wf_script" value="script-generate&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Seed-2.0-pro&lt;br&gt;Strategy + Factor&lt;br&gt;Structured JSON&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=12;fontStyle=1;" vertex="1" parent="layer_ai">
+          <mxGeometry x="630" y="45" width="180" height="65" as="geometry" />
         </mxCell>
-        <mxCell id="wf_tts" value="tts-generate&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;语音合成&lt;br&gt;旁白音频URL&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=12;fontStyle=1;" parent="layer_ai" vertex="1">
-          <mxGeometry x="40" y="120" width="170" height="60" as="geometry" />
+
+        
+        <mxCell id="wf_tts" value="tts-generate&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Voice Synthesis&lt;br&gt;Multi-language&lt;br&gt;Audio URL Output&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=12;fontStyle=1;" vertex="1" parent="layer_ai">
+          <mxGeometry x="30" y="130" width="180" height="65" as="geometry" />
         </mxCell>
-        <mxCell id="wf_video" value="video-generate&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Seedance-1.5-pro&lt;br&gt;画面→5s视频URL&lt;br&gt;has_speaking口型&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=12;fontStyle=1;" parent="layer_ai" vertex="1">
-          <mxGeometry x="230" y="120" width="170" height="60" as="geometry" />
+        <mxCell id="wf_video" value="video-generate&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Seedance-1.5-pro&lt;br&gt;5s Video + Lip Sync&lt;br&gt;has_speaking&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=12;fontStyle=1;" vertex="1" parent="layer_ai">
+          <mxGeometry x="230" y="130" width="180" height="65" as="geometry" />
         </mxCell>
-        <mxCell id="wf_compose" value="video-compose&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;内置剪辑工具&lt;br&gt;拼接+字幕+配音&lt;br&gt;合成最终视频&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=12;fontStyle=1;" parent="layer_ai" vertex="1">
-          <mxGeometry x="420" y="120" width="170" height="60" as="geometry" />
+        <mxCell id="wf_compose" value="video-compose&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Built-in Editor&lt;br&gt;Splice + Subtitle + Audio&lt;br&gt;Transition + BGM&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=12;fontStyle=1;" vertex="1" parent="layer_ai">
+          <mxGeometry x="430" y="130" width="180" height="65" as="geometry" />
         </mxCell>
-        <mxCell id="ai_integration" value="扣子内置模型&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;LLM(Seed-2.0-pro)&lt;br&gt;Embedding(text+vision)&lt;br&gt;TTS · Seedance&lt;br&gt;视频剪辑工具&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3e5f5;strokeColor=#9673a6;fontSize=12;fontStyle=2;dashed=1;dashPattern=4 4;" parent="layer_ai" vertex="1">
-          <mxGeometry x="830" y="50" width="200" height="80" as="geometry" />
+
+        
+        <mxCell id="wf_imggen" value="image-generate&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Text-to-Image&lt;br&gt;Product/Scene/BG&lt;br&gt;Supplement Material&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3e5f5;strokeColor=#9673a6;fontSize=12;fontStyle=2;dashed=1;dashPattern=4 4;" vertex="1" parent="layer_ai">
+          <mxGeometry x="630" y="130" width="180" height="65" as="geometry" />
         </mxCell>
-        <mxCell id="ai_data_ref" value="FastAPI向量检索&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;embedding→PG阈值筛选&lt;br&gt;临时URL→MinIO转存&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3e5f5;strokeColor=#9673a6;fontSize=12;fontStyle=2;dashed=1;dashPattern=4 4;" parent="layer_ai" vertex="1">
-          <mxGeometry x="830" y="140" width="200" height="60" as="geometry" />
+        <mxCell id="wf_img2vid" value="image-to-video&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Seedance-1.5-pro&lt;br&gt;Image + Motion&lt;br&gt;Replace video-generate&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3e5f5;strokeColor=#9673a6;fontSize=12;fontStyle=2;dashed=1;dashPattern=4 4;" vertex="1" parent="layer_ai">
+          <mxGeometry x="830" y="130" width="180" height="65" as="geometry" />
         </mxCell>
-        <mxCell id="flow_embed_search" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#9673a6;endArrow=block;endFill=1;" parent="layer_ai" source="wf_query" target="wf_search" edge="1">
+        <mxCell id="wf_analyze" value="video-analyze&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Seed-2.0-pro&lt;br&gt;Scene Split + Hook&lt;br&gt;Selling Point DNA&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3e5f5;strokeColor=#9673a6;fontSize=12;fontStyle=2;dashed=1;dashPattern=4 4;" vertex="1" parent="layer_ai">
+          <mxGeometry x="830" y="45" width="180" height="65" as="geometry" />
+        </mxCell>
+
+        
+        <mxCell id="ai_models" value="Coze Built-in Models&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;LLM (Seed-2.0-pro)&lt;br&gt;Embedding (text+vision, 1024d)&lt;br&gt;TTS &amp;middot; Seedance &amp;middot; Image Gen&lt;br&gt;Video Editing Tool&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3e5f5;strokeColor=#9673a6;fontSize=12;fontStyle=2;dashed=1;dashPattern=4 4;" vertex="1" parent="layer_ai">
+          <mxGeometry x="1040" y="45" width="200" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ai_data_ref" value="FastAPI Vector Search&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;embedding &amp;rarr; PG Threshold&lt;br&gt;Temp URL &amp;rarr; MinIO Store&lt;br&gt;Two-level: material + slice&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3e5f5;strokeColor=#9673a6;fontSize=12;fontStyle=2;dashed=1;dashPattern=4 4;" vertex="1" parent="layer_ai">
+          <mxGeometry x="1040" y="140" width="200" height="65" as="geometry" />
+        </mxCell>
+
+        
+        <mxCell id="flow_embed_query" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#9673a6;endArrow=block;endFill=1;" parent="layer_ai" source="wf_embed" target="wf_query" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="flow_query_search" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#9673a6;endArrow=block;endFill=1;" parent="layer_ai" source="wf_query" target="wf_search" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="flow_search_script" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#9673a6;endArrow=block;endFill=1;" parent="layer_ai" source="wf_search" target="wf_script" edge="1">
@@ -146,22 +180,46 @@
         <mxCell id="flow_video_compose" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;strokeColor=#9673a6;endArrow=block;endFill=1;" parent="layer_ai" source="wf_video" target="wf_compose" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="layer_data" value="数据层" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;verticalAlign=top;align=center;spacingTop=10;fontSize=14;fontStyle=1;fontColor=#b85450;dashed=1;dashPattern=8 4;" parent="1" vertex="1">
-          <mxGeometry x="200" y="880" width="1360" height="170" as="geometry" />
+
+        
+        <mxCell id="flow_imggen_search" value="material insufficient" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1;strokeColor=#9673a6;endArrow=block;endFill=1;dashed=1;dashPattern=4 4;fontSize=9;" parent="layer_ai" source="wf_imggen" target="wf_search" edge="1">
+          <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="data_pg" value="PostgreSQL&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;users&lt;br&gt;products(MD)&lt;br&gt;materials+单embedding&lt;br&gt;scripts&lt;br&gt;video_tasks&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#ffffff;strokeColor=#b85450;fontSize=12;" parent="layer_data" vertex="1">
-          <mxGeometry x="120" y="40" width="160" height="100" as="geometry" />
-        </mxCell>
-        <mxCell id="data_redis" value="Redis&lt;br&gt;(本地Docker)&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Celery Broker&lt;br&gt;任务状态缓存&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#ffffff;strokeColor=#b85450;fontSize=12;" parent="layer_data" vertex="1">
-          <mxGeometry x="280" y="40" width="160" height="100" as="geometry" />
-        </mxCell>
-        <mxCell id="data_minio" value="MinIO&lt;br&gt;(本地Docker)&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;图片&lt;br&gt;音频&lt;br&gt;视频文件&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#ffffff;strokeColor=#b85450;fontSize=12;" parent="layer_data" vertex="1">
-          <mxGeometry x="500" y="40" width="160" height="100" as="geometry" />
-        </mxCell>
-        <mxCell id="data_pgvector" value="pgvector&lt;br&gt;(PG扩展)&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;HNSW索引&lt;br&gt;阈值筛选检索&lt;br&gt;默认≥0.6&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#ffffff;strokeColor=#b85450;fontSize=12;" parent="layer_data" vertex="1">
-          <mxGeometry x="720" y="40" width="160" height="100" as="geometry" />
+        <mxCell id="flow_img2vid_video" value="alternative" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1;strokeColor=#9673a6;endArrow=block;endFill=1;dashed=1;dashPattern=4 4;fontSize=9;" parent="layer_ai" source="wf_img2vid" target="wf_compose" edge="1">
+          <mxGeometry relative="1" as="geometry" />
         </mxCell>
 
+        
+        <mxCell id="pipeline_label" value="Main Pipeline: embed &amp;rarr; query &amp;rarr; search &amp;rarr; script &amp;rarr; tts &amp;rarr; video &amp;rarr; compose" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontStyle=2;fontColor=#7b1fa2;" vertex="1" parent="layer_ai">
+          <mxGeometry x="30" y="220" width="500" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="supp_label" value="Supplemental: image-generate (on-demand) | image-to-video (replace video-generate) | video-analyze (hit analysis)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontStyle=2;fontColor=#9673a6;" vertex="1" parent="layer_ai">
+          <mxGeometry x="30" y="250" width="800" height="30" as="geometry" />
+        </mxCell>
+
+        
+        <mxCell id="layer_data" value="Data Layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;verticalAlign=top;align=center;spacingTop=10;fontSize=14;fontStyle=1;fontColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="200" y="980" width="1360" height="190" as="geometry" />
+        </mxCell>
+        <mxCell id="data_pg" value="PostgreSQL&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;users&lt;br&gt;products&lt;br&gt;materials (single embedding)&lt;br&gt;material_slices (scene embedding)&lt;br&gt;scripts&lt;br&gt;video_tasks&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#ffffff;strokeColor=#b85450;fontSize=12;" vertex="1" parent="layer_data">
+          <mxGeometry x="40" y="40" width="200" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="data_redis" value="Redis&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Celery Broker&lt;br&gt;Task State Cache&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#ffffff;strokeColor=#b85450;fontSize=12;" vertex="1" parent="layer_data">
+          <mxGeometry x="280" y="40" width="160" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="data_minio" value="MinIO&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Images&lt;br&gt;Audio&lt;br&gt;Videos&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#ffffff;strokeColor=#b85450;fontSize=12;" vertex="1" parent="layer_data">
+          <mxGeometry x="480" y="40" width="160" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="data_pgvector" value="pgvector&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;HNSW Index&lt;br&gt;Threshold Filter &amp;ge;0.6&lt;br&gt;Two-level Retrieval&lt;br&gt;material + slice&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#ffffff;strokeColor=#b85450;fontSize=12;" vertex="1" parent="layer_data">
+          <mxGeometry x="680" y="40" width="180" height="120" as="geometry" />
+        </mxCell>
+
+        
+        <mxCell id="deploy_note" value="&lt;font style=&quot;font-size:11px&quot;&gt;Deploy: 19404h.top (Docker)&lt;br&gt;APISIX + FastAPI + Celery + Redis&lt;br&gt;PostgreSQL (pgvector) + MinIO&lt;br&gt;AI Workflows on Coze Code&lt;/font&gt;" style="shape=note;whiteSpace=wrap;html=1;size=18;fillColor=#fff9c4;strokeColor=#f9a825;fontSize=11;align=left;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="1100" y="1240" width="260" height="90" as="geometry" />
+        </mxCell>
+
+        
         <mxCell id="link_user_gw" value="HTTPS" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#666666;endArrow=block;endFill=1;fontSize=11;" parent="1" source="layer_user" target="layer_gateway" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
@@ -171,18 +229,16 @@
         <mxCell id="link_gw_core" value="/api/v1/*" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#82b366;endArrow=block;endFill=1;fontSize=10;" parent="1" source="layer_gateway" target="svc_core" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="link_core_queue" value="分发异步任务" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#d6b656;endArrow=block;endFill=1;dashed=1;fontSize=10;" parent="1" source="svc_core" target="svc_queue" edge="1">
+        <mxCell id="link_core_queue" value="Dispatch Async" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#d6b656;endArrow=block;endFill=1;dashed=1;fontSize=10;" parent="1" source="svc_core" target="svc_queue" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="link_queue_ai" value="HTTP 调用工作流API" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#9673a6;endArrow=block;endFill=1;dashed=1;fontSize=10;" parent="1" source="svc_queue" target="layer_ai" edge="1">
+        <mxCell id="link_queue_ai" value="HTTP Workflow API" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#9673a6;endArrow=block;endFill=1;dashed=1;fontSize=10;" parent="1" source="svc_queue" target="layer_ai" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="link_ai_data" value="读写" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#b85450;endArrow=block;endFill=1;dashed=1;fontSize=10;" parent="1" source="layer_ai" target="layer_data" edge="1">
+        <mxCell id="link_ai_data" value="R/W" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#b85450;endArrow=block;endFill=1;dashed=1;fontSize=10;" parent="1" source="layer_ai" target="layer_data" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="deploy_note" value="&lt;font style=&quot;font-size:11px&quot;&gt;本地部署：19404h.top (Docker)&lt;br&gt;APISIX + FastAPI + Celery + Redis&lt;br&gt;PostgreSQL(pgvector) + MinIO&lt;br&gt;仅AI工作流走扣子编程平台&lt;/font&gt;" style="shape=note;whiteSpace=wrap;html=1;size=18;fillColor=#fff9c4;strokeColor=#f9a825;fontSize=11;align=left;spacingLeft=10;" parent="1" vertex="1">
-          <mxGeometry x="1100" y="1120" width="260" height="90" as="geometry" />
-        </mxCell>
+
       </root>
     </mxGraphModel>
   </diagram>
