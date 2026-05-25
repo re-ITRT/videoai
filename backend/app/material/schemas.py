@@ -1,12 +1,78 @@
-from pydantic import BaseModel
+"""素材模块 Schema"""
+from pydantic import BaseModel, Field
 from typing import Optional
+from datetime import datetime
 
+
+# ── Upload ────────────────────────────────
 
 class MaterialUploadRequest(BaseModel):
     product_id: Optional[int] = None
     material_type: str  # product / general / reference
     input_type: str  # image / video
+    image_url: Optional[str] = None
+    text_content: Optional[str] = None
+    source: str = "upload"
 
+
+class MaterialUploadResponse(BaseModel):
+    id: int
+    material_type: str
+    input_type: str
+    image_url: Optional[str] = None
+    text_content: Optional[str] = None
+    source: str = "upload"
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ── Material ──────────────────────────────
+
+class MaterialResponse(BaseModel):
+    id: int
+    user_id: str
+    product_id: Optional[int] = None
+    material_type: str
+    input_type: str
+    image_url: Optional[str] = None
+    video_url: Optional[str] = None
+    text_content: Optional[str] = None
+    tags: list = []
+    source: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ── Slice ─────────────────────────────────
+
+class SliceCreateRequest(BaseModel):
+    slice_type: str  # video_scene / keyframe / audio_segment
+    scene_id: Optional[int] = None
+    time_range: Optional[str] = None
+    description: Optional[str] = None
+    image_url: Optional[str] = None
+
+
+class SliceResponse(BaseModel):
+    id: int
+    material_id: int
+    slice_type: str
+    scene_id: Optional[int] = None
+    time_range: Optional[str] = None
+    description: Optional[str] = None
+    image_url: Optional[str] = None
+    tags: list = []
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ── Search ────────────────────────────────
 
 class MaterialSearchRequest(BaseModel):
     query: str
