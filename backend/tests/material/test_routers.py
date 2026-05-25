@@ -108,7 +108,7 @@ class TestMaterialRoutes:
 
     @pytest.mark.asyncio
     async def test_get_nonexistent_material(self, client):
-        headers = await _register(client, "notfound")
+        headers = await _register(client, f"notfound_{id(self)}")
         resp = await client.get("/api/v1/materials/99999", headers=headers)
         assert resp.status_code == 404
 
