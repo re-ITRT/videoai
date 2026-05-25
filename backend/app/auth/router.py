@@ -50,8 +50,8 @@ async def register(
         )
 
     # Generate access token and refresh token
-    access_token = create_access_token(data={"sub": user.id})
-    refresh_token = create_refresh_token(data={"sub": user.id})
+    access_token = create_access_token(data={"sub": str(user.id)})
+    refresh_token = create_refresh_token(data={"sub": str(user.id)})
 
     return TokenResponse(
         access_token=access_token,
@@ -88,8 +88,8 @@ async def login(
         )
 
     # Generate access token and refresh token
-    access_token = create_access_token(data={"sub": user.id})
-    refresh_token = create_refresh_token(data={"sub": user.id})
+    access_token = create_access_token(data={"sub": str(user.id)})
+    refresh_token = create_refresh_token(data={"sub": str(user.id)})
 
     return TokenResponse(
         access_token=access_token,
@@ -165,5 +165,5 @@ async def refresh(
             detail={"code": 401, "message": "User not found", "detail": "User associated with this token no longer exists"}
         )
 
-    new_access_token = create_access_token(data={"sub": user.id})
+    new_access_token = create_access_token(data={"sub": str(user.id)})
     return RefreshTokenResponse(access_token=new_access_token, token_type="bearer")
