@@ -1,0 +1,55 @@
+"""
+扣子工作流调用封装 — 7个工作流 webhook 调用
+"""
+import json
+import httpx
+from typing import Any
+
+from app.config import settings
+
+# ── 工作流 Token ──────────────────────────
+WORKFLOW_TOKENS = {
+    "material-embed": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjY2MGNhNTFkLTc1ZTMtNDMxYS1hZWQwLTkxZTIyNTc5M2RiNSJ9.eyJpc3MiOiJodHRwczovL2FwaS5jb3plLmNuIiwiYXVkIjpbImNKOXo5MDF5czNNdk1icUw4WVJvcVMwT3ptWE8zYkdrIl0sImV4cCI6ODIxMDI2Njg3Njc5OSwiaWF0IjoxNzc5NTQ1NDA2LCJzdWIiOiJzcGlmZmU6Ly9hcGkuY296ZS5jbi93b3JrbG9hZF9pZGVudGl0eS9pZDo3NjQyOTcwMDE3ODM4OTIzODI2Iiwic3JjIjoiaW5ib3VuZF9hdXRoX2FjY2Vzc190b2tlbl9pZDo3NjQzMDg5MzIzMTE3NTEwNzAyIn0.b27cn_DM1nN7OByl59blnXEuZ-vs1JERRo1q41OwrvhsMCvScAofC-DFnTFeV8G-XnwdanLB8jbd0lwuJ5U7RXdxwvwayTGfA9GFnx4_V3lVLhb0biyxswS0ggk-TmTvGL85ea91Gs27gysQVcoeLzR-l08FhTZpavTHS49SZP07UqSTKjmo0bF92q00JXEQJgwxLxZJ27iu85p84YayfUjv_CB0vTZ9ON2wFNLKzEQ9X_wqqKpsmYDMtV8aOh1iGUe-q_XXF_KMWsNAoZ8SCTopVOixymqrDTFQOdQFJWt6ygKo9nfTuMfRT_F_VbUcc0D7z-eHBTWgVGKsYuOkRg",
+    "query-generate": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjY2MGNhNTFkLTc1ZTMtNDMxYS1hZWQwLTkxZTIyNTc5M2RiNSJ9.eyJpc3MiOiJodHRwczovL2FwaS5jb3plLmNuIiwiYXVkIjpbIjhrQXhZNUVIM2NOUDIwUng3c0tDcWJxRGZkaHVHWEZ3Il0sImV4cCI6ODIxMDI2Njg3Njc5OSwiaWF0IjoxNzc5NTQ1MzgwLCJzdWIiOiJzcGlmZmU6Ly9hcGkuY296ZS5jbi93b3JrbG9hZF9pZGVudGl0eS9pZDo3NjQyOTc0OTE1MjcxODUyMDUxIiwic3JjIjoiaW5ib3VuZF9hdXRoX2FjY2Vzc190b2tlbl9pZDo3NjQzMDg5MjEyOTI0NzU1OTgzIn0.ipLFvIxr5qBtlV8YgxWAG4bSUhXUu8bW1j5PRTYUeByRjvC6Aam44896fDHwyYcWlajQ71ut-GHYoTzjZZLKRC2sY6O_eUqm47jpujiRFC95h46npi38qXWgAY7bKi_sbBdftnylxiFeUleaL985ANGIc6AXWXXSquQD9GQW-mGNxanXemMP9cNdc5orxNA3clLU1Weo1a2px8rjmH-DZ29qRQBbjinpZ9USuHq-RahBURatYmEFdL4X96wObxaJwWuXxIt7_7gajgJxJE8965b8UarWaxLb_i6GLGivoqJg33gIBLp1ERbbs7fajILK1b5aFU4Ur7wkLNjnssNc5Q",
+    "material-search": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjY2MGNhNTFkLTc1ZTMtNDMxYS1hZWQwLTkxZTIyNTc5M2RiNSJ9.eyJpc3MiOiJodHRwczovL2FwaS5jb3plLmNuIiwiYXVkIjpbInVZR3JvbDlMNFQyR0VlMHRpbUFMUFBJUDd3RmxrVUVrIl0sImV4cCI6ODIxMDI2Njg3Njc5OSwiaWF0IjoxNzc5NTQ1NjAwLCJzdWIiOiJzcGlmZmU6Ly9hcGkuY296ZS5jbi93b3JrbG9hZF9pZGVudGl0eS9pZDo3NjQyOTk4NjUyODQ3MjU2OTkxIiwic3JjIjoiaW5ib3VuZF9hdXRoX2FjY2Vzc190b2tlbl9pZDo3NjQzMDkwMTU0NTU0MzkyNjE0In0.XUYwxXHYaDGdvVPLLSyludRbys1L8zxdv4AX41dX2PSrw9rZA0272U9Dn8pI3YURcKr_bbW-rj_Nv_-TmZT_TOVHtJpZ34tFCs0IRYjhQrIcL4VuzWTOXFQEGvD9QydSCE9CFEpF_PGydDq72vfPGpvtYcZT8Yx6wNL1x4LTpU-0rP90zmVo5oT85CmPMrbZD7S0x6FVrt6viKIgQ7EaIz6CrG_pX_pW6eyEkCoeBXfnCgVDVRTOfNnutYC5IaxOQZ-kvaNUtWXgaPGl5p81Ki3jJmEvFX1bJiLlxgk_J6qjmARUcNhUF4sf6OIZANUEfe9bdqj58-qGRerOMZOCrA",
+    "script-generate": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjY2MGNhNTFkLTc1ZTMtNDMxYS1hZWQwLTkxZTIyNTc5M2RiNSJ9.eyJpc3MiOiJodHRwczovL2FwaS5jb3plLmNuIiwiYXVkIjpbImNHR09wd245ZWtPek9rd25HbEFkS29PendWcWdaUDgwIl0sImV4cCI6ODIxMDI2Njg3Njc5OSwiaWF0IjoxNzc5NTQ1NDU1LCJzdWIiOiJzcGlmZmU6Ly9hcGkuY296ZS5jbi93b3JrbG9hZF9pZGVudGl0eS9pZDo3NjQyOTg1NzMyMDA0MzgwNzIzIiwic3JjIjoiaW5ib3VuZF9hdXRoX2FjY2Vzc190b2tlbl9pZDo3NjQzMDg5NTMxOTM5MzIzOTE0In0.UI4SSZmSmAJJ9r6oYlsY-shSHpvyu9cyAiBWHScPV3s6xC9JL1zqeZxGti5BAavNs_rDRgRKwbW-RZhB9sANlz-8747hyhFBslErQ27_iIzldD39UvqQqquhkcCJGHK_VHw7Uvp38hd_Hj-amcyt2Ya5Ye3mIy4iEvnifDmxQ5LM1GNLHTjq8GNp5aMEEKNNSYJH0CEZHyxP5zflqDcEXuKvPleuGWNzr01V2GFMfH87pavRCdpYFcF9heR7MB4Pc0PANzWwl_67Kt06oPwjJEw--X6Q0ainEXLZhodGECWRekeY0GB6fPfVyy9e4OG-QalJSOkO-xVQtYD43Lbixw",
+    "tts-generate": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjY2MGNhNTFkLTc1ZTMtNDMxYS1hZWQwLTkxZTIyNTc5M2RiNSJ9.eyJpc3MiOiJodHRwczovL2FwaS5jb3plLmNuIiwiYXVkIjpbIm1kWG40YXlzRGJpOTB2MWE0NU5lN0FRQ1I1eVZZVWp4Il0sImV4cCI6ODIxMDI2Njg3Njc5OSwiaWF0IjoxNzc5NTQ1NDMyLCJzdWIiOiJzcGlmZmU6Ly9hcGkuY296ZS5jbi93b3JrbG9hZF9pZGVudGl0eS9pZDo3NjQyOTk0ODY1OTY1MzY3MzIzIiwic3JjIjoiaW5ib3VuZF9hdXRoX2FjY2Vzc190b2tlbl9pZDo3NjQzMDg5NDM1OTg2MjMxMzE1In0.LW_tTM-e5sKp06nex5u-sYh8Ur-1nh_VJl-qJ-1_Hh715y7eXJQGan6-95QAfOKf_lTrpt4UxbQy2ISRs_2t8I0B_FW6R1Xdh-cQLgAdTO0HmM3NPmD5Wr-q_ov22iSQeg_6f6_arcBH3PEw2JAJCtnJiX9ZoXvvNEugYJlyGKSnkV0puq0y39_2GSfkNlW4V1FMMAyDmVobY75urM4S4x22MaIxZEwKnC3P7r-fF-Uvas5bXAErzWKKXe3U2RaQlVYnCCUnGdwOOVoll7xxB1vyXkmkjn6bHLxncSwxjqBf1p4boQUDx72Cbzyi34W_lviQoXmvsXPajkCW9IYmKQ",
+    "video-generate": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjY2MGNhNTFkLTc1ZTMtNDMxYS1hZWQwLTkxZTIyNTc5M2RiNSJ9.eyJpc3MiOiJodHRwczovL2FwaS5jb3plLmNuIiwiYXVkIjpbIjhDc3F4M2dXNzhBZmpyeHZTZFlnNnVjUnVldWhaUkNaIl0sImV4cCI6ODIxMDI2Njg3Njc5OSwiaWF0IjoxNzc5NTQ1NDc1LCJzdWIiOiJzcGlmZmU6Ly9hcGkuY296ZS5jbi93b3JrbG9hZF9pZGVudGl0eS9pZDo3NjQzMDA3MTQ0NDI1NDIyODY3Iiwic3JjIjoiaW5ib3VuZF9hdXRoX2FjY2Vzc190b2tlbl9pZDo3NjQzMDg5NjE4NjA2MjI3NDgzIn0.a2xul0cKTeqYNRRmkShpSUYx1BcjclKFLJfrE5MIQeIcIeuDdIUmjSnCK2WL5GWVyqyXdCeCxeXJ8rm_HZdHmtGjUXgE6U2-D9W4BaR9Pqsg7iucQussbp8HoXzU01Aq1gVjjQJbfvxMJM8Ek2Yshea0YIibtmd1WmXutUMhK-SP4VvPPhjDvoR-IzuL92Uawg1F6doASl4yJIqA8tFPr0ikyCQ88B0vQw_sBRTXVerpQJvbNZ26DlT8XfKH2aIZsd6KBjmrCJ57KsHVLzCo-pxvhUpZZmuMmm-saUK1oyM5hDMXcw7bevRfD7v-53530vVbAjP4gMIutJjy4ipZtA",
+    "video-compose": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjY2MGNhNTFkLTc1ZTMtNDMxYS1hZWQwLTkxZTIyNTc5M2RiNSJ9.eyJpc3MiOiJodHRwczovL2FwaS5jb3plLmNuIiwiYXVkIjpbInJIU2lZbDJQSEUzS2RmRjhKb3drQ3R0OFc5QXQydTBnIl0sImV4cCI6ODIxMDI2Njg3Njc5OSwiaWF0IjoxNzc5NTQ1NTAzLCJzdWIiOiJzcGlmZmU6Ly9hcGkuY296ZS5jbi93b3JrbG9hZF9pZGVudGl0eS9pZDo3NjQzMDgwNjExMDYxNTYzNDE4Iiwic3JjIjoiaW5ib3VuZF9hdXRoX2FjY2Vzc190b2tlbl9pZDo3NjQzMDg5NzM3MjUwNTA0NzU0In0.Ium4enhw9BiA6Ou0oTisnHhx1QF0Y76ToXCwNPY_mnZnjV8I8uJULbaFBUJCHeOx26GltbmzLM6iaZJmu3Qu7_C-tvaAXCiBID9qoOX7d6g63cF4w2v7obItvttbw7HLWLUELfMnNZxnLSykvVI-3RLE5lJXd166T7PZF-0Rirq15hUzkCW13MjlMUaW1Ar0hPqR7hvRME1YJj-MO6ccMCe92-Me8EosuGEiehj0pMtk7lXw8aqznlLbDOHFcE7Zcrv2bPNjPF5NovY4IVEIkp8zP0hfeIqaUF2bdMimCOLE083v1z2bXW4oC4I3xx2UA6YnHppwxysqfjIn24wvjw",
+}
+
+# ── Webhook URL ────────────────────────────
+WORKFLOW_URLS = {
+    "material-embed": "https://t4j8pznrth.coze.site/run",
+    "query-generate": "https://428t9mxy9v.coze.site/run",
+    "material-search": "https://jr8nbdc5c9.coze.site/run",
+    "script-generate": "https://t4tzw2gt7y.coze.site/run",
+    "tts-generate": "https://nqd8bwqzx2.coze.site/run",
+    "video-generate": "https://77nxhkq859.coze.site/run",
+    "video-compose": "https://ztz3tcs24c.coze.site/run",
+}
+
+AVAILABLE_WORKFLOWS = list(WORKFLOW_URLS.keys())
+
+WORKFLOW_TIMEOUT = 120  # seconds
+
+
+async def call_workflow(workflow_name: str, payload: dict) -> dict:
+    """调用扣子工作流 webhook"""
+    if workflow_name not in WORKFLOW_URLS:
+        raise ValueError(f"未知工作流: {workflow_name}，可用: {AVAILABLE_WORKFLOWS}")
+
+    url = WORKFLOW_URLS[workflow_name]
+    token = WORKFLOW_TOKENS.get(workflow_name)
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+
+    async with httpx.AsyncClient(timeout=WORKFLOW_TIMEOUT) as client:
+        response = await client.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+        result = response.json()
+
+    return result
