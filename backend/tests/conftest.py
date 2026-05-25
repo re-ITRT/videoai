@@ -14,6 +14,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.main import app as fastapi_app
 from app.core.database import Base, get_db
 
+# ── 导入所有 models 让 Base.metadata 完整 ──
+from app.auth.models import *  # noqa: F401, F403 (includes User)
+from app.material.models import *  # noqa: F401, F403
+from app.script.models import *  # noqa: F401, F403
+from app.creation.models import *  # noqa: F401, F403
+
 
 # ── 覆盖 settings ──────────────────────────────
 import app.config

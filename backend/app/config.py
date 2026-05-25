@@ -13,6 +13,13 @@ class Settings(BaseSettings):
     JWT_EXPIRE_MINUTES: int = 1440
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     CELERY_BROKER_URL: str = "redis://localhost:6379/1"
+    
+    # 火山引擎方舟配置
+    ARK_API_KEY: str = ""
+    ARK_BASE_URL: str = ""
+    ARK_SEED_EP: str = ""
+    ARK_SEEDANCE_EP: str = ""
+    
     model_config = {"env_file": ".env"}
 
 
