@@ -13,6 +13,9 @@ class MaterialUploadRequest(BaseModel):
     image_url: Optional[str] = None
     text_content: Optional[str] = None
     source: str = "upload"
+    # material-embed 工作流输出
+    scenes: list[str] = Field(default_factory=list, description="material-embed 返回的 scenes JSON 字符串数组")
+    video_tags: list[str] = Field(default_factory=list)
 
 
 class MaterialUploadResponse(BaseModel):

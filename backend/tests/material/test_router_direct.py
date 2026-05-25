@@ -36,15 +36,21 @@ class TestMaterialRouterDirect:
 
     @pytest.mark.asyncio
     async def test_upload_video_creates_slices(self, db_session, dummy_user):
+        """上传视频 + scenes → 切片按 time_range 创建"""
         from app.material.router import upload_material, list_slices
         from app.material.schemas import MaterialUploadRequest
 
         resp = await upload_material(
-            request=MaterialUploadRequest(material_type="product", input_type="video"),
+            request=MaterialUploadRequest(
+                material_type="product", input_type="video",
+                scenes=['{"scene_id":1,"time_range":"<0s-3s>","description":"开场"}',
+                        '{"scene_id":2,"time_range":"<3s-6s>","description":"展示"}'],
+            ),
             db=db_session, current_user=dummy_user,
         )
         slices = await list_slices(material_id=resp.id, slice_type=None, db=db_session, current_user=dummy_user)
-        assert len(slices) == 3
+        assert len(slices) == 2
+        assert slices[0].time_range == "0s-3s"  # 尖括号已清除
 
     @pytest.mark.asyncio
     async def test_list_slices_filtered(self, db_session, dummy_user):

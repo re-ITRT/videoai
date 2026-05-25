@@ -111,24 +111,35 @@ async def list_slices(db: AsyncSession, material_id: int, slice_type: str | None
     return list(result.scalars().all())
 
 
-async def create_video_slices(
+async def parse_and_create_slices(
     db: AsyncSession,
     material_id: int,
-    scene_count: int = 3,
+    scenes: list[str],
 ) -> list[MaterialSlice]:
-    """视频入库时自动创建默认切片（后续可由 material-embed 工作流细化）"""
+    """解析 material-embed 工作流的 scenes 输出，创建切片"""
+    import json
     slices = []
-    for i in range(scene_count):
+    for scene_str in scenes:
+        try:
+            scene = json.loads(scene_str)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        time_range = scene.get("time_range", "")
+        # 清理 time_range 的尖括号
+        if time_range.startswith("<") and time_range.endswith(">"):
+            time_range = time_range[1:-1]
         s = MaterialSlice(
             material_id=material_id,
             slice_type="video_scene",
-            scene_id=i + 1,
-            time_range=f"{i * 5}s-{(i + 1) * 5}s",
-            description=f"场景 {i + 1}",
+            scene_id=scene.get("scene_id"),
+            time_range=time_range,
+            description=scene.get("description"),
+            script=scene.get("script") if isinstance(scene.get("script"), str) else None,
         )
         db.add(s)
         slices.append(s)
-    await db.commit()
-    for s in slices:
-        await db.refresh(s)
+    if slices:
+        await db.commit()
+        for s in slices:
+            await db.refresh(s)
     return slices

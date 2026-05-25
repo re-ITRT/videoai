@@ -21,7 +21,7 @@ async def upload_material(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """上传素材并保存，视频素材自动创建默认切片"""
+    """上传素材并保存，素材切片由 material-embed 工作流的 scenes 解析"""
     material = await svc.create_material(
         db=db,
         user_id=str(current_user.id),
@@ -33,9 +33,9 @@ async def upload_material(
         source=request.source,
     )
 
-    # 视频素材自动创建默认切片
-    if request.input_type == "video":
-        await svc.create_video_slices(db, material.id, scene_count=3)
+    # 解析 material-embed 工作流的 scenes → 创建切片
+    if request.scenes:
+        await svc.parse_and_create_slices(db, material.id, request.scenes)
 
     return MaterialUploadResponse.model_validate(material)
 

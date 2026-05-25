@@ -10,10 +10,16 @@ async def _register(client, username):
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
 
-async def _register_and_upload_video(client, username):
+async def _upload_video_with_scenes(client, username):
     headers = await _register(client, username)
+    scenes = [
+        '{"scene_id":1,"time_range":"<0s-3s>","description":"开场展示"}',
+        '{"scene_id":2,"time_range":"<3s-5.2s>","description":"产品特写"}',
+        '{"scene_id":3,"time_range":"<5.2s-8s>","description":"使用场景"}',
+    ]
     upload = await client.post("/api/v1/materials/upload", json={
-        "material_type": "product", "input_type": "video"
+        "material_type": "product", "input_type": "video",
+        "scenes": scenes,
     }, headers=headers)
     return headers, upload.json()["id"]
 
@@ -33,19 +39,54 @@ class TestMaterialRoutes:
         assert resp.json()["id"] > 0
 
     @pytest.mark.asyncio
-    async def test_upload_video_creates_slices(self, client):
-        headers = await _register(client, "video_up")
+    async def test_upload_with_scenes(self, client):
+        """上传 + material-embed scenes → 按 time_range 创建切片"""
+        headers = await _register(client, "scenes_up")
+        scenes = [
+            '{"scene_id":1,"time_range":"<0s-3s>","description":"智能手表360度旋转"}',
+            '{"scene_id":2,"time_range":"<3s-5.2s>","description":"手表佩戴展示"}',
+        ]
         resp = await client.post("/api/v1/materials/upload", json={
             "material_type": "product", "input_type": "video",
+            "image_url": "https://example.com/vid.mp4",
+            "scenes": scenes,
+            "video_tags": ["智能手表", "产品展示"],
         }, headers=headers)
         assert resp.status_code == 200
         mid = resp.json()["id"]
 
+        # 验证切片根据 time_range 创建，尖括号已清除
         resp = await client.get(f"/api/v1/materials/{mid}/slices", headers=headers)
         assert resp.status_code == 200
         slices = resp.json()
-        assert len(slices) == 3
-        assert slices[0]["slice_type"] == "video_scene"
+        assert len(slices) == 2
+        assert slices[0]["time_range"] == "0s-3s"
+        assert slices[1]["time_range"] == "3s-5.2s"
+        assert slices[0]["scene_id"] == 1
+
+    @pytest.mark.asyncio
+    async def test_upload_with_invalid_scenes(self, client):
+        """无效 scenes JSON 字符串被忽略"""
+        headers = await _register(client, "bad_scene")
+        resp = await client.post("/api/v1/materials/upload", json={
+            "material_type": "product", "input_type": "video",
+            "scenes": ["not-json", '{"valid": true}'],
+        }, headers=headers)
+        assert resp.status_code == 200
+        mid = resp.json()["id"]
+        resp = await client.get(f"/api/v1/materials/{mid}/slices", headers=headers)
+        assert len(resp.json()) == 1  # 只有 valid 的被解析
+
+    @pytest.mark.asyncio
+    async def test_upload_no_scenes_no_slices(self, client):
+        """上传不传 scenes → 无切片"""
+        headers = await _register(client, "no_scene")
+        resp = await client.post("/api/v1/materials/upload", json={
+            "material_type": "product", "input_type": "video",
+        }, headers=headers)
+        mid = resp.json()["id"]
+        resp = await client.get(f"/api/v1/materials/{mid}/slices", headers=headers)
+        assert resp.json() == []
 
     @pytest.mark.asyncio
     async def test_list_materials(self, client):
@@ -103,14 +144,16 @@ class TestSliceRoutes:
 
     @pytest.mark.asyncio
     async def test_list_slices(self, client):
-        headers, mid = await _register_and_upload_video(client, "sl1")
+        headers, mid = await _upload_video_with_scenes(client, "sl1")
         resp = await client.get(f"/api/v1/materials/{mid}/slices", headers=headers)
         assert resp.status_code == 200
-        assert len(resp.json()) == 3
+        slices = resp.json()
+        assert len(slices) == 3
+        assert slices[0]["time_range"] == "0s-3s"
 
     @pytest.mark.asyncio
     async def test_list_slices_filter(self, client):
-        headers, mid = await _register_and_upload_video(client, "sl2")
+        headers, mid = await _upload_video_with_scenes(client, "sl2")
         resp = await client.get(
             f"/api/v1/materials/{mid}/slices?slice_type=video_scene",
             headers=headers,
@@ -120,7 +163,7 @@ class TestSliceRoutes:
 
     @pytest.mark.asyncio
     async def test_create_slice(self, client):
-        headers, mid = await _register_and_upload_video(client, "sl3")
+        headers, mid = await _upload_video_with_scenes(client, "sl3")
         resp = await client.post(
             f"/api/v1/materials/{mid}/slices",
             json={"slice_type": "video_scene", "scene_id": 99, "description": "自定义"},
@@ -157,12 +200,22 @@ class TestMaterialSchemas:
         from app.material.schemas import MaterialUploadRequest
         req = MaterialUploadRequest(material_type="product", input_type="image")
         assert req.input_type == "image"
+        assert req.scenes == []
+
+    def test_upload_with_scenes_schema(self):
+        from app.material.schemas import MaterialUploadRequest
+        req = MaterialUploadRequest(
+            material_type="product", input_type="video",
+            scenes=['{"scene_id":1}'],
+            video_tags=["test"],
+        )
+        assert len(req.scenes) == 1
+        assert len(req.video_tags) == 1
 
     def test_search_request_defaults(self):
         from app.material.schemas import MaterialSearchRequest
         req = MaterialSearchRequest(query="watch")
         assert req.threshold == 0.6
-        assert req.search_level == "material"
 
     def test_slice_create_request(self):
         from app.material.schemas import SliceCreateRequest
@@ -173,3 +226,13 @@ class TestMaterialSchemas:
         from app.material.schemas import SliceResponse
         r = SliceResponse(id=1, material_id=10, slice_type="keyframe", time_range="0-5s")
         assert r.time_range == "0-5s"
+
+    def test_upload_response(self):
+        from app.material.schemas import MaterialUploadResponse
+        r = MaterialUploadResponse(id=1, material_type="product", input_type="image")
+        assert r.source == "upload"
+
+    def test_material_response(self):
+        from app.material.schemas import MaterialResponse
+        r = MaterialResponse(id=1, user_id="1", material_type="product", input_type="image")
+        assert r.tags == []

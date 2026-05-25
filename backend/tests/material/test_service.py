@@ -70,21 +70,33 @@ class TestMaterialServiceDirect:
     @pytest.mark.asyncio
     async def test_list_slices_by_type(self, db_session):
         m = await svc.create_material(db_session, user_id="1", material_type="product", input_type="video")
-        await svc.create_video_slices(db_session, m.id, scene_count=2)
+        await svc.parse_and_create_slices(db_session, m.id, [
+            '{"scene_id":1,"time_range":"<0s-3s>"}',
+            '{"scene_id":2,"time_range":"<3s-6s>"}',
+        ])
         scenes = await svc.list_slices(db_session, m.id, slice_type="video_scene")
         assert len(scenes) == 2
 
     @pytest.mark.asyncio
-    async def test_create_video_slices_custom_count(self, db_session):
+    async def test_parse_scenes_custom(self, db_session):
         m = await svc.create_material(db_session, user_id="1", material_type="product", input_type="video")
-        slices = await svc.create_video_slices(db_session, m.id, scene_count=5)
+        slices = await svc.parse_and_create_slices(db_session, m.id, [
+            '{"scene_id":1,"time_range":"<0s-3s>","description":"开场"}',
+            '{"scene_id":2,"time_range":"<3s-5s>","description":"展示"}',
+            '{"scene_id":3,"time_range":"<5s-8s>","description":"收尾"}',
+            '{"scene_id":4,"time_range":"<8s-10s>","description":"结束"}',
+            '{"scene_id":5,"time_range":"<10s-12s>","description":"黑屏"}',
+        ])
         assert len(slices) == 5
         assert slices[4].scene_id == 5
 
     @pytest.mark.asyncio
-    async def test_delete_material_cascades(self, db_session):
+    async def test_parse_scenes_bracket_cleaning(self, db_session):
         m = await svc.create_material(db_session, user_id="1", material_type="product", input_type="video")
-        await svc.create_video_slices(db_session, m.id)
+        slices = await svc.parse_and_create_slices(db_session, m.id, [
+            '{"scene_id":1,"time_range":"<0s-3s>"}',
+        ])
+        assert slices[0].time_range == "0s-3s"  # 尖括号清除
         ok = await svc.delete_material(db_session, m.id)
         assert ok is True
         remaining = await svc.list_slices(db_session, m.id)
