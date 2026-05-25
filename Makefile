@@ -8,13 +8,13 @@ install: ## 安装依赖
 	cd backend && uv venv .venv && source .venv/bin/activate && uv pip install -r requirements.txt
 
 test: ## 运行全部测试
-	cd backend && source .venv/bin/activate && python -m pytest tests/ -v
+	cd backend && . .venv/bin/activate && python -m pytest tests/ -v
 
 test-cov: ## 运行测试 + 覆盖率报告
-	cd backend && source .venv/bin/activate && python -m pytest tests/ --cov=app --cov-report=term-missing
+	cd backend && . .venv/bin/activate && python -m pytest tests/ --cov=app --cov-report=term-missing
 
 test-cov-html: ## 运行测试 + HTML 覆盖率报告
-	cd backend && source .venv/bin/activate && python -m pytest tests/ --cov=app --cov-report=html && echo "→ 打开 backend/htmlcov/index.html"
+	cd backend && . .venv/bin/activate && python -m pytest tests/ --cov=app --cov-report=html && echo "→ 打开 backend/htmlcov/index.html"
 
 test-watch: ## 文件变动时自动跑测试
 	cd backend && source .venv/bin/activate && find . -name '*.py' | entr -c python -m pytest tests/ -v --tb=short

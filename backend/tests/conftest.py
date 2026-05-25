@@ -20,6 +20,7 @@ import app.config
 app.config.settings.DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 app.config.settings.REDIS_URL = ""
 app.config.settings.MINIO_ENDPOINT = ""
+app.config.settings.CELERY_BROKER_URL = ""
 
 
 # ── SQLite 兼容 JSONB ──────────────────────────
