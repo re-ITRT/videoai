@@ -81,3 +81,11 @@ async def generate_script(
         mode=request.mode,
         created_at=db_script.created_at,
     )
+
+
+async def analyze_video(db, request, user_id):
+    raise NotImplementedError(视频分析功能待实现)
+
+
+async def update_scene(db, script_id, scene_id, update_data):
+    raise NotImplementedError(分镜更新功能待实现)

@@ -13,7 +13,8 @@ class ScriptGenerateRequest(BaseModel):
     factor_ids: List[int] = []
     num_variants: int = 1
     additional_instructions: Optional[str] = None
-    aspect_ratio: str = 9:16
+    aspect_ratio: str = "9:16"
+    mode: str = "auto"
     target_duration: int = 15
 
 
@@ -44,7 +45,7 @@ class ScriptGenerateResponse(BaseModel):
 # ── 爆款视频分析 ──────────────────────────
 class VideoAnalyzeRequest(BaseModel):
     video_url: str
-    analysis_type: str = full  # full | quick
+    analysis_type: str = "full"  # full | quick
 
 
 class StoryboardItem(BaseModel):
