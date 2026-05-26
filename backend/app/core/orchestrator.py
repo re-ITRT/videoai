@@ -1,6 +1,7 @@
 """
 创作编排器 — 状态机驱动 7 步工作流
 """
+import time
 import json
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -8,6 +9,17 @@ from app.core.states import TaskState, WORKFLOW_STEPS, TRANSITIONS, EDITABLE_STA
 from app.core.ws_manager import manager
 from app.creation.models import VideoTask, TaskLog
 from app.workers.workflow import call_workflow
+
+# 各工作流使用的模型名称
+WORKFLOW_MODELS = {
+    "material-embed": "doubao-embedding-vision-251215",
+    "query-generate": "doubao-seed-2.0-pro",
+    "material-search": "doubao-embedding-vision-251215",
+    "script-generate": "doubao-seed-2.0-pro",
+    "tts-generate": "doubao-seed-2.0-pro",
+    "video-generate": "doubao-seedance-1.5-pro",
+    "video-compose": "doubao-seed-2.0-pro",
+}
 
 
 async def run_next_step(db: AsyncSession, task: VideoTask, user_id: str):
@@ -54,6 +66,8 @@ async def run_next_step(db: AsyncSession, task: VideoTask, user_id: str):
     db.add(log)
     await db.commit()
 
+    start_time = time.time()
+
     try:
         # 构建 payload
         payload = build_payload(task, workflow_name)
@@ -75,7 +89,10 @@ async def run_next_step(db: AsyncSession, task: VideoTask, user_id: str):
         )
 
         # 更新日志
+        duration_ms = int((time.time() - start_time) * 1000)
         log.status = "completed"
+        log.duration_ms = duration_ms
+        log.model_used = WORKFLOW_MODELS.get(workflow_name)
         await db.commit()
 
         # 自动模式下继续下一步
