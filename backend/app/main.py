@@ -10,6 +10,10 @@ from app.workers.router import router as workflow_router
 from app.reference.router import router as reference_router
 from app.template.router import router as template_router
 
+# ── 初始化日志 ──────────────────────────
+from app.core.logging import setup_logging
+setup_logging()
+
 app = FastAPI(title="Video-AI API", version="0.1.0", docs_url="/docs")
 
 app.add_middleware(
