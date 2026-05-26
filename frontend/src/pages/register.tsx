@@ -1,4 +1,5 @@
 import { Form, Input, Button, Card, message } from 'antd'
+import { UserOutlined, LockOutlined } from '@ant-design/icons'
 import { Link } from 'react-router-dom'
 import { register } from '../utils/api'
 
