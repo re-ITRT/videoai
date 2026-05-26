@@ -37,7 +37,7 @@ class MockResponse:
         self.json_data = json_data
         self.raise_error = raise_error
 
-    async def json(self):
+    def json(self):
         return self.json_data
 
     def raise_for_status(self):
