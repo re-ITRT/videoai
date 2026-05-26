@@ -9,6 +9,7 @@ from app.material.schemas import (
     MaterialSearchRequest, MaterialSearchResult,
 )
 from app.material import service as svc
+from app.material import search as search_svc
 
 router = APIRouter(prefix="/api/v1/materials", tags=["materials"])
 
@@ -98,10 +99,38 @@ async def search_materials(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """语义检索（骨架 — 待集成 pgvector 相似度查询）"""
-    # TODO: 集成 pgvector <=> 余弦相似度查询
-    # 当前返回空结果，占位
-    return []
+    """语义检索 — 调 material-search 工作流 → pgvector 阈值筛选"""
+    try:
+        results = await search_svc.search_materials(
+            db=db,
+            user_id=str(current_user.id),
+            query=request.query,
+            threshold=request.threshold,
+            max_results=request.max_results,
+            search_level=request.search_level,
+        )
+    except Exception as e:
+        # pgvector 不可用时回退到文本搜索
+        try:
+            results = await search_svc.search_materials_fallback(
+                db=db,
+                user_id=str(current_user.id),
+                query=request.query,
+                max_results=request.max_results,
+            )
+        except Exception:
+            results = []
+
+    return [
+        MaterialSearchResult(
+            id=r["id"],
+            similarity=float(r.get("similarity", 0)),
+            image_url=r.get("image_url"),
+            text_content=r.get("text_content"),
+            tags=r.get("tags", []),
+        )
+        for r in results
+    ]
 
 
 # ═══════════════════════════════════════════
