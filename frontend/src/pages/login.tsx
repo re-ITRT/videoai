@@ -6,12 +6,15 @@ import { login } from '../utils/api'
 export default function Login() {
   const navigate = useNavigate()
   const onFinish = async (values: any) => {
+    console.log('Login attempt:', values.username)
     try {
       const res: any = await login(values)
+      console.log('Login response:', res)
       localStorage.setItem('token', res.access_token)
       message.success('登录成功')
       navigate('/')
     } catch (error: any) {
+      console.error('Login failed:', error.response?.status, error.response?.data)
       message.error(error.response?.data?.detail?.message || error.response?.data?.detail || '登录失败')
     }
   }
