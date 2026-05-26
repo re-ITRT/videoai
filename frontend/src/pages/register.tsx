@@ -10,7 +10,7 @@ export default function Register() {
       const res: any = await register(values)
       localStorage.setItem('token', res.access_token)
       message.success('注册成功')
-      navigate('/')
+      window.location.href = '/'
     } catch (error: any) {
       message.error(error.response?.data?.detail?.message || error.response?.data?.detail || '注册失败')
     }
