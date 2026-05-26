@@ -75,34 +75,176 @@ class TestWSManager:
 
 class TestOrchestrator:
 
-    def test_build_payload_script(self):
+    @pytest.mark.asyncio
+    async def test_build_payload_script(self, db_session):
         from app.core.orchestrator import build_payload
         from app.creation.models import VideoTask
         task = VideoTask(user_id=1, product_info={"name": "测试"}, auto_mode=True)
-        payload = build_payload(task, "script-generate")
+        db_session.add(task)
+        await db_session.commit()
+        await db_session.refresh(task)
+
+        payload = await build_payload(db_session, task, "script-generate")
         assert payload["target_duration"] == 15
         assert payload["mode"] == "auto"
 
-    def test_build_payload_video(self):
+    @pytest.mark.asyncio
+    async def test_build_payload_video(self, db_session):
         from app.core.orchestrator import build_payload
         from app.creation.models import VideoTask
         task = VideoTask(user_id=1, product_info={}, aspect_ratio="1:1")
-        payload = build_payload(task, "video-generate")
+        db_session.add(task)
+        await db_session.commit()
+        await db_session.refresh(task)
+
+        payload = await build_payload(db_session, task, "video-generate")
         assert payload["aspect_ratio"] == "1:1"
 
-    def test_build_payload_default(self):
+    @pytest.mark.asyncio
+    async def test_build_payload_default(self, db_session):
         from app.core.orchestrator import build_payload
         from app.creation.models import VideoTask
         task = VideoTask(user_id=1, product_info={})
-        assert build_payload(task, "unknown") == {}
+        db_session.add(task)
+        await db_session.commit()
+        await db_session.refresh(task)
 
-    def test_save_result(self):
+        assert await build_payload(db_session, task, "unknown") == {}
+
+    @pytest.mark.asyncio
+    async def test_save_result(self, db_session):
         from app.core.orchestrator import save_workflow_result
         from app.creation.models import VideoTask
         task = VideoTask(user_id=1, product_info={})
-        save_workflow_result(task, "script-generate", {"scenes": []})
-        save_workflow_result(task, "video-compose", {"output_url": "https://ex.com/v.mp4"})
+        db_session.add(task)
+        await db_session.commit()
+        await db_session.refresh(task)
+
+        await save_workflow_result(db_session, task, "script-generate", {"scenes": []})
+        await save_workflow_result(db_session, task, "video-compose", {"output_url": "https://ex.com/v.mp4"})
         assert task.output_url == "https://ex.com/v.mp4"
+
+    @pytest.mark.asyncio
+    async def test_build_payload_material_search(self, db_session):
+        """测试 C2 material-search payload 构造"""
+        from app.core.orchestrator import build_payload
+        from app.creation.models import VideoTask
+        from app.script.models import Script
+
+        task = VideoTask(user_id=1, product_info={"name": "测试产品"}, status="CREATED")
+        db_session.add(task)
+        await db_session.commit()
+        await db_session.refresh(task)
+
+        # 先创建一个脚本
+        script = Script(
+            task_id=task.id,
+            content={
+                "scenes": [
+                    {"visual_description": "产品特写展示", "narration": "大家好今天给大家推荐一款好物"},
+                    {"visual_description": "使用效果演示", "narration": "看这个效果真的很棒"},
+                ]
+            }
+        )
+        db_session.add(script)
+        await db_session.commit()
+        await db_session.refresh(script)
+
+        task.script_id = script.id
+        await db_session.commit()
+
+        payload = await build_payload(db_session, task, "material-search")
+        assert "product_queries" in payload
+        assert len(payload["product_queries"]) > 0
+        assert "产品特写展示" in payload["product_queries"]
+
+    @pytest.mark.asyncio
+    async def test_build_payload_video_compose(self, db_session):
+        """测试 C4 video-compose payload 构造"""
+        from app.core.orchestrator import build_payload
+        from app.creation.models import VideoTask
+        from app.script.models import Script
+
+        task = VideoTask(
+            user_id=1,
+            product_info={"name": "测试产品"},
+            status="VIDEO_GENERATE_DONE",
+            aspect_ratio="16:9",
+            video_urls=[
+                {"type": "scene_video", "scene_id": 1, "video_url": "https://ex.com/s1.mp4"},
+                {"type": "scene_video", "scene_id": 2, "video_url": "https://ex.com/s2.mp4"},
+            ],
+        )
+        db_session.add(task)
+        await db_session.commit()
+        await db_session.refresh(task)
+
+        # 创建脚本
+        script = Script(
+            task_id=task.id,
+            content={
+                "scenes": [
+                    {"scene_id": 1, "narration": "第一个分镜旁白", "duration": 3},
+                    {"scene_id": 2, "narration": "第二个分镜旁白", "duration": 3},
+                ]
+            }
+        )
+        db_session.add(script)
+        await db_session.commit()
+        await db_session.refresh(script)
+
+        task.script_id = script.id
+        await db_session.commit()
+
+        payload = await build_payload(db_session, task, "video-compose")
+        assert payload["aspect_ratio"] == "16:9"
+        assert len(payload["scenes"]) == 2
+        assert payload["scenes"][0]["video_url"] == "https://ex.com/s1.mp4"
+        assert payload["add_subtitles"] is True
+
+    @pytest.mark.asyncio
+    async def test_save_result_material_search(self, db_session):
+        """测试 C2 material-search 结果保存"""
+        from app.core.orchestrator import save_workflow_result
+        from app.creation.models import VideoTask
+
+        task = VideoTask(user_id=1, product_info={})
+        db_session.add(task)
+        await db_session.commit()
+        await db_session.refresh(task)
+
+        result = {
+            "materials": [
+                {"id": 1, "image_url": "https://ex.com/m1.jpg", "similarity": 0.92},
+                {"id": 2, "image_url": "https://ex.com/m2.jpg", "similarity": 0.85},
+            ]
+        }
+        await save_workflow_result(db_session, task, "material-search", result)
+        assert task.video_urls is not None
+        assert len(task.video_urls) >= 2
+        assert task.video_urls[0]["type"] == "material"
+
+    @pytest.mark.asyncio
+    async def test_save_result_video_generate(self, db_session):
+        """测试 C3 video-generate 结果保存"""
+        from app.core.orchestrator import save_workflow_result
+        from app.creation.models import VideoTask
+
+        task = VideoTask(user_id=1, product_info={}, video_urls=[])
+        db_session.add(task)
+        await db_session.commit()
+        await db_session.refresh(task)
+
+        result = {
+            "video_urls": [
+                {"scene_id": 1, "video_url": "https://ex.com/s1.mp4"},
+                {"scene_id": 2, "video_url": "https://ex.com/s2.mp4"},
+            ]
+        }
+        await save_workflow_result(db_session, task, "video-generate", result)
+        assert len(task.video_urls) == 2
+        assert task.video_urls[0]["type"] == "scene_video"
+        assert task.video_urls[0]["video_url"] == "https://ex.com/s1.mp4"
 
     @pytest.mark.asyncio
     async def test_run_next_step_completed(self, db_session):
