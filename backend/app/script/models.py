@@ -35,6 +35,21 @@ class InspirationTemplate(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
+class StrategyFactor(Base):
+    __tablename__ = "strategy_factors"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String(64), nullable=False)
+    name = Column(String(128), nullable=False)  # 因子名称：痛点开场/场景化展示/产品特写
+    factor_type = Column(String(32), nullable=False)  # hook / scene / narration / visual / ending
+    description = Column(Text)  # 因子描述
+    content = Column(JSONB, nullable=False)  # 因子具体内容：文案/画面描述/台词等
+    category = Column(String(64))
+    tags = Column(JSONB, default=[])
+    usage_count = Column(Integer, default=0)  # 使用次数
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
 class Script(Base):
     __tablename__ = "scripts"
 
