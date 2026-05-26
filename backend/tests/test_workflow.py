@@ -22,6 +22,7 @@ class TestWorkflowTokens:
             "tts-generate",
             "video-generate",
             "video-compose",
+            "video-analyze",
         }
         assert set(WORKFLOW_TOKENS.keys()) == expected_workflows
 
