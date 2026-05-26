@@ -1,5 +1,5 @@
 """
-扣子工作流调用封装 — 7个工作流 webhook 调用
+扣子工作流调用封装 — 8个工作流 webhook 调用
 """
 import json
 import httpx
@@ -16,6 +16,7 @@ WORKFLOW_TOKENS = {
     "tts-generate": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjY2MGNhNTFkLTc1ZTMtNDMxYS1hZWQwLTkxZTIyNTc5M2RiNSJ9.eyJpc3MiOiJodHRwczovL2FwaS5jb3plLmNuIiwiYXVkIjpbIm1kWG40YXlzRGJpOTB2MWE0NU5lN0FRQ1I1eVZZVWp4Il0sImV4cCI6ODIxMDI2Njg3Njc5OSwiaWF0IjoxNzc5NTQ1NDMyLCJzdWIiOiJzcGlmZmU6Ly9hcGkuY296ZS5jbi93b3JrbG9hZF9pZGVudGl0eS9pZDo3NjQyOTk0ODY1OTY1MzY3MzIzIiwic3JjIjoiaW5ib3VuZF9hdXRoX2FjY2Vzc190b2tlbl9pZDo3NjQzMDg5NDM1OTg2MjMxMzE1In0.LW_tTM-e5sKp06nex5u-sYh8Ur-1nh_VJl-qJ-1_Hh715y7eXJQGan6-95QAfOKf_lTrpt4UxbQy2ISRs_2t8I0B_FW6R1Xdh-cQLgAdTO0HmM3NPmD5Wr-q_ov22iSQeg_6f6_arcBH3PEw2JAJCtnJiX9ZoXvvNEugYJlyGKSnkV0puq0y39_2GSfkNlW4V1FMMAyDmVobY75urM4S4x22MaIxZEwKnC3P7r-fF-Uvas5bXAErzWKKXe3U2RaQlVYnCCUnGdwOOVoll7xxB1vyXkmkjn6bHLxncSwxjqBf1p4boQUDx72Cbzyi34W_lviQoXmvsXPajkCW9IYmKQ",
     "video-generate": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjY2MGNhNTFkLTc1ZTMtNDMxYS1hZWQwLTkxZTIyNTc5M2RiNSJ9.eyJpc3MiOiJodHRwczovL2FwaS5jb3plLmNuIiwiYXVkIjpbIjhDc3F4M2dXNzhBZmpyeHZTZFlnNnVjUnVldWhaUkNaIl0sImV4cCI6ODIxMDI2Njg3Njc5OSwiaWF0IjoxNzc5NTQ1NDc1LCJzdWIiOiJzcGlmZmU6Ly9hcGkuY296ZS5jbi93b3JrbG9hZF9pZGVudGl0eS9pZDo3NjQzMDA3MTQ0NDI1NDIyODY3Iiwic3JjIjoiaW5ib3VuZF9hdXRoX2FjY2Vzc190b2tlbl9pZDo3NjQzMDg5NjE4NjA2MjI3NDgzIn0.a2xul0cKTeqYNRRmkShpSUYx1BcjclKFLJfrE5MIQeIcIeuDdIUmjSnCK2WL5GWVyqyXdCeCxeXJ8rm_HZdHmtGjUXgE6U2-D9W4BaR9Pqsg7iucQussbp8HoXzU01Aq1gVjjQJbfvxMJM8Ek2Yshea0YIibtmd1WmXutUMhK-SP4VvPPhjDvoR-IzuL92Uawg1F6doASl4yJIqA8tFPr0ikyCQ88B0vQw_sBRTXVerpQJvbNZ26DlT8XfKH2aIZsd6KBjmrCJ57KsHVLzCo-pxvhUpZZmuMmm-saUK1oyM5hDMXcw7bevRfD7v-53530vVbAjP4gMIutJjy4ipZtA",
     "video-compose": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjY2MGNhNTFkLTc1ZTMtNDMxYS1hZWQwLTkxZTIyNTc5M2RiNSJ9.eyJpc3MiOiJodHRwczovL2FwaS5jb3plLmNuIiwiYXVkIjpbInJIU2lZbDJQSEUzS2RmRjhKb3drQ3R0OFc5QXQydTBnIl0sImV4cCI6ODIxMDI2Njg3Njc5OSwiaWF0IjoxNzc5NTQ1NTAzLCJzdWIiOiJzcGlmZmU6Ly9hcGkuY296ZS5jbi93b3JrbG9hZF9pZGVudGl0eS9pZDo3NjQzMDgwNjExMDYxNTYzNDE4Iiwic3JjIjoiaW5ib3VuZF9hdXRoX2FjY2Vzc190b2tlbl9pZDo3NjQzMDg5NzM3MjUwNTA0NzU0In0.Ium4enhw9BiA6Ou0oTisnHhx1QF0Y76ToXCwNPY_mnZnjV8I8uJULbaFBUJCHeOx26GltbmzLM6iaZJmu3Qu7_C-tvaAXCiBID9qoOX7d6g63cF4w2v7obItvttbw7HLWLUELfMnNZxnLSykvVI-3RLE5lJXd166T7PZF-0Rirq15hUzkCW13MjlMUaW1Ar0hPqR7hvRME1YJj-MO6ccMCe92-Me8EosuGEiehj0pMtk7lXw8aqznlLbDOHFcE7Zcrv2bPNjPF5NovY4IVEIkp8zP0hfeIqaUF2bdMimCOLE083v1z2bXW4oC4I3xx2UA6YnHppwxysqfjIn24wvjw",
+    "video-analyze": "TODO: 请在扣子平台创建video-analyze工作流后更新Token",
 }
 
 # ── Webhook URL ────────────────────────────
@@ -27,6 +28,7 @@ WORKFLOW_URLS = {
     "tts-generate": "https://nqd8bwqzx2.coze.site/run",
     "video-generate": "https://77nxhkq859.coze.site/run",
     "video-compose": "https://ztz3tcs24c.coze.site/run",
+    "video-analyze": "TODO: 请在扣子平台创建video-analyze工作流后更新URL",
 }
 
 AVAILABLE_WORKFLOWS = list(WORKFLOW_URLS.keys())
