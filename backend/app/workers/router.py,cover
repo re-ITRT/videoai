@@ -1,0 +1,28 @@
+> """工作流路由 — 触发扣子工作流"""
+> from fastapi import APIRouter, HTTPException
+  
+> from app.workers.workflow import call_workflow, AVAILABLE_WORKFLOWS
+> from app.material.schemas import MaterialUploadRequest, MaterialSearchRequest
+> from app.material import service as mat_svc
+> from app.core.database import get_db
+  
+> router = APIRouter(prefix="/api/v1/workflows", tags=["workflows"])
+  
+  
+> @router.get("")
+> async def list_workflows():
+>     """列出可用工作流"""
+>     return {"workflows": AVAILABLE_WORKFLOWS}
+  
+  
+> @router.post("/{workflow_name}/run")
+> async def run_workflow(workflow_name: str, payload: dict):
+>     """执行指定工作流"""
+>     if workflow_name not in AVAILABLE_WORKFLOWS:
+>         raise HTTPException(status_code=404, detail=f"未知工作流: {workflow_name}")
+  
+!     try:
+!         result = await call_workflow(workflow_name, payload)
+!         return {"workflow": workflow_name, "result": result}
+!     except Exception as e:
+!         raise HTTPException(status_code=502, detail=f"工作流调用失败: {str(e)}")

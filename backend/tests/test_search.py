@@ -1,6 +1,12 @@
 """素材检索服务测试 — M6/M7"""
 import pytest
 from unittest.mock import AsyncMock
+from app.auth.models import User
+
+
+@pytest.fixture
+def dummy_user():
+    return User(id=42, username="srch_user", hashed_password="h", is_active=True, role="user")
 
 
 async def _mock_workflow(name, payload):

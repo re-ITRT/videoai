@@ -1,0 +1,46 @@
+> """
+> WebSocket 连接管理器 — 向用户推送任务进度
+> """
+> from typing import Dict
+> from fastapi import WebSocket
+  
+  
+> class ConnectionManager:
+>     """管理用户 WebSocket 连接，按 user_id 分组"""
+  
+>     def __init__(self):
+>         self.active: Dict[str, list[WebSocket]] = {}
+  
+>     async def connect(self, user_id: str, ws: WebSocket):
+>         await ws.accept()
+>         self.active.setdefault(user_id, []).append(ws)
+  
+>     def disconnect(self, user_id: str, ws: WebSocket):
+>         self.active.setdefault(user_id, [])
+>         self.active[user_id] = [w for w in self.active[user_id] if w != ws]
+  
+>     async def send_to_user(self, user_id: str, message: dict):
+>         """向用户的所有连接推送消息"""
+>         for ws in self.active.get(user_id, []):
+>             try:
+>                 await ws.send_json(message)
+!             except Exception:
+-                 pass
+  
+>     async def broadcast_task_progress(self, user_id: str, task_id: int, state: str,
+>                                       workflow_name: str | None = None,
+>                                       result: dict | None = None,
+>                                       editable: bool = False):
+>         """推送任务进度"""
+>         msg = {
+>             "type": "task_progress",
+>             "task_id": task_id,
+>             "state": state,
+>             "workflow": workflow_name,
+>             "editable": editable,
+>             "result": result or {},
+>         }
+>         await self.send_to_user(user_id, msg)
+  
+  
+> manager = ConnectionManager()
