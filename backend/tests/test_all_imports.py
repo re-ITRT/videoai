@@ -15,7 +15,7 @@ def test_all_router_imports():
 
 def test_all_worker_imports():
     from app.workers.workflow import WORKFLOW_TOKENS, call_workflow
-    assert len(WORKFLOW_TOKENS) == 7
+    assert len(WORKFLOW_TOKENS) == 8
 
 
 def test_all_models_import():

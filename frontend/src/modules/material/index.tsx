@@ -25,7 +25,9 @@ export default function MaterialList() {
     { title: 'ID', dataIndex: 'id', width: 60 },
     { title: '类型', dataIndex: 'material_type', render: (v: string) => <Tag color={v === 'video' ? 'blue' : v === 'image' ? 'green' : 'orange'}>{v}</Tag> },
     { title: '标签', dataIndex: 'tags', render: (tags: string[]) => tags?.map(t => <Tag key={t}>{t}</Tag>) },
-    { title: '创建时间', dataIndex: 'created_at', render: (v: string) => new Date(v).toLocaleString() },
+    { title: '来源', dataIndex: 'source', render: (v: string) => v ? <Tag>{v}</Tag> : null },
+    { title: '预览', dataIndex: 'image_url', render: (url: string) => url ? <img src={url} loading="lazy" alt="" style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 4 }} /> : null },
+    { title: '创建时间', dataIndex: 'created_at', render: (v: string) => v ? new Date(v).toLocaleString() : '' },
     { title: '操作', render: (_: any, r: Material) => <Button danger icon={<DeleteOutlined />} size="small" onClick={() => handleDelete(r.id)} /> },
   ]
   return (
