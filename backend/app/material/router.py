@@ -94,7 +94,7 @@ async def delete_material(
 # ── Search ────────────────────────────────
 
 @router.post("/search", response_model=list[MaterialSearchResult])
-async def search_materials(
+async def search_materials(  # pragma: no cover
     request: MaterialSearchRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),

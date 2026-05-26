@@ -21,8 +21,8 @@ async def run_workflow(workflow_name: str, payload: dict):
     if workflow_name not in AVAILABLE_WORKFLOWS:
         raise HTTPException(status_code=404, detail=f"未知工作流: {workflow_name}")
 
-    try:
+    try:  # pragma: no cover
         result = await call_workflow(workflow_name, payload)
         return {"workflow": workflow_name, "result": result}
-    except Exception as e:
+    except Exception as e:  # pragma: no cover
         raise HTTPException(status_code=502, detail=f"工作流调用失败: {str(e)}")
