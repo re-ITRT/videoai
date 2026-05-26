@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Card, Row, Col, Statistic, Skeleton } from 'antd'
 import { VideoCameraOutlined, FileTextOutlined, ThunderboltOutlined } from '@ant-design/icons'
-import { getMaterials, getTasks } from '../../utils/api'
+import { getMaterials, getTasks } from '../utils/api'
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true)

@@ -20,7 +20,6 @@ import {
 } from 'antd';
 import {
   PlayCircleOutlined,
-  SearchOutlined,
   DeleteOutlined,
   EyeOutlined,
   PlusOutlined,
@@ -447,7 +446,7 @@ const ReferencePage: React.FC = () => {
                       {scene.description || JSON.stringify(scene)}
                     </li>
                   ))}
-                </ul>
+                </ol>
               </div>
             )}
 

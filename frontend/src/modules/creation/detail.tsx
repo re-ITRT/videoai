@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Card, Descriptions, Button, Spin, Empty, Steps, Tag, Space } from 'antd'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getTask, getTaskLogs, retryTask } from '../../utils/api'
-import type { VideoTask, TaskLog } from './types'
+import type { VideoTask } from './types'
 
 const WORKFLOW_STEPS = [
   { title: '素材', status: 'wait' },
@@ -38,7 +38,7 @@ export default function CreationDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [task, setTask] = useState<VideoTask | null>(null)
-  const [logs, setLogs] = useState<TaskLog[]>([])
+  const [logs, setLogs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [retrying, setRetrying] = useState(false)
 
@@ -73,7 +73,7 @@ export default function CreationDetail() {
   if (loading) return <Card loading><Spin /></Card>
   if (!task) return <Empty description="任务不存在" />
 
-  const stepInfo = mapStateToStep(task.state || task.status || 'CREATED')
+  const stepInfo = mapStateToStep(task.state || 'CREATED')
 
   return (
     <Card
@@ -92,7 +92,7 @@ export default function CreationDetail() {
       />
 
       <Descriptions column={2} bordered size="small">
-        <Descriptions.Item label="状态"><Tag color={stepInfo.status === 'error' ? 'red' : 'blue'}>{task.state || task.status}</Tag></Descriptions.Item>
+        <Descriptions.Item label="状态"><Tag color={stepInfo.status === 'error' ? 'red' : 'blue'}>{task.state}</Tag></Descriptions.Item>
         <Descriptions.Item label="画幅">{task.aspect_ratio || '9:16'}</Descriptions.Item>
         <Descriptions.Item label="模式">{task.auto_mode ? '自动' : '手动'}</Descriptions.Item>
         <Descriptions.Item label="重试">{task.retry_count || 0} 次</Descriptions.Item>
@@ -101,14 +101,14 @@ export default function CreationDetail() {
 
       {stepInfo.status === 'error' && (
         <Space style={{ marginTop: 16 }}>
-          <span style={{ color: 'red' }}>错误: {task.error_msg || task.error_message || '未知错误'}</span>
+          <span style={{ color: 'red' }}>错误: {task.error_message || '未知错误'}</span>
           <Button type="primary" danger loading={retrying} onClick={handleRetry}>重试</Button>
         </Space>
       )}
 
-      {task.output_url && (
+      {task.video_url && (
         <div style={{ marginTop: 16 }}>
-          <video src={task.output_url} controls style={{ maxWidth: '100%' }} />
+          <video src={task.video_url} controls style={{ maxWidth: '100%' }} />
         </div>
       )}
 
