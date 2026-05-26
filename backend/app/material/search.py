@@ -29,8 +29,11 @@ async def search_materials(
         "product_queries": [query],
         "general_queries": [],
     }
-    workflow_result = await call_workflow("material-search", workflow_payload)
-    embeddings = workflow_result.get("product_embeddings", [])
+    try:
+        workflow_result = await call_workflow("material-search", workflow_payload)
+        embeddings = workflow_result.get("product_embeddings", [])
+    except Exception:
+        embeddings = []
 
     if not embeddings:
         return []
@@ -44,7 +47,6 @@ async def search_materials(
         if not vector:
             continue
 
-        # vector 转 pgvector 格式: [0.1,0.2,...]
         vec_str = "[" + ",".join(str(v) for v in vector) + "]"
 
         if search_level == "slice":
@@ -79,7 +81,6 @@ async def search_materials(
                     seen_ids.add(rid)
                     results.append(dict(row))
         except Exception:
-            # pgvector 不可用时 fallback
             pass
 
     # 3. 按相似度排序
@@ -94,7 +95,7 @@ async def search_materials_fallback(
     max_results: int = 50,
 ) -> list[dict]:
     """
-    文本回退搜索 — tags JSONB + text_content LIKE
+    文本回退搜索 — tags + text_content LIKE
     当 pgvector 不可用时使用
     """
     sql = text("""
@@ -103,8 +104,8 @@ async def search_materials_fallback(
         FROM materials
         WHERE user_id = :user_id
           AND (
-              tags::text ILIKE :q
-              OR text_content ILIKE :q
+              CAST(tags AS TEXT) LIKE :q
+              OR text_content LIKE :q
           )
         ORDER BY id DESC
         LIMIT :limit

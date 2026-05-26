@@ -152,7 +152,7 @@ class TestApprove:
     @pytest.mark.asyncio
     async def test_approve_nonexistent(self, client):
         resp = await client.post("/api/v1/tasks/99999/approve")
-        assert resp.status_code == 403  # no auth first
+        assert resp.status_code == 403
 
     @pytest.mark.asyncio
     async def test_approve_not_editable(self, client):
@@ -163,8 +163,32 @@ class TestApprove:
         }, headers=headers)
         tid = create.json()["id"]
         resp = await client.post(f"/api/v1/tasks/{tid}/approve", headers=headers)
-        # CREATED 状态不在 EDITABLE_STATES 中
         assert resp.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_run_step_completed(self, db_session):
+        from app.core.orchestrator import run_next_step
+        from app.creation.models import VideoTask
+        task = VideoTask(user_id=1, product_info={}, status="EXPORTED")
+        db_session.add(task)
+        await db_session.commit()
+        await run_next_step(db_session, task, "u1")
+        assert task.status == "EXPORTED"
+
+    @pytest.mark.asyncio
+    async def test_run_step_success(self, db_session):
+        from app.core.orchestrator import run_next_step
+        from app.creation.models import VideoTask
+        task = VideoTask(user_id=1, product_info={"name": "测试"}, auto_mode=False, status="CREATED")
+        db_session.add(task)
+        await db_session.commit()
+
+        with patch("app.core.orchestrator.call_workflow", new_callable=AsyncMock) as m:
+            m.return_value = {"output_url": "https://ex.com/v.mp4"}
+            await run_next_step(db_session, task, "u1")
+        await db_session.refresh(task)
+        # CREATED → MATERIAL_EMBED → MATERIAL_EMBED_DONE
+        assert task.status == "MATERIAL_EMBED_DONE"
 
     @pytest.mark.asyncio
     async def test_run_step_no_transition(self, db_session):
