@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.script.schemas import ScriptGenerateRequest, ScriptGenerateResponse
 from app.script.service import generate_script
 
-router = APIRouter(prefix="/scripts", tags=["scripts"])
+router = APIRouter(prefix="/api/v1/scripts", tags=["scripts"])
 
 
 @router.post("/generate", response_model=ScriptGenerateResponse)
