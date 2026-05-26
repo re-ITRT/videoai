@@ -17,10 +17,11 @@ async def analyze_and_save_video(
 ) -> ReferenceVideo:
     """
     调用video-analyze工作流分析视频，并保存结果到数据库
+    ✅ 直接复用material-embed的scenes输出，无需重新处理视频
     """
-    # 1. 调用扣子工作流分析视频
+    # 1. 调用扣子工作流分析（只传scenes，不处理视频本身）
     payload = {
-        "source_url": request.source_url,
+        "scenes": [s.model_dump() for s in request.scenes],
         "source_platform": request.source_platform,
         "title": request.title,
         "category": request.category,

@@ -22,9 +22,12 @@ def mock_db():
 
 @pytest.mark.asyncio
 async def test_analyze_and_save_video(mock_db):
-    """测试分析并保存视频"""
+    """测试分析并保存视频 - 直接复用scenes，无需处理视频"""
     request = VideoAnalyzeRequest(
-        source_url="https://example.com/video.mp4",
+        scenes=[
+            {"scene_id": 1, "time_range": "<00:00-00:03>", "description": "产品特写展示", "script": "姐妹们，今天给大家安利一款超好用的粉底液"},
+            {"scene_id": 2, "time_range": "<00:03-00:07>", "description": "上妆演示", "script": "你们看这个质地，真的超级清爽，一点都不油腻"},
+        ],
         source_platform="TikTok",
         title="测试视频",
         category="美妆",
@@ -34,8 +37,8 @@ async def test_analyze_and_save_video(mock_db):
         "hook_method": "痛点直击",
         "selling_points": ["质地清爽", "持久不脱妆"],
         "storyboard": [
-            {"type": "开场", "description": "展示产品"},
-            {"type": "使用", "description": "演示上妆"},
+            {"type": "Hook", "description": "痛点提问"},
+            {"type": "Demo", "description": "使用展示"},
         ],
         "style": "口播",
         "analysis_report": {"overall": "优秀", "score": 95},
@@ -46,12 +49,12 @@ async def test_analyze_and_save_video(mock_db):
 
         video = await analyze_and_save_video(mock_db, "test_user", request)
 
-        mock_call.assert_called_once_with("video-analyze", {
-            "source_url": "https://example.com/video.mp4",
-            "source_platform": "TikTok",
-            "title": "测试视频",
-            "category": "美妆",
-        })
+        # ✅ 只传scenes，不传source_url，不重复处理视频
+        call_args = mock_call.call_args[0]
+        assert call_args[0] == "video-analyze"
+        assert "scenes" in call_args[1]
+        assert "source_url" not in call_args[1]
+        assert len(call_args[1]["scenes"]) == 2
 
         mock_db.add.assert_called_once()
         mock_db.commit.assert_called_once()

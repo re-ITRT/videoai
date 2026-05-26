@@ -68,7 +68,7 @@ const ReferencePage: React.FC = () => {
 
   // 分析弹窗
   const [analyzeModalVisible, setAnalyzeModalVisible] = useState(false);
-  const [analyzeUrl, setAnalyzeUrl] = useState('');
+  const [analyzeScenes, setAnalyzeScenes] = useState('');  // JSON格式的scenes数组
   const [analyzeTitle, setAnalyzeTitle] = useState('');
   const [analyzeCategory, setAnalyzeCategory] = useState('');
   const [analyzePlatform, setAnalyzePlatform] = useState('custom');
@@ -105,8 +105,19 @@ const ReferencePage: React.FC = () => {
 
   // 分析视频
   const handleAnalyze = async () => {
-    if (!analyzeUrl) {
-      Modal.error({ title: '请输入视频URL' });
+    if (!analyzeScenes) {
+      Modal.error({ title: '请输入scenes数据' });
+      return;
+    }
+
+    let scenes;
+    try {
+      scenes = JSON.parse(analyzeScenes);
+      if (!Array.isArray(scenes)) {
+        throw new Error('必须是数组格式');
+      }
+    } catch (e) {
+      Modal.error({ title: 'scenes格式错误', content: '请输入有效的JSON数组格式' });
       return;
     }
 
@@ -116,7 +127,7 @@ const ReferencePage: React.FC = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          source_url: analyzeUrl,
+          scenes: scenes,
           source_platform: analyzePlatform,
           title: analyzeTitle,
           category: analyzeCategory,
@@ -127,7 +138,7 @@ const ReferencePage: React.FC = () => {
       if (data.success) {
         Modal.success({ title: '分析成功！', content: '视频已添加到优质视频库' });
         setAnalyzeModalVisible(false);
-        setAnalyzeUrl('');
+        setAnalyzeScenes('');
         setAnalyzeTitle('');
         setAnalyzeCategory('');
         loadVideos();
@@ -313,21 +324,21 @@ const ReferencePage: React.FC = () => {
 
       {/* 分析弹窗 */}
       <Modal
-        title="分析新视频"
+        title="爆款视频拆解"
         open={analyzeModalVisible}
         onOk={handleAnalyze}
         onCancel={() => setAnalyzeModalVisible(false)}
-        width={600}
+        width={700}
         confirmLoading={loading}
       >
         <Space direction="vertical" style={{ width: '100%' }} size="large">
           <div>
-            <Text strong>视频URL *</Text>
-            <Input
-              placeholder="输入视频链接"
-              value={analyzeUrl}
-              onChange={(e) => setAnalyzeUrl(e.target.value)}
-              prefix={<SearchOutlined />}
+            <Text strong>Scenes 数据 *</Text>
+            <TextArea
+              placeholder={`粘贴 material-embed 工作流输出的 scenes JSON 数组，例如：\n[\n  {"scene_id": 1, "time_range": "<00:00-00:03>", "description": "产品特写", "script": "姐妹们..."},\n  ...\n]`}
+              value={analyzeScenes}
+              onChange={(e) => setAnalyzeScenes(e.target.value)}
+              rows={8}
             />
           </div>
           <div>
@@ -368,7 +379,8 @@ const ReferencePage: React.FC = () => {
             </Select>
           </div>
           <Paragraph type="secondary">
-            系统将调用AI工作流自动分析视频的Hook手法、卖点、分镜、风格等信息，并保存到优质视频库。
+            ✅ <Text strong>无需重新处理视频</Text>，直接复用 material-embed 已生成的 scenes 数据做爆款拆解分析。
+            系统将分析 Hook 手法、核心卖点、分镜结构、风格节奏等，并保存到优质视频库。
           </Paragraph>
         </Space>
       </Modal>
