@@ -14,3 +14,4 @@ backend/htmlcov/
 backend/.pytest_cache/
 backend/.coverage*
 *.coverage
+*.py,cover
