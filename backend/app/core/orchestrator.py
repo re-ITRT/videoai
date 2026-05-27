@@ -181,7 +181,12 @@ async def build_payload(db: AsyncSession, task: VideoTask, workflow_name: str) -
     elif workflow_name == "tts-generate":
         script = await _get_script(db, task)
         scenes = script.get("scenes", []) if script else []
-        return {"scenes": scenes}
+        # 多语种TTS支持
+        payload = {"scenes": scenes}
+        if task.target_languages:
+            payload["polyglot"] = True
+            payload["target_languages"] = task.target_languages
+        return payload
 
     elif workflow_name == "video-generate":
         # C3: 为每个分镜生成视频片段
@@ -213,7 +218,7 @@ async def build_payload(db: AsyncSession, task: VideoTask, workflow_name: str) -
         }
 
     elif workflow_name == "video-compose":
-        # C4: 合成最终视频
+        # C4: 合成最终视频，支持多语种
         script = await _get_script(db, task)
         scenes = script.get("scenes", []) if script else []
 
@@ -221,14 +226,22 @@ async def build_payload(db: AsyncSession, task: VideoTask, workflow_name: str) -
         # video_urls 格式: [{"scene_id": 1, "video_url": "...", "audio_url": "..."}]
         video_urls = task.video_urls or []
 
+        # 确定使用的语言版本（默认用第一个目标语言，或zh-CN
+        languages = task.target_languages or ["zh-CN"]
+        selected_lang = languages[0]
+        lang_tts = task.tts_results.get(selected_lang, {})
+        scene_audios = lang_tts.get("scene_audios", [])
+
         # 构建完整分镜数据：视频 + 字幕 + 配音
         composed_scenes = []
         for i, scene in enumerate(scenes):
-            scene_video = next((v for v in video_urls if v.get("scene_id") == i + 1), None)
+            scene_id = scene.get("scene_id", i + 1)
+            scene_video = next((v for v in video_urls if v.get("scene_id") == scene_id), None)
+            scene_audio = next((a for a in scene_audios if a.get("scene_id") == scene_id), None)
             composed_scenes.append({
-                "scene_id": scene.get("scene_id", i + 1),
+                "scene_id": scene_id,
                 "video_url": scene_video.get("video_url", "") if scene_video else "",
-                "audio_url": scene_video.get("audio_url", "") if scene_video else "",
+                "audio_url": scene_audio.get("audio_url", "") if scene_audio else (scene_video.get("audio_url", "") if scene_video else ""),
                 "narration": scene.get("narration", ""),
                 "subtitle": scene.get("subtitle") or scene.get("narration", ""),
                 "duration": scene.get("duration", 3),
@@ -241,6 +254,7 @@ async def build_payload(db: AsyncSession, task: VideoTask, workflow_name: str) -
             "output_format": "mp4",
             "add_subtitles": True,
             "bgm_style": task.style or "电商",
+            "language": selected_lang,  # 传给工作流用于字幕语言匹配
         }
 
     return {}
@@ -287,9 +301,26 @@ async def save_workflow_result(db: AsyncSession, task: VideoTask, workflow_name:
         setattr(task, "script_scenes", scenes)
 
     elif workflow_name == "tts-generate":
-        # 保存配音结果
-        audio_results = result.get("audio_urls", []) or result.get("results", [])
-        task.audio_url = audio_results[0].get("url") if audio_results else ""
+        # 保存配音结果，支持多语种
+        if result.get("polyglot"):
+            # 多语种模式: {zh-CN: {audio_url, scene_audios}, en-US: {...}}
+            task.tts_results = result.get("languages", {})
+            # 默认使用第一个语言作为主音频
+            languages = task.target_languages or list(task.tts_results.keys())
+            if languages:
+                first_lang = languages[0]
+                task.audio_url = task.tts_results.get(first_lang, {}).get("audio_url", "")
+        else:
+            # 单语种模式
+            audio_results = result.get("audio_urls", []) or result.get("results", [])
+            task.audio_url = audio_results[0].get("url") if audio_results else ""
+            # 也存到tts_results里统一格式
+            task.tts_results = {
+                "zh-CN": {
+                    "audio_url": task.audio_url,
+                    "scene_audios": audio_results
+                }
+            }
 
     elif workflow_name == "video-generate":
         # C3: 保存每个分镜生成的视频片段

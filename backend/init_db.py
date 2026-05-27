@@ -93,6 +93,8 @@ async def main():
                 duration FLOAT,
                 error_message TEXT,
                 retry_count INTEGER DEFAULT 0,
+                target_languages JSONB DEFAULT '[]',
+                tts_results JSONB DEFAULT '{}',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )

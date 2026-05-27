@@ -101,6 +101,84 @@ class TestOrchestrator:
         assert payload["aspect_ratio"] == "1:1"
 
     @pytest.mark.asyncio
+    async def test_build_payload_tts_polyglot(self, db_session):
+        """测试多语种TTS payload 构造"""
+        from app.core.orchestrator import build_payload
+        from app.creation.models import VideoTask
+        from app.script.models import Script
+
+        task = VideoTask(
+            user_id=1,
+            product_info={"name": "测试产品"},
+            target_languages=["zh-CN", "en-US", "ja-JP"],
+        )
+        db_session.add(task)
+        await db_session.commit()
+        await db_session.refresh(task)
+
+        # 创建脚本
+        script = Script(
+            task_id=task.id,
+            content={
+                "scenes": [
+                    {"visual_description": "产品特写", "narration": "大家好"},
+                    {"visual_description": "使用演示", "narration": "效果很棒"},
+                ]
+            }
+        )
+        db_session.add(script)
+        await db_session.commit()
+        await db_session.refresh(script)
+
+        task.script_id = script.id
+        await db_session.commit()
+
+        payload = await build_payload(db_session, task, "tts-generate")
+        assert payload["polyglot"] is True
+        assert payload["target_languages"] == ["zh-CN", "en-US", "ja-JP"]
+        assert len(payload["scenes"]) == 2
+
+    @pytest.mark.asyncio
+    async def test_save_result_tts_polyglot(self, db_session):
+        """测试多语种TTS结果保存"""
+        from app.core.orchestrator import save_workflow_result
+        from app.creation.models import VideoTask
+
+        task = VideoTask(
+            user_id=1,
+            product_info={},
+            target_languages=["zh-CN", "en-US"],
+        )
+        db_session.add(task)
+        await db_session.commit()
+        await db_session.refresh(task)
+
+        result = {
+            "polyglot": True,
+            "languages": {
+                "zh-CN": {
+                    "audio_url": "https://ex.com/zh.mp3",
+                    "scene_audios": [
+                        {"scene_id": 1, "audio_url": "https://ex.com/zh_s1.mp3"},
+                        {"scene_id": 2, "audio_url": "https://ex.com/zh_s2.mp3"},
+                    ]
+                },
+                "en-US": {
+                    "audio_url": "https://ex.com/en.mp3",
+                    "scene_audios": [
+                        {"scene_id": 1, "audio_url": "https://ex.com/en_s1.mp3"},
+                        {"scene_id": 2, "audio_url": "https://ex.com/en_s2.mp3"},
+                    ]
+                }
+            }
+        }
+        await save_workflow_result(db_session, task, "tts-generate", result)
+        assert task.audio_url == "https://ex.com/zh.mp3"
+        assert "zh-CN" in task.tts_results
+        assert "en-US" in task.tts_results
+        assert task.tts_results["en-US"]["audio_url"] == "https://ex.com/en.mp3"
+
+    @pytest.mark.asyncio
     async def test_build_payload_default(self, db_session):
         from app.core.orchestrator import build_payload
         from app.creation.models import VideoTask

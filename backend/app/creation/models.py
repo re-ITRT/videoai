@@ -18,6 +18,8 @@ class VideoTask(Base):
     audio_url = Column(Text)
     video_urls = Column(JSONB, default=[])
     output_url = Column(Text)
+    target_languages = Column(JSONB, default=[])  # 多语种目标语言列表
+    tts_results = Column(JSONB, default={})  # 多语种TTS结果: {lang: {audio_url, scene_audios}}
     aspect_ratio = Column(String(8), default="9:16")  # 9:16 / 16:9
     error_msg = Column(Text)
     retry_count = Column(Integer, default=0)
