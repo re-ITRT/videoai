@@ -10,6 +10,7 @@ from app.workers.router import router as workflow_router
 from app.reference.router import router as reference_router
 from app.template.router import router as template_router
 from app.review import router as review_router
+from app.metrics.router import router as metrics_router
 
 # ── 初始化日志 ──────────────────────────
 from app.core.logging import setup_logging
@@ -34,6 +35,7 @@ app.include_router(workflow_router)
 app.include_router(reference_router)
 app.include_router(template_router)
 app.include_router(review_router)
+app.include_router(metrics_router)
 
 
 @app.get("/health")

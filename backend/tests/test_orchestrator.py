@@ -441,3 +441,54 @@ class TestApprove:
             await db_session.refresh(task)
             # 找不到工作流 → 直接返回，状态不变
             assert task.status != "EXPORTED"
+
+
+class TestMetrics:
+    """数据归因模块测试"""
+
+    @pytest.mark.asyncio
+    async def test_create_metric(self, client, auth_headers):
+        """测试创建视频指标"""
+        resp = await client.post("/api/v1/metrics", json={
+            "platform": "tiktok",
+            "publish_date": "2026-05-27",
+            "impressions": 10000,
+            "views": 6500,
+            "completion_rate": 45.2,
+            "likes": 320,
+            "comments": 86,
+            "product_clicks": 2100,
+            "orders": 320,
+            "gmv": 15600.00,
+            "cost": 3200.00,
+            "roi": 4.875,
+        }, headers=auth_headers)
+        assert resp.status_code == 200
+        assert "id" in resp.json()
+
+    @pytest.mark.asyncio
+    async def test_get_overview(self, client, auth_headers):
+        """测试概览接口"""
+        resp = await client.get("/api/v1/metrics/overview", headers=auth_headers)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "total_views" in data
+        assert "total_gmv" in data
+        assert "overall_roi" in data
+
+    @pytest.mark.asyncio
+    async def test_get_trend(self, client, auth_headers):
+        """测试趋势接口"""
+        resp = await client.get("/api/v1/metrics/trend?dimension=day", headers=auth_headers)
+        assert resp.status_code == 200
+        assert isinstance(resp.json(), list)
+
+    @pytest.mark.asyncio
+    async def test_get_funnel(self, client, auth_headers):
+        """测试漏斗接口"""
+        resp = await client.get("/api/v1/metrics/funnel", headers=auth_headers)
+        assert resp.status_code == 200
+        funnel = resp.json()
+        assert len(funnel) == 5
+        assert funnel[0]["name"] == "曝光"
+        assert funnel[-1]["name"] == "下单"
