@@ -1,0 +1,132 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  PYTHON_VERSION: '3.11'
+  WORK_DIR: backend
+
+jobs:
+  # ── CI 阶段：测试 ───────────────────────────────────
+  test:
+    runs-on: ubuntu-latest
+    name: 运行单元测试
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: video_ai_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置Python环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: '${{ env.WORK_DIR }}/requirements.txt'
+
+      - name: 安装依赖
+        working-directory: ${{ env.WORK_DIR }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio flake8 pytest-cov
+
+      - name: 代码格式检查
+        working-directory: ${{ env.WORK_DIR }}
+        run: |
+          flake8 app/ --max-line-length=120 --exclude=__pycache__,*.pyc
+
+      - name: 初始化测试数据库
+        working-directory: ${{ env.WORK_DIR }}
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/video_ai_test
+        run: |
+          python init_db.py
+
+      - name: 运行pytest
+        working-directory: ${{ env.WORK_DIR }}
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/video_ai_test
+          ENV: test
+        run: |
+          pytest tests/ -v --cov=app --cov-report=xml --cov-report=term
+
+      - name: 上传覆盖率报告
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: ${{ env.WORK_DIR }}/coverage.xml
+
+  # ── CD 阶段：部署 ───────────────────────────────────
+  deploy:
+    runs-on: ubuntu-latest
+    name: 部署到生产服务器
+    needs: test  # 依赖测试阶段通过
+    if: github.ref == 'refs/heads/master'  # 仅master分支部署
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 部署到服务器
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          script: |
+            cd /opt/video-ai
+            
+            # 拉取最新代码
+            echo "=== 拉取最新代码 ==="
+            git pull origin master
+            
+            # 进入后端目录
+            cd backend
+            
+            # 激活虚拟环境
+            source venv/bin/activate
+            
+            # 安装新增依赖
+            echo "=== 安装依赖 ==="
+            pip install -r requirements.txt
+            
+            # 数据库迁移（如果有新表）
+            echo "=== 数据库初始化 ==="
+            python init_db.py
+            
+            # 重启服务
+            echo "=== 重启服务 ==="
+            systemctl restart video-ai
+            
+            # 等待服务启动
+            sleep 5
+            
+            # 健康检查
+            echo "=== 健康检查 ==="
+            curl -f http://localhost:8000/health || exit 1
+            
+            echo "✅ 部署成功！"
+
+      - name: 部署通知
+        run: |
+          echo "🎉 CI/CD 流程完成，代码已成功部署到生产服务器！"
