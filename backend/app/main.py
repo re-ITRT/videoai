@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.auth.router import router as auth_router
 from app.material.router import router as material_router
@@ -36,6 +37,12 @@ app.include_router(reference_router)
 app.include_router(template_router)
 app.include_router(review_router)
 app.include_router(metrics_router)
+
+# ── 静态文件 ──────────────────────────
+import os
+uploads_dir = "/app/uploads"
+os.makedirs(uploads_dir, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 
 @app.get("/health")

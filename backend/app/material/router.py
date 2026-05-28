@@ -1,4 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+import os
+import uuid
+import shutil
+from pathlib import Path
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.deps import get_current_user
@@ -39,6 +43,50 @@ async def upload_material(
         await svc.parse_and_create_slices(db, material.id, request.scenes)
 
     return MaterialUploadResponse.model_validate(material)
+
+
+# ── File Upload ────────────────────────────
+
+UPLOAD_DIR = Path("/app/uploads")
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+
+@router.post("/upload/file")
+async def upload_material_file(
+    file: UploadFile = File(...),
+    material_type: str = Form("product"),
+    input_type: str = Form("image"),
+    category: str = Form(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """上传素材文件（图片/视频），保存文件并创建素材记录"""
+    ext = os.path.splitext(file.filename or "file")[1] or ".bin"
+    filename = f"{uuid.uuid4().hex}{ext}"
+    filepath = UPLOAD_DIR / filename
+
+    with open(filepath, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+
+    image_url = f"/uploads/{filename}"
+
+    material = await svc.create_material(
+        db=db,
+        user_id=str(current_user.id),
+        material_type=material_type,
+        input_type=input_type,
+        image_url=image_url,
+        source="upload",
+    )
+
+    return {
+        "id": material.id,
+        "material_type": material.material_type,
+        "input_type": material.input_type,
+        "image_url": image_url,
+        "source": "upload",
+        "created_at": material.created_at,
+    }
 
 
 # ── List ──────────────────────────────────

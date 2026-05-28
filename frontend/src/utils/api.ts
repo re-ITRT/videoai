@@ -42,7 +42,7 @@ export const deleteProduct = (id: number) => request.delete(`/products/${id}`)
 // ==============================
 export const getMaterials = (params?: any) => request.get('/materials', { params })
 export const uploadMaterial = (data: any) =>
-  request.post('/materials/upload', data)
+  request.post(data instanceof FormData ? '/materials/upload/file' : '/materials/upload', data)
 export const deleteMaterial = (id: number) => request.delete(`/materials/${id}`)
 export const searchMaterials = (params: any) => request.get('/materials/search', { params })
 
