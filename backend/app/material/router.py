@@ -14,6 +14,8 @@ from app.material.schemas import (
 )
 from app.material import service as svc
 from app.material import search as search_svc
+from app.core.signer import generate_signed_url
+from app.workers.workflow import call_workflow
 
 router = APIRouter(prefix="/api/v1/materials", tags=["materials"])
 
@@ -62,6 +64,7 @@ async def upload_material_file(
 ):
     """上传素材文件（图片/视频），保存文件并创建素材记录"""
     image_url = None
+    signed_url = None
     if file and file.filename:
         ext = os.path.splitext(file.filename or "file")[1] or ".bin"
         filename = f"{uuid.uuid4().hex}{ext}"
@@ -69,6 +72,7 @@ async def upload_material_file(
         with open(filepath, "wb") as f:
             shutil.copyfileobj(file.file, f)
         image_url = f"/uploads/{filename}"
+        signed_url = generate_signed_url(image_url, expire_seconds=7200)
 
     material = await svc.create_material(
         db=db,
@@ -78,6 +82,24 @@ async def upload_material_file(
         image_url=image_url,
         source="upload",
     )
+
+    # 调用 material-embed 工作流（异步触发，不阻塞返回）
+    if signed_url:
+        try:
+            public_url = f"http://114.117.242.17:3000{signed_url}"
+            workflow_result = await call_workflow("material-embed", {
+                "brief_description": category or material_type,
+                "image_url": public_url,
+                "input_type": input_type,
+                "user_id": str(current_user.id),
+                "material_type": material_type,
+            })
+            # 解析 scenes → 创建切片
+            scenes = workflow_result.get("scenes", [])
+            if scenes:
+                await svc.parse_and_create_slices(db, material.id, scenes)
+        except Exception:
+            pass  # 嵌入失败不影响上传成功
 
     return {
         "id": material.id,
