@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Card, Form, Select, Input, Button, Upload, message } from 'antd'
-import { UploadOutlined, InboxOutlined } from '@ant-design/icons'
+import { InboxOutlined } from '@ant-design/icons'
 import { uploadMaterial } from '../../utils/api'
 import { useNavigate } from 'react-router-dom'
 import type { UploadFile } from 'antd'
