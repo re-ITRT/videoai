@@ -5,8 +5,14 @@ export default function MaterialUpload() {
   const navigate = useNavigate()
   const [form] = Form.useForm()
   const onFinish = async (values: any) => {
-    try { await uploadMaterial(values); message.success('上传成功'); navigate('/material') }
-    catch { message.error('上传失败') }
+    try {
+      // 自动设置 input_type = material_type
+      await uploadMaterial({ ...values, input_type: values.material_type || 'image' })
+      message.success('上传成功')
+      navigate('/material')
+    } catch {
+      message.error('上传失败')
+    }
   }
   return (
     <Card title="上传素材">

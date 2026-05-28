@@ -41,8 +41,8 @@ export const deleteProduct = (id: number) => request.delete(`/products/${id}`)
 // Materials
 // ==============================
 export const getMaterials = (params?: any) => request.get('/materials', { params })
-export const uploadMaterial = (data: FormData) =>
-  request.post('/materials/upload', data, { headers: { 'Content-Type': 'multipart/form-data' } })
+export const uploadMaterial = (data: any) =>
+  request.post('/materials/upload', data)
 export const deleteMaterial = (id: number) => request.delete(`/materials/${id}`)
 export const searchMaterials = (params: any) => request.get('/materials/search', { params })
 
