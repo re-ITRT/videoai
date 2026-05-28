@@ -95,11 +95,20 @@ async def upload_material_file(
                     "input_type": input_type,
                     "user_id": str(current_user.id),
                     "material_type": material_type,
+                    "product_id": 0,
                 })
                 scenes = result.get("scenes", [])
-                if scenes:
-                    async with async_session() as session:
-                        await svc.parse_and_create_slices(session, material.id, scenes)
+                tags = result.get("video_tags", [])
+                # 保存嵌入结果到 material 记录
+                async with async_session() as session:
+                    m = await session.get(type(material), material.id)
+                    if m:
+                        if tags:
+                            m.tags = tags
+                        if scenes:
+                            from app.material import service as mat_svc
+                            await mat_svc.parse_and_create_slices(session, m.id, scenes)
+                        await session.commit()
             except Exception:
                 pass
         
