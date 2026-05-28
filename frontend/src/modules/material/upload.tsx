@@ -25,7 +25,8 @@ export default function MaterialUpload() {
     fd.append('input_type', mtype)
     fd.append('category', values.category || '其他')
     if (values.brief_description) fd.append('text_content', values.brief_description)
-    if (values.product_name) fd.append('product_name', values.product_name)
+    if (values.product_name && values.product_name.trim()) fd.append('product_name', values.product_name)
+    if (!fileList[0]?.originFileObj) { message.warning('请选择文件'); setUploading(false); return }
     fd.append('file', fileList[0].originFileObj as Blob)
 
     try {
