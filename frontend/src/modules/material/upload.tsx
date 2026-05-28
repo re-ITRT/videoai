@@ -19,7 +19,13 @@ export default function MaterialUpload() {
     const fd = new FormData()
     fd.append('material_type', values.material_type || 'product')
     fd.append('input_type', values.material_type || 'image')
-    fd.append('file', fileList[0].originFileObj as Blob)
+    
+    // 获取上传的文件
+    const uploadFile = fileList[0]
+    if (!uploadFile) { message.warning('请选择文件'); setUploading(false); return }
+    
+    const fileObj = (uploadFile as any).originFileObj || uploadFile
+    fd.append('file', fileObj)
 
     try {
       await uploadMaterial(fd)
