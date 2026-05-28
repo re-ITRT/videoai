@@ -1,3 +1,4 @@
+import asyncio
 import os
 import uuid
 import shutil
@@ -5,6 +6,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
+from app.core.database import async_session
 from app.core.deps import get_current_user
 from app.auth.models import User
 from app.material.schemas import (
@@ -82,24 +84,26 @@ async def upload_material_file(
         image_url=image_url,
         source="upload",
     )
-
-    # 调用 material-embed 工作流（异步触发，不阻塞返回）
+    # 异步触发 material-embed 工作流（不阻塞返回）
     if signed_url:
-        try:
-            public_url = f"http://114.117.242.17:3000{signed_url}"
-            workflow_result = await call_workflow("material-embed", {
-                "brief_description": category or material_type,
-                "image_url": public_url,
-                "input_type": input_type,
-                "user_id": str(current_user.id),
-                "material_type": material_type,
-            })
-            # 解析 scenes → 创建切片
-            scenes = workflow_result.get("scenes", [])
-            if scenes:
-                await svc.parse_and_create_slices(db, material.id, scenes)
-        except Exception:
-            pass  # 嵌入失败不影响上传成功
+        async def run_embed():
+            try:
+                public_url = f"http://114.117.242.17:3000{signed_url}"
+                result = await call_workflow("material-embed", {
+                    "brief_description": category or material_type,
+                    "image_url": public_url,
+                    "input_type": input_type,
+                    "user_id": str(current_user.id),
+                    "material_type": material_type,
+                })
+                scenes = result.get("scenes", [])
+                if scenes:
+                    async with async_session() as session:
+                        await svc.parse_and_create_slices(session, material.id, scenes)
+            except Exception:
+                pass
+        
+        asyncio.create_task(run_embed())
 
     return {
         "id": material.id,
