@@ -53,7 +53,7 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 @router.post("/upload/file")
 async def upload_material_file(
-    file: UploadFile = File(...),
+    file: UploadFile = File(None),
     material_type: str = Form("product"),
     input_type: str = Form("image"),
     category: str = Form(None),
@@ -61,14 +61,14 @@ async def upload_material_file(
     current_user: User = Depends(get_current_user),
 ):
     """上传素材文件（图片/视频），保存文件并创建素材记录"""
-    ext = os.path.splitext(file.filename or "file")[1] or ".bin"
-    filename = f"{uuid.uuid4().hex}{ext}"
-    filepath = UPLOAD_DIR / filename
-
-    with open(filepath, "wb") as f:
-        shutil.copyfileobj(file.file, f)
-
-    image_url = f"/uploads/{filename}"
+    image_url = None
+    if file and file.filename:
+        ext = os.path.splitext(file.filename or "file")[1] or ".bin"
+        filename = f"{uuid.uuid4().hex}{ext}"
+        filepath = UPLOAD_DIR / filename
+        with open(filepath, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+        image_url = f"/uploads/{filename}"
 
     material = await svc.create_material(
         db=db,
