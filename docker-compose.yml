@@ -32,6 +32,8 @@ services:
     ports:
       - "8000:8000"
     env_file: ./backend/.env
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
       - postgres
       - redis
@@ -55,3 +57,4 @@ services:
 volumes:
   pgdata:
   minio_data:
+  uploads_data:
