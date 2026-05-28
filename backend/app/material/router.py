@@ -86,9 +86,13 @@ async def upload_material_file(
     )
     # 异步触发 material-embed 工作流（不阻塞返回）
     if signed_url:
+        import logging
+        embed_logger = logging.getLogger("material-embed")
+        
         async def run_embed():
             try:
                 public_url = f"http://114.117.242.17:3000{signed_url}"
+                embed_logger.info(f"Starting material-embed for material {material.id}, url={public_url[:60]}...")
                 result = await call_workflow("material-embed", {
                     "brief_description": f"{category or material_type}素材",
                     "image_url": public_url,
@@ -110,8 +114,8 @@ async def upload_material_file(
                             from app.material import service as mat_svc
                             await mat_svc.parse_and_create_slices(session, m.id, scenes)
                         await session.commit()
-            except Exception:
-                pass
+            except Exception as e:
+                embed_logger.error(f"material-embed failed for material {material.id}: {e}")
         
         asyncio.create_task(run_embed())
 
