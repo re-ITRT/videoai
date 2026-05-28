@@ -13,6 +13,7 @@ export default function MaterialUpload() {
   const [fileList, setFileList] = useState<UploadFile[]>([])
   const [uploading, setUploading] = useState(false)
   const [mtype, setMtype] = useState<string>('image')
+  const [category, setCategory] = useState<string>('其他')
 
   const onFinish = async (values: any) => {
     if (fileList.length === 0) { message.warning('请选择文件'); return }
@@ -50,18 +51,20 @@ export default function MaterialUpload() {
         </Form.Item>
 
         <Form.Item name="category" label="分类" rules={[{ required: true }]} initialValue="其他">
-          <Select options={CATEGORIES.map(c => ({ value: c, label: c }))} />
+          <Select onChange={(v) => setCategory(v)} options={CATEGORIES.map(c => ({ value: c, label: c }))} />
         </Form.Item>
+
+        {category === '产品' && (
+          <Form.Item name="product_name" label="产品名称" rules={[{ required: true, message: '请填写产品名称' }]}>
+            <Input placeholder="请输入产品名称" />
+          </Form.Item>
+        )}
 
         {mtype === 'image' && (
           <Form.Item name="brief_description" label="描述（可选）">
             <Input.TextArea rows={3} placeholder="如：白色运动鞋 透气网面" />
           </Form.Item>
         )}
-
-        <Form.Item name="product_name" label="产品名称">
-          <Input placeholder="如输入产品名，素材即视为产品素材" />
-        </Form.Item>
 
         <Form.Item label="选择文件">
           <Upload.Dragger
