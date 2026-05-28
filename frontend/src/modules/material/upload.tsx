@@ -5,11 +5,14 @@ import { uploadMaterial } from '../../utils/api'
 import { useNavigate } from 'react-router-dom'
 import type { UploadFile } from 'antd'
 
+const CATEGORIES = ['产品', '场景', '人物', '动物', '美食', '科技', '其他']
+
 export default function MaterialUpload() {
   const navigate = useNavigate()
   const [form] = Form.useForm()
   const [fileList, setFileList] = useState<UploadFile[]>([])
   const [uploading, setUploading] = useState(false)
+  const [mtype, setMtype] = useState<string>('image')
 
   const onFinish = async (values: any) => {
     if (fileList.length === 0) { message.warning('请选择文件'); return }
@@ -17,20 +20,17 @@ export default function MaterialUpload() {
 
     setUploading(true)
     const fd = new FormData()
-    fd.append('material_type', values.material_type || 'product')
-    fd.append('input_type', values.material_type || 'image')
-    
-    // 获取上传的文件
-    const uploadFile = fileList[0]
-    if (!uploadFile) { message.warning('请选择文件'); setUploading(false); return }
-    
-    const fileObj = (uploadFile as any).originFileObj || uploadFile
-    fd.append('file', fileObj)
+    fd.append('material_type', mtype)
+    fd.append('input_type', mtype)
+    fd.append('category', values.category || '其他')
+    if (values.brief_description) fd.append('text_content', values.brief_description)
+    if (values.product_name) fd.append('product_name', values.product_name)
+    fd.append('file', fileList[0].originFileObj as Blob)
 
     try {
       await uploadMaterial(fd)
       message.success('上传成功')
-      navigate('/creation')  // 跳转到任务队列页
+      navigate('/material')
     } catch (e: any) {
       const detail = e?.response?.data?.detail || e?.message || '上传失败'
       message.error(typeof detail === 'string' ? detail : '上传失败')
@@ -42,22 +42,40 @@ export default function MaterialUpload() {
   return (
     <Card title="上传素材">
       <Form form={form} onFinish={onFinish} layout="vertical" style={{ maxWidth: 600 }}>
-        <Form.Item name="material_type" label="素材类型" rules={[{ required: true }]}>
-          <Select options={[{ value: 'image', label: '图片' }, { value: 'video', label: '视频' }, { value: 'text', label: '文本' }]} />
+        <Form.Item name="material_type" label="素材类型" rules={[{ required: true }]} initialValue="image">
+          <Select onChange={(v) => setMtype(v)} options={[
+            { value: 'image', label: '图片' },
+            { value: 'video', label: '视频' },
+          ]} />
         </Form.Item>
-        <Form.Item name="category" label="分类"><Input placeholder="如：美妆、食品、数码" /></Form.Item>
+
+        <Form.Item name="category" label="分类" rules={[{ required: true }]} initialValue="其他">
+          <Select options={CATEGORIES.map(c => ({ value: c, label: c }))} />
+        </Form.Item>
+
+        {mtype === 'image' && (
+          <Form.Item name="brief_description" label="描述（可选）">
+            <Input.TextArea rows={3} placeholder="如：白色运动鞋 透气网面" />
+          </Form.Item>
+        )}
+
+        <Form.Item name="product_name" label="产品名称">
+          <Input placeholder="如输入产品名，素材即视为产品素材" />
+        </Form.Item>
+
         <Form.Item label="选择文件">
           <Upload.Dragger
             fileList={fileList}
             beforeUpload={(f) => { setFileList([f]); return false }}
             onRemove={() => setFileList([])}
             maxCount={1}
-            accept="image/*,video/*"
+            accept={mtype === 'image' ? 'image/*' : 'video/*'}
           >
             <p className="ant-upload-drag-icon"><InboxOutlined /></p>
             <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
           </Upload.Dragger>
         </Form.Item>
+
         <Form.Item>
           <Button type="primary" htmlType="submit" loading={uploading} disabled={uploading}>
             {uploading ? '上传中...' : '提交'}

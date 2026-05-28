@@ -61,12 +61,16 @@ async def upload_material_file(
     material_type: str = Form("product"),
     input_type: str = Form("image"),
     category: str = Form(None),
+    text_content: str = Form(None),
+    product_name: str = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """上传素材文件（图片/视频），保存文件并创建素材记录"""
     image_url = None
     signed_url = None
+    product_name = None
+    text_content = None
     if file and file.filename:
         ext = os.path.splitext(file.filename or "file")[1] or ".bin"
         filename = f"{uuid.uuid4().hex}{ext}"
@@ -82,6 +86,7 @@ async def upload_material_file(
         material_type=material_type,
         input_type=input_type,
         image_url=image_url,
+        text_content=text_content,
         source="upload",
     )
     # 异步触发 material-embed 工作流（不阻塞返回）
@@ -93,11 +98,11 @@ async def upload_material_file(
             try:
                 public_url = f"http://114.117.242.17:3000{signed_url}"
                 embed_logger.info(f"Starting material-embed for material {material.id}, url={public_url[:60]}...")
+                brief = text_content or category or f"上传的{material_type}素材"
                 result = await call_workflow("material-embed", {
                     "image_url": public_url,
-                    "brief_description": category or f"上传的{material_type}素材",
+                    "brief_description": brief,
                     "material_type": "product",
-                    "product_id": 0,
                 })
                 # Coze webhook 响应可能是 {code, data} 格式
                 data = result.get("data") if isinstance(result, dict) and "data" in result else result
