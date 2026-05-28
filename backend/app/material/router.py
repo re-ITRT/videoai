@@ -102,8 +102,14 @@ async def upload_material_file(
                     "product_id": 0,
                     "category": category or "",
                 })
-                scenes = result.get("scenes", [])
-                tags = result.get("video_tags", [])
+                # Coze webhook 响应可能是 {code, data} 格式
+                data = result.get("data") if isinstance(result, dict) and "data" in result else result
+                if isinstance(data, dict):
+                    scenes = data.get("scenes", [])
+                    tags = data.get("video_tags", []) or data.get("tags", [])
+                else:
+                    scenes = result.get("scenes", [])
+                    tags = result.get("video_tags", [])
                 # 保存嵌入结果到 material 记录
                 async with async_session() as session:
                     m = await session.get(type(material), material.id)
