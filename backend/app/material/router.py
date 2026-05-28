@@ -94,13 +94,10 @@ async def upload_material_file(
                 public_url = f"http://114.117.242.17:3000{signed_url}"
                 embed_logger.info(f"Starting material-embed for material {material.id}, url={public_url[:60]}...")
                 result = await call_workflow("material-embed", {
-                    "brief_description": f"{category or material_type}素材",
                     "image_url": public_url,
-                    "input_type": input_type,
-                    "user_id": str(current_user.id),
+                    "brief_description": category or f"上传的{material_type}素材",
                     "material_type": "product",
                     "product_id": 0,
-                    "category": category or "",
                 })
                 # Coze webhook 响应可能是 {code, data} 格式
                 data = result.get("data") if isinstance(result, dict) and "data" in result else result
