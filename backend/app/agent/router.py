@@ -406,9 +406,9 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
                 "aspect_ratio": aspect_ratio,
             })
             logger.info("generate_raw_response", session_id=session_id, raw=json.dumps(result, ensure_ascii=False)[:500])
-            task_ids = []
-            if isinstance(result, dict):
-                task_ids = result.get("task_ids", [])
+            # Coze 返回格式：{"result": {"task_ids": [...]}, "run_id": "..."}
+            inner = result.get("result", result) if isinstance(result, dict) else result
+            task_ids = inner.get("task_ids", []) if isinstance(inner, dict) else []
             if not task_ids:
                 return json.dumps({"error": "提交视频生成任务失败，未获取到 task_ids"}, ensure_ascii=False)
 
@@ -431,9 +431,10 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
                         "workflow_type": "query",
                         "task_ids": task_ids,
                     })
-                    if isinstance(qr, dict):
-                        if qr.get("status") == "completed":
-                            clips = qr.get("video_clips", [])
+                    qr_inner = qr.get("result", qr) if isinstance(qr, dict) else qr
+                    if isinstance(qr_inner, dict):
+                        if qr_inner.get("status") == "completed":
+                            clips = qr_inner.get("video_clips", [])
                             for clip in clips:
                                 vu = clip.get("video_url", "")
                                 if vu:
@@ -446,7 +447,7 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
                                     db.add(sf)
                             await db.commit()
                             return json.dumps(qr, ensure_ascii=False)
-                        elif qr.get("status") == "running":
+                        elif qr_inner.get("status") == "running":
                             continue  # 继续轮询
                 except Exception as e:
                     logger.warning("poll_retry", session_id=session_id, error=str(e))
