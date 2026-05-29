@@ -68,7 +68,7 @@ export default function WorkflowSettings() {
                 })}
                 saveConfig={async (data) => {
                   const merged = { ...cfg, ...data }
-                  const res = await updateWorkflowConfig(name, { config: merged })
+                  const res: any = await updateWorkflowConfig(name, { config: merged })
                   const newCfg = res.config
                   return {
                     base_url: newCfg.base_url || '',
