@@ -34,6 +34,7 @@ services:
     env_file: ./backend/.env
     volumes:
       - uploads_data:/app/uploads
+      - logs_data:/app/logs
     depends_on:
       - postgres
       - redis
@@ -58,3 +59,4 @@ volumes:
   pgdata:
   minio_data:
   uploads_data:
+  logs_data:

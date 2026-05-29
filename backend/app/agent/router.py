@@ -6,6 +6,7 @@ from sqlalchemy import select, func as sa_func
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.auth.models import User
+from app.core.logging import get_logger
 from app.agent.models import (
     AgentSession, AgentMessage, SessionFile,
     SessionCreate, SessionResponse, MessageResponse, SessionFileResponse,
@@ -15,6 +16,10 @@ from app.workers.workflow import call_workflow
 
 router = APIRouter(prefix="/api/v1/agent", tags=["agent"])
 
+
+# ── Session CRUD ───────────────────────────
+
+logger = get_logger("agent")
 
 # ── Session CRUD ───────────────────────────
 
@@ -441,6 +446,7 @@ async def agent_chat(
     user_msg = AgentMessage(session_id=session_id, role="user", content=message)
     db.add(user_msg)
     await db.commit()
+    logger.info("chat_request", session_id=session_id, user_id=current_user.id, message_preview=message[:100])
 
     # 获取 AI 配置
     from app.ai.models import UserAIConfig
@@ -497,10 +503,14 @@ async def agent_chat(
                     detail += " | body: " + e.response.text[:500]
                 except Exception:
                     pass
+            logger.error("llm_error", session_id=session_id, round=_round, error=detail)
             raise HTTPException(status_code=502, detail=f"AI 调用失败: {detail}")
 
         choice = data["choices"][0]
         msg = choice["message"]
+        logger.info("llm_response", session_id=session_id, round=_round,
+                    model=payload["model"], tool_calls=bool(msg.get("tool_calls")),
+                    finish_reason=choice.get("finish_reason"))
         assistant_content = msg.get("content", "")
         reasoning = msg.get("reasoning_content") or msg.get("reasoning")
         tool_calls = msg.get("tool_calls")
@@ -549,8 +559,11 @@ async def agent_chat(
                 if "session_id" not in func_args:
                     func_args["session_id"] = session_id
                 result_text = await execute_tool(func_name, func_args, db, session_id, current_user)
+                logger.info("tool_executed", session_id=session_id, tool=func_name,
+                            args_preview=str(func_args)[:200], result_preview=result_text[:200])
             except Exception as e:
                 result_text = json.dumps({"error": str(e)}, ensure_ascii=False)
+                logger.error("tool_error", session_id=session_id, tool=func_name, error=str(e))
 
             tool_msg = AgentMessage(
                 session_id=session_id, role="tool",
