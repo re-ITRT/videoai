@@ -405,6 +405,7 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
                 "scenes": scenes,
                 "aspect_ratio": aspect_ratio,
             })
+            logger.info("generate_raw_response", session_id=session_id, raw=json.dumps(result, ensure_ascii=False)[:500])
             task_ids = []
             if isinstance(result, dict):
                 task_ids = result.get("task_ids", [])
