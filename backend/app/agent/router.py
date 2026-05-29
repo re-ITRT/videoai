@@ -253,6 +253,18 @@ TOOLS_DEFINITIONS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "check_video_status",
+            "description": "【状态查询】查询已提交的视频生成任务的进度，返回 running 或 completed + 视频URL",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        },
+    },
 ]
 
 
@@ -281,6 +293,9 @@ SYSTEM_PROMPT = """你是 Video-AI 平台的 AI 助手，帮助用户生成电�
 
 ### 步骤 6 — 视频合成 (compose_video)
 将视频片段 + 音频合成为最终视频，存入 final_videos/ 目录。
+
+### 检查进度 (check_video_status)
+提交视频生成后，用此工具查询进度。返回 completed 后才可合成。
 
 ## 核心规则
 - 必须按 1→2→3→4→5→6 顺序执行，不能跳步
@@ -418,42 +433,38 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
                 db.add(sf)
                 await db.commit()
 
-            # 启动后台轮询
-            async def poll_video():
-                for attempt in range(60):  # 60 * 30s = 30 min
-                    await asyncio.sleep(30)
-                    try:
-                        qr = await call_workflow("video-generate", {
-                            "workflow_type": "query",
-                            "task_ids": task_ids,
-                        })
-                        if isinstance(qr, dict):
-                            if qr.get("status") == "completed":
-                                clips = qr.get("video_clips", [])
-                                async with async_session() as bg_db:
-                                    for clip in clips:
-                                        vu = clip.get("video_url", "")
-                                        if vu:
-                                            bg_db.add(SessionFile(
-                                                session_id=session_id, file_type="video_clip",
-                                                filename=f"clip_{session_id}_scene{clip.get('scene_id', '')}.mp4",
-                                                file_url=vu,
-                                                description=f"场景 {clip.get('scene_id', '')} 视频片段",
-                                            ))
-                                    await bg_db.commit()
-                                logger.info("poll_video_done", session_id=session_id)
-                                return
-                        # still running, continue polling
-                    except Exception as e:
-                        logger.warning("poll_video_retry", session_id=session_id, error=str(e))
-                logger.warning("poll_video_timeout", session_id=session_id)
-            asyncio.create_task(poll_video())
-
             return json.dumps({
                 "status": "submitted",
-                "message": f"视频生成任务已提交（{len(scenes)} 个分镜），后台正在生成中，约 10-15 分钟后完成。完成后会通知你。",
+                "message": f"视频生成任务已提交（{len(scenes)} 个分镜），正在生成中，约 10-15 分钟后完成。可以用 check_video_status 工具查询进度。",
                 "task_ids": task_ids,
             }, ensure_ascii=False)
+
+        elif tool_name == "check_video_status":
+            # 从 session_file 读取 task_ids
+            existing_files = await get_session_files(db, session_id)
+            task_file = next((f for f in existing_files if f.file_type == "video_task"), None)
+            if not task_file or not task_file.description:
+                return json.dumps({"status": "no_task", "message": "没有找到视频生成任务"}, ensure_ascii=False)
+            task_ids = json.loads(task_file.description)
+            qr = await call_workflow("video-generate", {
+                "workflow_type": "query",
+                "task_ids": task_ids,
+            })
+            if isinstance(qr, dict) and qr.get("status") == "completed":
+                clips = qr.get("video_clips", [])
+                for clip in clips:
+                    vu = clip.get("video_url", "")
+                    if vu:
+                        existing_urls = {f.file_url for f in existing_files if f.file_type == "video_clip"}
+                        if vu not in existing_urls:
+                            db.add(SessionFile(
+                                session_id=session_id, file_type="video_clip",
+                                filename=f"clip_{session_id}_scene{clip.get('scene_id', '')}.mp4",
+                                file_url=vu,
+                                description=f"场景 {clip.get('scene_id', '')} 视频片段",
+                            ))
+                await db.commit()
+            return json.dumps(qr, ensure_ascii=False)
 
         elif tool_name == "compose_video":
             # 从 SessionFile 读取已生成的视频片段和音频
