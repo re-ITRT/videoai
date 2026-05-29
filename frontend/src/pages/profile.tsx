@@ -126,7 +126,7 @@ function AIConfigForm() {
       const data: any = {}
       if (values.api_key) data.api_key = values.api_key
       data.base_url = values.base_url || 'https://api.openai.com/v1'
-      const res = await scanModels(data)
+      const res: any = await scanModels(data)
       form.setFieldsValue({ model: res.selected })
       setConfig((prev: any) => ({ ...prev, available_models: res.models, base_url: values.base_url }))
       message.success(`扫描到 ${res.models.length} 个模型`)
