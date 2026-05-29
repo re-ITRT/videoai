@@ -10,7 +10,7 @@ from app.workflow.models import (
     WorkflowConfig, WorkflowConfigResponse, WorkflowConfigUpdate,
     AVAILABLE_WORKFLOWS,
 )
-import os
+import os, httpx
 
 router = APIRouter(prefix="/api/v1/workflows", tags=["workflows"])
 
@@ -123,3 +123,35 @@ async def update_workflow_prompt(workflow_name: str, filename: str, body: dict):
     with open(fpath, "w", encoding="utf-8") as f:
         f.write(content)
     return {"ok": True}
+
+
+@router.post("/configs/{workflow_name}/scan-models")
+async def scan_workflow_models(
+    workflow_name: str,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """扫描工作流 LLM 的可用模型"""
+    config = await get_or_create_config(db, current_user.id, workflow_name)
+    cfg = json.loads(config.config or "{}")
+    base_url = body.get("base_url") or cfg.get("base_url", "https://api.openai.com/v1")
+    api_key = body.get("api_key") or cfg.get("api_key", "")
+    if not api_key:
+        raise HTTPException(status_code=400, detail="请先配置 API Key")
+    url = base_url.rstrip("/") + "/models"
+    headers = {"Authorization": f"Bearer {api_key}"}
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(url, headers=headers)
+            resp.raise_for_status()
+            data = resp.json()
+            models = [m["id"] for m in data.get("data", []) if "id" in m]
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=502, detail=f"API 返回错误: {e.response.status_code}")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"连接失败: {str(e)}")
+    cfg["available_models"] = models
+    config.config = json.dumps(cfg)
+    await db.commit()
+    return {"models": models, "selected": cfg.get("model", models[0] if models else "")}

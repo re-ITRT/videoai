@@ -1,58 +1,16 @@
 import { useState, useEffect } from 'react'
-import { Card, Form, Input, Button, Spin, message, Tag, Space, Tabs, Modal } from 'antd'
+import { Card, Button, Spin, message, Tag, Space } from 'antd'
 import {
   getWorkflowConfigs, updateWorkflowConfig, getAvailableWorkflows,
 } from '../../utils/api'
 import request from '../../utils/request'
-
-const { TextArea } = Input
-
-function PromptEditor({ workflowName, visible, onClose }: { workflowName: string; visible: boolean; onClose: () => void }) {
-  const [files, setFiles] = useState<Record<string, string>>({})
-  const [activeTab, setActiveTab] = useState<string>('')
-
-  useEffect(() => {
-    if (!visible) return
-    request.get(`/workflows/prompts/${workflowName}`).then((res: any) => {
-      setFiles(res.files || {})
-      const keys = Object.keys(res.files || {})
-      if (keys.length > 0) setActiveTab(keys[0])
-    }).catch(() => message.error('加载prompt失败'))
-  }, [visible, workflowName])
-
-  const handleSave = async (filename: string) => {
-    try {
-      await request.put(`/workflows/prompts/${workflowName}/${filename}`, { content: files[filename] })
-      message.success(`${filename} 已保存`)
-    } catch {
-      message.error('保存失败')
-    }
-  }
-
-  const keys = Object.keys(files)
-  if (keys.length === 0) return null
-
-  return (
-    <Modal title={`Prompt 编辑器 - ${workflowName}`} open={visible} onCancel={onClose} width={800} footer={null}>
-      <Tabs activeKey={activeTab} onChange={setActiveTab} items={keys.map(k => ({
-        key: k,
-        label: k,
-        children: (
-          <div>
-            <TextArea rows={20} value={files[k]} onChange={e => setFiles({ ...files, [k]: e.target.value })} />
-            <Button type="primary" style={{ marginTop: 8 }} onClick={() => handleSave(k)}>保存 {k}</Button>
-          </div>
-        ),
-      }))} />
-    </Modal>
-  )
-}
+import LlmConfigForm from '../common/LlmConfigForm'
+import PromptEditor from './PromptEditor'
 
 export default function WorkflowSettings() {
   const [configs, setConfigs] = useState<Record<string, any>>({})
   const [availMeta, setAvailMeta] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState<string | null>(null)
   const [promptWorkflow, setPromptWorkflow] = useState<string | null>(null)
 
   const load = async () => {
@@ -71,16 +29,6 @@ export default function WorkflowSettings() {
 
   useEffect(() => { load() }, [])
 
-  const handleSave = async (name: string, values: any) => {
-    setSaving(name)
-    try {
-      const current = configs[name]?.config || {}
-      await updateWorkflowConfig(name, { config: { ...current, ...values } })
-      message.success(`${name} 配置已保存`)
-    } catch { message.error('保存失败') }
-    setSaving(null)
-  }
-
   if (loading) return <Spin />
 
   const names = Object.keys(availMeta)
@@ -90,7 +38,9 @@ export default function WorkflowSettings() {
     <div>
       {names.map((name) => {
         const meta = availMeta[name]
+        const isLlm = meta.fields?.some((f: any) => f.key === 'model')
         const cfg = configs[name]?.config || {}
+
         return (
           <Card
             key={name}
@@ -107,26 +57,34 @@ export default function WorkflowSettings() {
             extra={<Button size="small" onClick={() => setPromptWorkflow(name)}>编辑 Prompt</Button>}
           >
             <p style={{ color: '#666', fontSize: 13, marginBottom: 12 }}>{meta.description}</p>
-            <Form
-              layout="vertical"
-              initialValues={cfg}
-              onFinish={(values) => handleSave(name, values)}
-            >
-              {(meta.fields || []).map((f: any) => (
-                <Form.Item key={f.key} name={f.key} label={f.label}>
-                  {f.type === 'password' ? (
-                    <Input.Password placeholder={f.placeholder} />
-                  ) : (
-                    <Input placeholder={f.placeholder} />
-                  )}
-                </Form.Item>
-              ))}
-              <Form.Item>
-                <Button type="primary" htmlType="submit" loading={saving === name}>
-                  保存配置
-                </Button>
-              </Form.Item>
-            </Form>
+
+            {isLlm ? (
+              <LlmConfigForm
+                getConfig={async () => ({
+                  base_url: cfg.base_url || '',
+                  model: cfg.model || '',
+                  has_api_key: !!cfg.api_key,
+                  available_models: cfg.available_models || [],
+                })}
+                saveConfig={async (data) => {
+                  const merged = { ...cfg, ...data }
+                  const res = await updateWorkflowConfig(name, { config: merged })
+                  const newCfg = res.config
+                  return {
+                    base_url: newCfg.base_url || '',
+                    model: newCfg.model || '',
+                    has_api_key: !!newCfg.api_key,
+                    available_models: newCfg.available_models || [],
+                  }
+                }}
+                scanModels={async (data) => {
+                  const res = await request.post(`/workflows/configs/${name}/scan-models`, data)
+                  return res
+                }}
+              />
+            ) : (
+              <p style={{ color: '#999', fontSize: 13 }}>该工作流无需配置</p>
+            )}
           </Card>
         )
       })}

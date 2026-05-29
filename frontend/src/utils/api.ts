@@ -83,3 +83,5 @@ export const getWorkflowConfig = (name: string) => request.get(`/workflows/confi
 export const updateWorkflowConfig = (name: string, data: any) =>
   request.put(`/workflows/configs/${name}`, data)
 export const getAvailableWorkflows = () => request.get('/workflows/available')
+export const scanWorkflowModels = (name: string, data: any) =>
+  request.post(`/workflows/configs/${name}/scan-models`, data)
