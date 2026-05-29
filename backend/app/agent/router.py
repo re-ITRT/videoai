@@ -345,7 +345,30 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
                 "target_duration": args.get("target_duration", 15),
                 "selected_materials": args.get("selected_materials", []),
             }
-            result = await call_workflow("script-generate", payload)
+            # 检查是否启用本地工作流
+            from sqlalchemy import select as _select
+            from app.workflow.models import WorkflowConfig
+            wf_q = await db.execute(
+                _select(WorkflowConfig).where(
+                    WorkflowConfig.user_id == user.id,
+                    WorkflowConfig.workflow_name == "script-generate",
+                )
+            )
+            wf_cfg = wf_q.scalar_one_or_none()
+            if wf_cfg and wf_cfg.enabled:
+                cfg = json.loads(wf_cfg.config or "{}")
+                if cfg.get("api_key") and cfg.get("base_url") and cfg.get("model"):
+                    from app.workflow.runners.script_generate import run_script_generate
+                    result = await run_script_generate(
+                        api_key=cfg["api_key"],
+                        base_url=cfg["base_url"],
+                        model=cfg["model"],
+                        params=payload,
+                    )
+                else:
+                    result = await call_workflow("script-generate", payload)
+            else:
+                result = await call_workflow("script-generate", payload)
             # 保存到 session_file
             script_json = json.dumps(result, ensure_ascii=False)
             sf = SessionFile(
