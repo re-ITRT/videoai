@@ -16,7 +16,9 @@
 - 素材ID {{ material.material_id }}: {{ material.text_content }}（标签：{{ material.tags | join('、') }}）
 {% endfor %}
 
-请生成完整的剧本JSON，确保：
-1. 所有场景时长总和等于{{ duration }}秒
-2. 合理使用narration和dialogue两种line_type
-3. 为narration类型的场景配置TTS参数
+## 要求
+1. 所有场景时长总和必须等于{{ duration }}秒
+2. 每个场景用 `lines` 数组控制台词时间轴
+3. lines 中每条台词需指定：speaker（说话人）、text（台词）、tone（语气语调）、start_sec/end_sec（在场景内的起止秒数）
+4. 至少有一些旁白台词，也可以加入角色对话增加代入感
+5. 台词时长和场景时长相匹配
