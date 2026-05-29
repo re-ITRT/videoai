@@ -105,4 +105,4 @@ async def scan_available_models(
         config.api_key = body.api_key
     await db.commit()
 
-    return {"models": models, "selected": config.model}
+    return {"models": models, "selected": config.model if config.model and config.model in models else (models[0] if models else config.model)}

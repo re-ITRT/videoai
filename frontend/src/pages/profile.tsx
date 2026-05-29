@@ -103,14 +103,14 @@ function AIConfigForm() {
   useEffect(() => {
     getAIConfig().then((res: any) => {
       setConfig(res)
-      form.setFieldsValue({ base_url: res.base_url, api_key: '', model: res.model })
+      form.setFieldsValue({ base_url: res.base_url, api_key: '', model: [res.model] })
     }).catch(() => message.error('加载AI配置失败')).finally(() => setLoading(false))
   }, [])
 
   const handleSave = async (values: any) => {
     setSaving(true)
     try {
-      const data: any = { base_url: values.base_url, model: values.model }
+      const data: any = { base_url: values.base_url, model: values.model?.[0] }
       if (values.api_key) data.api_key = values.api_key
       const res = await updateAIConfig(data)
       setConfig(res)
@@ -128,7 +128,7 @@ function AIConfigForm() {
       if (values.api_key) data.api_key = values.api_key
       data.base_url = values.base_url || 'https://api.openai.com/v1'
       const res: any = await scanModels(data)
-      form.setFieldsValue({ model: res.selected })
+      form.setFieldsValue({ model: [res.selected] })
       setConfig((prev: any) => ({ ...prev, available_models: res.models, base_url: values.base_url }))
       message.success(`扫描到 ${res.models.length} 个模型`)
     } catch (e: any) { message.error(e?.response?.data?.detail || '扫描失败') }
@@ -148,6 +148,8 @@ function AIConfigForm() {
         <Space>
           <Form.Item name="model" noStyle>
             <Select style={{ width: 280 }} placeholder="选择或输入模型名" mode="tags" maxCount={1}
+              showSearch
+              dropdownRender={(menu) => menu}
               options={config?.available_models?.map((m: string) => ({ value: m, label: m })) || []}
             />
           </Form.Item>
