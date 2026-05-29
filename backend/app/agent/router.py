@@ -203,12 +203,11 @@ TOOLS_DEFINITIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "session_id": {"type": "integer", "description": "当前 Session ID"},
                     "script_text": {"type": "string", "description": "旁白文字内容"},
                     "voice": {"type": "string", "description": "音色，默认女声"},
                     "speed": {"type": "number", "description": "语速倍率，默认1.0"},
                 },
-                "required": ["session_id", "script_text"],
+                "required": ["script_text"],
             },
         },
     },
@@ -220,7 +219,6 @@ TOOLS_DEFINITIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "session_id": {"type": "integer", "description": "当前 Session ID"},
                     "scenes": {
                         "type": "array",
                         "items": {
@@ -235,7 +233,7 @@ TOOLS_DEFINITIONS = [
                     },
                     "aspect_ratio": {"type": "string", "description": "画幅比例 9:16 或 16:9", "default": "9:16"},
                 },
-                "required": ["session_id", "scenes"],
+                "required": ["scenes"],
             },
         },
     },
@@ -247,11 +245,10 @@ TOOLS_DEFINITIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "session_id": {"type": "integer", "description": "当前 Session ID"},
                     "script_text": {"type": "string", "description": "旁白文字（用于字幕）"},
                     "aspect_ratio": {"type": "string", "description": "画幅比例 9:16 或 16:9", "default": "9:16"},
                 },
-                "required": ["session_id"],
+                "required": ["script_text"],
             },
         },
     },
