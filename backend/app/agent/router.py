@@ -397,41 +397,30 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
             for s in scenes:
                 if "visual_desc" not in s and "visual_description" in s:
                     s["visual_desc"] = s.pop("visual_description")
-            # 异步启动视频生成（不阻塞，因为 Coze webhook 有超时限制）
-            async def bg_video_gen():
-                try:
-                    payload = {
-                        "task_id": session_id,
-                        "scenes": scenes,
-                        "aspect_ratio": aspect_ratio,
-                    }
-                    result = await call_workflow("video-generate", payload)
-                    clips = []
-                    if isinstance(result, dict):
-                        clips = result.get("video_clips", []) or result.get("data", result)
-                        if isinstance(clips, dict) and "video_clips" in clips:
-                            clips = clips["video_clips"]
-                    if isinstance(clips, list):
-                        async with async_session() as bg_db:
-                            for clip in clips:
-                                video_url = clip.get("video_url", "")
-                                if video_url:
-                                    bg_db.add(SessionFile(
-                                        session_id=session_id, file_type="video_clip",
-                                        filename=f"clip_{session_id}_scene{clip.get('scene_id', '')}.mp4",
-                                        file_url=video_url,
-                                        description=f"场景 {clip.get('scene_id', '')} 视频片段",
-                                    ))
-                            await bg_db.commit()
-                        logger.info("bg_video_done", session_id=session_id, clips=len(clips))
-                except Exception as e:
-                    logger.error("bg_video_failed", session_id=session_id, error=str(e))
-            asyncio.create_task(bg_video_gen())
-            return json.dumps({
-                "status": "submitted",
-                "message": f"视频生成任务已提交（{len(scenes)} 个分镜），预计 10-15 分钟后完成。完成后会自动存入 session 文件，届时可继续视频合成。",
-                "scene_count": len(scenes),
-            }, ensure_ascii=False)
+            payload = {
+                "task_id": session_id,
+                "scenes": scenes,
+                "aspect_ratio": aspect_ratio,
+            }
+            result = await call_workflow("video-generate", payload)
+            clips = []
+            if isinstance(result, dict):
+                clips = result.get("video_clips", []) or result.get("data", result)
+                if isinstance(clips, dict) and "video_clips" in clips:
+                    clips = clips["video_clips"]
+            if isinstance(clips, list):
+                for clip in clips:
+                    video_url = clip.get("video_url", "")
+                    if video_url:
+                        sf = SessionFile(
+                            session_id=session_id, file_type="video_clip",
+                            filename=f"clip_{session_id}_scene{clip.get('scene_id', '')}.mp4",
+                            file_url=video_url,
+                            description=f"场景 {clip.get('scene_id', '')} 视频片段",
+                        )
+                        db.add(sf)
+                await db.commit()
+            return json.dumps(result, ensure_ascii=False, indent=2)
 
         elif tool_name == "compose_video":
             # 从 SessionFile 读取已生成的视频片段和音频
