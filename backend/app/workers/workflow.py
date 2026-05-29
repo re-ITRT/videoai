@@ -33,7 +33,7 @@ WORKFLOW_URLS = {
 
 AVAILABLE_WORKFLOWS = list(WORKFLOW_URLS.keys())
 
-WORKFLOW_TIMEOUT = 120  # seconds
+WORKFLOW_TIMEOUT = 600  # seconds (10 min, for slow video gen)
 
 
 async def call_workflow(workflow_name: str, payload: dict) -> dict:
