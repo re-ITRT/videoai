@@ -7,13 +7,6 @@ import request from '../../utils/request'
 
 const { TextArea } = Input
 
-interface WorkflowField {
-  key: string
-  label: string
-  type: string
-  placeholder?: string
-}
-
 function PromptEditor({ workflowName, visible, onClose }: { workflowName: string; visible: boolean; onClose: () => void }) {
   const [files, setFiles] = useState<Record<string, string>>({})
   const [activeTab, setActiveTab] = useState<string>('')
