@@ -1,6 +1,7 @@
 """AI Agent — Session + 消息 + 工具调用"""
 import json
 import os
+import shutil
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -130,9 +131,6 @@ async def list_sessions(db: AsyncSession, user_id: int) -> list[AgentSession]:
         .order_by(AgentSession.updated_at.desc())
     )
     return list(result.scalars().all())
-
-
-import shutil
 
 
 async def delete_session(db: AsyncSession, session_id: int, user_id: int) -> bool:
