@@ -124,7 +124,7 @@ async def upload_material_file(
                             from sqlalchemy import text as sa_text
                             vec_str = "[" + ",".join(str(v) for v in image_emb) + "]"
                             await session.execute(
-                                sa_text("UPDATE materials SET embedding = :vec::vector WHERE id = :id"),
+                                sa_text("UPDATE materials SET embedding = CAST(:vec AS vector) WHERE id = :id"),
                                 {"vec": vec_str, "id": m.id},
                             )
                         if scenes:
