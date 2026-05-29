@@ -9,6 +9,14 @@ from app.core.deps import get_current_user
 from app.auth.models import User
 from app.ai.models import UserAIConfig, AIConfigResponse, AIConfigUpdate
 
+from pydantic import BaseModel
+
+
+class ScanModelsRequest(BaseModel):
+    base_url: str | None = None
+    api_key: str | None = None
+
+
 router = APIRouter(prefix="/api/v1/users/me/ai-config", tags=["ai"])
 
 
@@ -64,15 +72,14 @@ async def update_ai_config(
 
 @router.post("/scan-models")
 async def scan_available_models(
-    base_url: str | None = None,
-    api_key: str | None = None,
+    body: ScanModelsRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """扫描可用模型列表"""
     config = await get_or_create_config(db, current_user.id)
-    url = (base_url or config.base_url).rstrip("/") + "/models"
-    key = api_key or config.api_key
+    url = (body.base_url or config.base_url).rstrip("/") + "/models"
+    key = body.api_key or config.api_key
 
     if not key:
         raise HTTPException(status_code=400, detail="请先配置 API Key")
@@ -90,10 +97,10 @@ async def scan_available_models(
         raise HTTPException(status_code=502, detail=f"连接失败: {str(e)}")
 
     config.available_models = json.dumps(models)
-    if base_url:
-        config.base_url = base_url
-    if api_key:
-        config.api_key = api_key
+    if body.base_url:
+        config.base_url = body.base_url
+    if body.api_key:
+        config.api_key = body.api_key
     await db.commit()
 
     return {"models": models, "selected": config.model}
