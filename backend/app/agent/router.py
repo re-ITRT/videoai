@@ -365,6 +365,9 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
             for s in scenes:
                 if "visual_desc" not in s and "visual_description" in s:
                     s["visual_desc"] = s.pop("visual_description")
+                # TTS 需要 text 字段
+                if "text" not in s:
+                    s["text"] = s.get("subtitle", "") or s.get("visual_desc", "") or args.get("script_text", "")
             payload = {"scenes": scenes}
             result = await call_workflow("tts-generate", payload)
             # tts-generate 输出 {audio_segments: [{scene_id, audio_url, duration}, ...]}
