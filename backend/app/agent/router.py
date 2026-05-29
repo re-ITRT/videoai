@@ -1,6 +1,7 @@
 """AI Agent 路由 — Session 管理 + 聊天 + 工具调用"""
 import asyncio
 import json
+import time
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func as sa_func
@@ -412,32 +413,59 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
             for s in scenes:
                 if "visual_desc" not in s and "visual_description" in s:
                     s["visual_desc"] = s.pop("visual_description")
-            payload = {
+            # 1. 提交任务
+            result = await call_workflow("video-generate", {
                 "workflow_type": "generate",
                 "task_id": session_id,
                 "scenes": scenes,
                 "aspect_ratio": aspect_ratio,
-            }
-            result = await call_workflow("video-generate", payload)
+            })
             task_ids = []
             if isinstance(result, dict):
                 task_ids = result.get("task_ids", [])
-            # 保存 task_ids 到 session_file
-            if task_ids:
-                sf = SessionFile(
-                    session_id=session_id, file_type="video_task",
-                    filename=f"tasks_{session_id}.json",
-                    file_url="",
-                    description=json.dumps(task_ids, ensure_ascii=False),
-                )
-                db.add(sf)
-                await db.commit()
+            if not task_ids:
+                return json.dumps({"error": "提交视频生成任务失败，未获取到 task_ids"}, ensure_ascii=False)
 
-            return json.dumps({
-                "status": "submitted",
-                "message": f"视频生成任务已提交（{len(scenes)} 个分镜），正在生成中，约 10-15 分钟后完成。可以用 check_video_status 工具查询进度。",
-                "task_ids": task_ids,
-            }, ensure_ascii=False)
+            # 保存 task_ids
+            sf = SessionFile(
+                session_id=session_id, file_type="video_task",
+                filename=f"tasks_{session_id}.json",
+                file_url="",
+                description=json.dumps(task_ids, ensure_ascii=False),
+            )
+            db.add(sf)
+            await db.commit()
+
+            # 2. 轮询等待（最多 30 分钟）
+            deadline = time.monotonic() + 1800  # 30 min
+            while time.monotonic() < deadline:
+                await asyncio.sleep(30)
+                try:
+                    qr = await call_workflow("video-generate", {
+                        "workflow_type": "query",
+                        "task_ids": task_ids,
+                    })
+                    if isinstance(qr, dict):
+                        if qr.get("status") == "completed":
+                            clips = qr.get("video_clips", [])
+                            for clip in clips:
+                                vu = clip.get("video_url", "")
+                                if vu:
+                                    sf = SessionFile(
+                                        session_id=session_id, file_type="video_clip",
+                                        filename=f"clip_{session_id}_scene{clip.get('scene_id', '')}.mp4",
+                                        file_url=vu,
+                                        description=f"场景 {clip.get('scene_id', '')} 视频片段",
+                                    )
+                                    db.add(sf)
+                            await db.commit()
+                            return json.dumps(qr, ensure_ascii=False)
+                        elif qr.get("status") == "running":
+                            continue  # 继续轮询
+                except Exception as e:
+                    logger.warning("poll_retry", session_id=session_id, error=str(e))
+                    continue
+            return json.dumps({"error": "视频生成超时（30分钟）"}, ensure_ascii=False)
 
         elif tool_name == "check_video_status":
             # 从 session_file 读取 task_ids
