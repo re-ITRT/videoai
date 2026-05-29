@@ -1,0 +1,22 @@
+请根据以下信息生成短视频剧本：
+
+## 产品信息
+- 产品名称：{{ product_info.name }}
+- 产品描述：{{ product_info.description }}
+- 核心卖点：{{ product_info.selling_points | join('、') }}
+
+## 风格定位
+{{ style }}
+
+## 总时长
+{{ duration }}秒
+
+## 可用素材
+{% for material in materials %}
+- 素材ID {{ material.material_id }}: {{ material.text_content }}（标签：{{ material.tags | join('、') }}）
+{% endfor %}
+
+请生成完整的剧本JSON，确保：
+1. 所有场景时长总和等于{{ duration }}秒
+2. 合理使用narration和dialogue两种line_type
+3. 为narration类型的场景配置TTS参数

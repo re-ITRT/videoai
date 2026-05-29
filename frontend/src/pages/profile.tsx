@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Card, Form, Input, Button, Descriptions, message, Spin, Select, Space } from 'antd'
 import { useAuth } from '../hooks/useAuth'
+import WorkflowSettings from '../modules/workflow/WorkflowSettings'
 import { getMyProfile, updateMyProfile, changeMyPassword, getAIConfig, updateAIConfig, scanModels } from '../utils/api'
 
 export default function Profile() {
@@ -74,6 +75,10 @@ export default function Profile() {
 
       <Card title="AI 配置" style={{ marginBottom: 24 }}>
         <AIConfigForm />
+      </Card>
+
+      <Card title="工作流设置" style={{ marginBottom: 24 }}>
+        <WorkflowSettings />
       </Card>
 
       <Card title="修改密码">

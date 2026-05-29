@@ -74,3 +74,12 @@ export const regenerateScene = (taskId: number, sceneId: number) =>
 export const getAIConfig = () => request.get('/users/me/ai-config')
 export const updateAIConfig = (data: any) => request.put('/users/me/ai-config', data)
 export const scanModels = (data?: any) => request.post('/users/me/ai-config/scan-models', data)
+
+// ==============================
+// Workflow Configs
+// ==============================
+export const getWorkflowConfigs = () => request.get('/workflows/configs')
+export const getWorkflowConfig = (name: string) => request.get(`/workflows/configs/${name}`)
+export const updateWorkflowConfig = (name: string, data: any) =>
+  request.put(`/workflows/configs/${name}`, data)
+export const getAvailableWorkflows = () => request.get('/workflows/available')
