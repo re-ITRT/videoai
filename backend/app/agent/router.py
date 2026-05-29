@@ -200,6 +200,22 @@ TOOLS_DEFINITIONS = [
     {
         "type": "function",
         "function": {
+            "name": "generate_tts",
+            "description": "【步骤4】根据剧本旁白生成语音音频，文件存入 session 的 tts/ 目录",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "script_text": {"type": "string", "description": "旁白文字内容"},
+                    "voice": {"type": "string", "description": "音色，默认女声"},
+                    "speed": {"type": "number", "description": "语速倍率，默认1.0"},
+                },
+                "required": ["script_text"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "generate_video",
             "description": "【步骤5】根据剧本分镜描述生成 AI 视频片段，文件存入 session 的 video_clips/ 目录",
             "parameters": {
@@ -258,14 +274,17 @@ SYSTEM_PROMPT = """你是 Video-AI 平台的 AI 助手，帮助用户生成电�
 ### 步骤 3 — 剧本生成 (generate_script)
 基于产品信息和选定的素材，生成结构化剧本。
 
-### 步骤 4 — 视频生成 (generate_video)
+### 步骤 4 — 语音合成 (generate_tts)
+根据剧本旁白生成语音，文件自动存入 session 的 tts/ 目录。
+
+### 步骤 5 — 视频生成 (generate_video)
 根据剧本分镜生成视频片段，文件自动存入 video_clips/ 目录。
 
-### 步骤 5 — 视频合成 (compose_video)
-将视频片段合成为最终视频（合成时自动生成语音和字幕），存入 final_videos/ 目录。
+### 步骤 6 — 视频合成 (compose_video)
+将视频片段 + 音频合成为最终视频，存入 final_videos/ 目录。
 
 ## 核心规则
-- 必须按 1→2→3→4→5 顺序执行，不能跳步
+- 必须按 1→2→3→4→5→6 顺序执行，不能跳步
 - 每步完成后向用户说明结果
 - 工具执行结果会通过 role=tool 消息返回，自动记录到数据库
 - 用户可以在中间步骤调整参数（如换关键词、选不同素材）
@@ -339,6 +358,40 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
             await db.commit()
             return json.dumps(result, ensure_ascii=False, indent=2)
 
+        elif tool_name == "generate_tts":
+            scenes = args.get("scenes", [])
+            if not scenes:
+                # fallback: wrap flat script_text into a single scene
+                scenes = [{"scene_id": 1, "visual_desc": args.get("script_text", ""), "duration": 15}]
+            # 确保字段名对齐 workflow
+            for s in scenes:
+                if "visual_desc" not in s and "visual_description" in s:
+                    s["visual_desc"] = s.pop("visual_description")
+                # TTS 需要 text 字段
+                if "text" not in s:
+                    s["text"] = s.get("subtitle", "") or s.get("visual_desc", "") or args.get("script_text", "")
+            payload = {"scenes": scenes}
+            result = await call_workflow("tts-generate", payload)
+            # tts-generate 输出 {audio_segments: [{scene_id, audio_url, duration}, ...]}
+            segments = []
+            if isinstance(result, dict):
+                segments = result.get("audio_segments", []) or result.get("data", result)
+                if isinstance(segments, dict) and "audio_segments" in segments:
+                    segments = segments["audio_segments"]
+            if isinstance(segments, list):
+                for seg in segments:
+                    audio_url = seg.get("audio_url", "")
+                    if audio_url:
+                        sf = SessionFile(
+                            session_id=session_id, file_type="tts",
+                            filename=f"tts_{session_id}_scene{seg.get('scene_id', '')}.mp3",
+                            file_url=audio_url,
+                            description=f"场景 {seg.get('scene_id', '')} TTS 语音",
+                        )
+                        db.add(sf)
+                await db.commit()
+            return json.dumps(result, ensure_ascii=False, indent=2)
+
         elif tool_name == "generate_video":
             scenes = args.get("scenes", [])
             aspect_ratio = args.get("aspect_ratio", "9:16")
@@ -402,16 +455,27 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
             return json.dumps({"error": "视频生成超时（30分钟）"}, ensure_ascii=False)
 
         elif tool_name == "compose_video":
-            # 从 SessionFile 读取已生成的视频片段（音频由 compose workflow 内部自动生成）
+            # 从 SessionFile 读取已生成的视频片段和音频
             existing_files = await get_session_files(db, session_id)
+            tts_files = [f for f in existing_files if f.file_type == "tts"]
             video_files = [f for f in existing_files if f.file_type == "video_clip"]
-            full_text = args.get("script_text", "")
+            # 如果只有一个 TTS 音频，给所有场景复用
+            fallback_audio = tts_files[0].file_url if tts_files else ""
             scenes_for_compose = []
+            full_text = args.get("script_text", "")
             for i, vf in enumerate(video_files):
                 sid = vf.description.replace("场景 ", "").replace(" 视频片段", "") if vf.description else ""
+                audio_url = ""
+                for af in tts_files:
+                    if sid and sid in (af.description or ""):
+                        audio_url = af.file_url or ""
+                        break
+                if not audio_url:
+                    audio_url = fallback_audio
                 scenes_for_compose.append({
                     "scene_id": int(sid) if sid and sid.isdigit() else i + 1,
                     "video_url": vf.file_url or "",
+                    "audio_url": audio_url,
                     "duration": 5,
                     "subtitle": full_text,
                 })
