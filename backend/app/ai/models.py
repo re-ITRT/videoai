@@ -24,6 +24,7 @@ class UserAIConfig(Base):
 class AIConfigResponse(BaseModel):
     base_url: str
     model: str
+    has_api_key: bool = False
     available_models: list = []
 
     class Config:

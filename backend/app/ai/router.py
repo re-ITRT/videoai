@@ -42,6 +42,7 @@ async def get_ai_config(
     return AIConfigResponse(
         base_url=config.base_url,
         model=config.model,
+        has_api_key=bool(config.api_key),
         available_models=models,
     )
 
@@ -66,6 +67,7 @@ async def update_ai_config(
     return AIConfigResponse(
         base_url=config.base_url,
         model=config.model,
+        has_api_key=bool(config.api_key),
         available_models=models,
     )
 

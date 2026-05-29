@@ -114,6 +114,7 @@ function AIConfigForm() {
       if (values.api_key) data.api_key = values.api_key
       const res = await updateAIConfig(data)
       setConfig(res)
+      form.setFieldsValue({ api_key: '' })
       message.success('配置已保存')
     } catch { message.error('保存失败') }
     setSaving(false)
@@ -141,7 +142,7 @@ function AIConfigForm() {
         <Input placeholder="https://api.openai.com/v1" />
       </Form.Item>
       <Form.Item name="api_key" label="API Key">
-        <Input.Password placeholder="输入新的 Key（留空不修改）" />
+        <Input.Password placeholder={config?.has_api_key ? '••••••••（已配置，留空不修改）' : '输入 API Key'} />
       </Form.Item>
       <Form.Item label="模型">
         <Space>
