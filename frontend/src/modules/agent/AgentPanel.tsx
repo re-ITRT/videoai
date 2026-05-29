@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Button, Input, List, Typography, Tag, Spin, Drawer, Modal, message } from 'antd'
+import { Button, Input, List, Typography, Tag, Spin, Drawer, Modal, message, Card } from 'antd'
 import { SendOutlined, RobotOutlined, UserOutlined, FolderOpenOutlined, DeleteOutlined, PlusOutlined, LoadingOutlined } from '@ant-design/icons'
 
 const { Text } = Typography
@@ -93,7 +93,7 @@ export default function AgentPanel() {
     setToolStatus('🤖 AI思考中...')
 
     try {
-      const data = await api(`/sessions/${currentSession}/chat`, {
+      await api(`/sessions/${currentSession}/chat`, {
         method: 'POST',
         body: JSON.stringify({ message: userMsg.content }),
       })
