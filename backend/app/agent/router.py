@@ -357,62 +357,105 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
             return json.dumps(result, ensure_ascii=False, indent=2)
 
         elif tool_name == "generate_tts":
-            payload = {
-                "script_text": args.get("script_text", ""),
-                "voice": args.get("voice", "女声"),
-                "speed": args.get("speed", 1.0),
-            }
+            scenes = args.get("scenes", [])
+            if not scenes:
+                # fallback: wrap flat script_text into a single scene
+                scenes = [{"scene_id": 1, "visual_desc": args.get("script_text", ""), "duration": 15}]
+            # 确保字段名对齐 workflow
+            for s in scenes:
+                if "visual_desc" not in s and "visual_description" in s:
+                    s["visual_desc"] = s.pop("visual_description")
+            payload = {"scenes": scenes}
             result = await call_workflow("tts-generate", payload)
-            # 保存到 session_file
-            audio_url = result.get("audio_url", result.get("url", ""))
-            if audio_url:
-                sf = SessionFile(
-                    session_id=session_id, file_type="tts",
-                    filename=f"tts_{session_id}.mp3",
-                    file_url=audio_url,
-                    description="TTS 语音",
-                )
-                db.add(sf)
+            # tts-generate 输出 {audio_segments: [{scene_id, audio_url, duration}, ...]}
+            segments = []
+            if isinstance(result, dict):
+                segments = result.get("audio_segments", []) or result.get("data", result)
+                if isinstance(segments, dict) and "audio_segments" in segments:
+                    segments = segments["audio_segments"]
+            if isinstance(segments, list):
+                for seg in segments:
+                    audio_url = seg.get("audio_url", "")
+                    if audio_url:
+                        sf = SessionFile(
+                            session_id=session_id, file_type="tts",
+                            filename=f"tts_{session_id}_scene{seg.get('scene_id', '')}.mp3",
+                            file_url=audio_url,
+                            description=f"场景 {seg.get('scene_id', '')} TTS 语音",
+                        )
+                        db.add(sf)
                 await db.commit()
             return json.dumps(result, ensure_ascii=False, indent=2)
 
         elif tool_name == "generate_video":
             scenes = args.get("scenes", [])
             aspect_ratio = args.get("aspect_ratio", "9:16")
-            results = []
-            for i, scene in enumerate(scenes):
-                payload = {
-                    "visual_description": scene.get("visual_description", ""),
-                    "duration": scene.get("duration", 5),
-                    "aspect_ratio": aspect_ratio,
-                }
-                result = await call_workflow("video-generate", payload)
-                video_url = result.get("video_url", result.get("url", ""))
-                if video_url:
-                    sf = SessionFile(
-                        session_id=session_id, file_type="video_clip",
-                        filename=f"clip_{session_id}_{i}.mp4",
-                        file_url=video_url,
-                        description=f"分镜 {scene.get('scene_id', i+1)} 视频片段",
-                    )
-                    db.add(sf)
-                results.append({"scene_id": scene.get("scene_id", i + 1), "result": result})
-            await db.commit()
-            return json.dumps(results, ensure_ascii=False, indent=2)
+            # 字段名对齐：visual_desc
+            for s in scenes:
+                if "visual_desc" not in s and "visual_description" in s:
+                    s["visual_desc"] = s.pop("visual_description")
+            payload = {
+                "task_id": session_id,
+                "scenes": scenes,
+                "aspect_ratio": aspect_ratio,
+            }
+            result = await call_workflow("video-generate", payload)
+            # video-generate 输出 {video_clips: [{scene_id, video_url, duration}, ...]}
+            clips = []
+            if isinstance(result, dict):
+                clips = result.get("video_clips", []) or result.get("data", result)
+                if isinstance(clips, dict) and "video_clips" in clips:
+                    clips = clips["video_clips"]
+            if isinstance(clips, list):
+                for clip in clips:
+                    video_url = clip.get("video_url", "")
+                    if video_url:
+                        sf = SessionFile(
+                            session_id=session_id, file_type="video_clip",
+                            filename=f"clip_{session_id}_scene{clip.get('scene_id', '')}.mp4",
+                            file_url=video_url,
+                            description=f"场景 {clip.get('scene_id', '')} 视频片段",
+                        )
+                        db.add(sf)
+                await db.commit()
+            return json.dumps(result, ensure_ascii=False, indent=2)
 
         elif tool_name == "compose_video":
-            payload = {
-                "script_text": args.get("script_text", ""),
-                "aspect_ratio": args.get("aspect_ratio", "9:16"),
-                "session_id": session_id,
-            }
+            # 从 SessionFile 读取已生成的视频片段和音频
+            existing_files = await get_session_files(db, session_id)
+            tts_files = [f for f in existing_files if f.file_type == "tts"]
+            video_files = [f for f in existing_files if f.file_type == "video_clip"]
+            scenes_for_compose = []
+            for vf in video_files:
+                sid = vf.description.replace("场景 ", "").replace(" 视频片段", "") if vf.description else ""
+                audio_url = ""
+                for af in tts_files:
+                    if sid and sid in (af.description or ""):
+                        audio_url = af.file_url or ""
+                        break
+                scenes_for_compose.append({
+                    "scene_id": int(sid) if sid.isdigit() else len(scenes_for_compose) + 1,
+                    "video_url": vf.file_url or "",
+                    "audio_url": audio_url,
+                    "duration": 5,
+                    "subtitle": args.get("script_text", ""),
+                })
+            if not scenes_for_compose:
+                # fallback: 用 args 中的 scenes
+                scenes_for_compose = args.get("scenes", [])
+            payload = {"scenes": scenes_for_compose}
             result = await call_workflow("video-compose", payload)
-            video_url = result.get("video_url", result.get("url", ""))
-            if video_url:
+            output_url = ""
+            if isinstance(result, dict):
+                output_url = result.get("output_video_url", "") or result.get("video_url", "")
+                data = result.get("data", {})
+                if isinstance(data, dict):
+                    output_url = output_url or data.get("output_video_url", "") or data.get("video_url", "")
+            if output_url:
                 sf = SessionFile(
                     session_id=session_id, file_type="final_video",
                     filename=f"final_{session_id}.mp4",
-                    file_url=video_url,
+                    file_url=output_url,
                     description="最终合成视频",
                 )
                 db.add(sf)
