@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { Card, Button, Input, List, Typography, Tag, Spin, Space, Drawer } from 'antd'
-import { SendOutlined, RobotOutlined, UserOutlined, FolderOpenOutlined } from '@ant-design/icons'
+import { Card, Button, Input, List, Typography, Tag, Spin, Space, Drawer, Modal } from 'antd'
+import { SendOutlined, RobotOutlined, UserOutlined, FolderOpenOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 
 const { Text } = Typography
 
@@ -53,6 +53,8 @@ export default function AgentPanel() {
   const [loading, setLoading] = useState(false)
   const [files, setFiles] = useState<SessionFile[]>([])
   const [fileDrawer, setFileDrawer] = useState(false)
+  const [newModal, setNewModal] = useState(false)
+  const [newTitle, setNewTitle] = useState('')
   const msgEnd = useRef<HTMLDivElement>(null)
 
   const loadSessions = async () => {
@@ -81,11 +83,27 @@ export default function AgentPanel() {
   }, [messages])
 
   const newSession = async () => {
-    const s = await api('/sessions', { method: 'POST', body: JSON.stringify({}) })
+    setNewModal(true)
+  }
+
+  const confirmNewSession = async () => {
+    const s = await api('/sessions', { method: 'POST', body: JSON.stringify({ title: newTitle || '新对话' }) })
     setSessions([s, ...sessions])
     setCurrentSession(s.id)
     setMessages([])
     setFiles([])
+    setNewModal(false)
+    setNewTitle('')
+  }
+
+  const deleteSession = async (sid: number) => {
+    // 暂时只从前端移除，后端后续可加 DELETE 接口
+    setSessions(sessions.filter(s => s.id !== sid))
+    if (currentSession === sid) {
+      setCurrentSession(null)
+      setMessages([])
+      setFiles([])
+    }
   }
 
   const sendMessage = async () => {
@@ -126,8 +144,8 @@ export default function AgentPanel() {
     <div style={{ display: 'flex', gap: 16, height: 'calc(100vh - 180px)' }}>
       {/* 左侧 Session 列表 */}
       <Card title="对话" size="small" style={{ width: 220, flexShrink: 0 }}>
-        <Button type="primary" size="small" block onClick={newSession} style={{ marginBottom: 8 }}>
-          + 新对话
+        <Button type="primary" size="small" block icon={<PlusOutlined />} onClick={newSession} style={{ marginBottom: 8 }}>
+          新对话
         </Button>
         <List
           size="small"
@@ -136,8 +154,9 @@ export default function AgentPanel() {
             <List.Item
               onClick={() => setCurrentSession(s.id)}
               style={{ cursor: 'pointer', background: currentSession === s.id ? '#e6f4ff' : undefined, padding: '4px 8px' }}
+              actions={[<Button key="del" type="text" size="small" danger icon={<DeleteOutlined />} onClick={(e) => { e.stopPropagation(); deleteSession(s.id) }} />]}
             >
-              <Text ellipsis style={{ maxWidth: 160 }}>{s.title}</Text>
+              <Text ellipsis style={{ maxWidth: 130 }}>{s.title}</Text>
             </List.Item>
           )}
         />
@@ -192,7 +211,10 @@ export default function AgentPanel() {
         </Space.Compact>
       </Card>
 
-      {/* 右侧文件抽屉 */}
+      <Modal title="新建对话" open={newModal} onOk={confirmNewSession} onCancel={() => setNewModal(false)}>
+        <Input placeholder="输入对话名称" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} onPressEnter={confirmNewSession} />
+      </Modal>
+
       <Drawer
         title="Session 文件"
         placement="right"

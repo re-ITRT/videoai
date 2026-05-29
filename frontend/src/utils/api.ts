@@ -67,3 +67,10 @@ export const getTaskLogs = (id: number) => request.get(`/tasks/${id}/logs`)
 export const approveScript = (id: number) => request.post(`/tasks/${id}/approve-script`)
 export const regenerateScene = (taskId: number, sceneId: number) =>
   request.post(`/tasks/${taskId}/regenerate-scene/${sceneId}`)
+
+// ==============================
+// AI Config
+// ==============================
+export const getAIConfig = () => request.get('/users/me/ai-config')
+export const updateAIConfig = (data: any) => request.put('/users/me/ai-config', data)
+export const scanModels = (data?: any) => request.post('/users/me/ai-config/scan-models', data)
