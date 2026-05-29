@@ -325,7 +325,7 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
                 query = pe.get("query", "")
                 emb = pe.get("embedding", [])
                 if emb:
-                    items = await search_materials_by_embeddings(db, user.id, emb, threshold)
+                    items = await search_materials_by_embeddings(db, str(user.id), emb, threshold)
                     for item in items:
                         item["source_query"] = query
                         all_results.append(item)
