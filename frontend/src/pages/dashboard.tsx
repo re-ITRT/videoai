@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Card, Row, Col, Statistic, Skeleton } from 'antd'
-import { VideoCameraOutlined, FileTextOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import { Card, Row, Col, Statistic, Skeleton, Tabs } from 'antd'
+import { VideoCameraOutlined, FileTextOutlined, ThunderboltOutlined, RobotOutlined } from '@ant-design/icons'
 import { getMaterials, getTasks } from '../utils/api'
+import AgentPanel from '../modules/agent/AgentPanel'
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true)
@@ -27,17 +28,32 @@ export default function Dashboard() {
   ]
 
   return (
-    <div>
-      <h2 style={{ marginBottom: 24 }}>工作台</h2>
-      <Row gutter={16}>
-        {cards.map((c, i) => (
-          <Col span={8} key={i}>
-            <Card>
-              {loading ? <Skeleton active paragraph={{ rows: 1 }} /> : <Statistic title={c.title} value={c.value} prefix={c.icon} />}
-            </Card>
-          </Col>
-        ))}
-      </Row>
-    </div>
+    <Tabs
+      defaultActiveKey="stats"
+      items={[
+        {
+          key: 'stats',
+          label: '工作台',
+          children: (
+            <>
+              <Row gutter={16} style={{ marginBottom: 24 }}>
+                {cards.map((c, i) => (
+                  <Col span={8} key={i}>
+                    <Card>
+                      {loading ? <Skeleton active paragraph={{ rows: 1 }} /> : <Statistic title={c.title} value={c.value} prefix={c.icon} />}
+                    </Card>
+                  </Col>
+                ))}
+              </Row>
+            </>
+          ),
+        },
+        {
+          key: 'agent',
+          label: <span><RobotOutlined /> AI 助手</span>,
+          children: <AgentPanel />,
+        },
+      ]}
+    />
   )
 }
