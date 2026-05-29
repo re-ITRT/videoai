@@ -109,15 +109,24 @@ async def upload_material_file(
                 if isinstance(data, dict):
                     scenes = data.get("scenes", [])
                     tags = data.get("video_tags", []) or data.get("tags", [])
+                    image_emb = data.get("image_embedding", [])
                 else:
                     scenes = result.get("scenes", [])
                     tags = result.get("video_tags", [])
+                    image_emb = result.get("image_embedding", [])
                 # 保存嵌入结果到 material 记录
                 async with async_session() as session:
                     m = await session.get(type(material), material.id)
                     if m:
                         if tags:
                             m.tags = tags
+                        if image_emb:
+                            from sqlalchemy import text as sa_text
+                            vec_str = "[" + ",".join(str(v) for v in image_emb) + "]"
+                            await session.execute(
+                                sa_text("UPDATE materials SET embedding = :vec::vector WHERE id = :id"),
+                                {"vec": vec_str, "id": m.id},
+                            )
                         if scenes:
                             from app.material import service as mat_svc
                             await mat_svc.parse_and_create_slices(session, m.id, scenes)
