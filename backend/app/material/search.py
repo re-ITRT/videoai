@@ -88,6 +88,29 @@ async def search_materials(
     return results[:max_results]
 
 
+async def search_materials_by_embeddings(
+    db: AsyncSession,
+    user_id: str,
+    embedding: list[float],
+    threshold: float = 0.6,
+    max_results: int = 20,
+) -> list[dict]:
+    """用已有 embedding 向量搜索 pgvector（不调 workflow）"""
+    vec_str = "[" + ",".join(str(v) for v in embedding) + "]"
+    sql = text("""
+        SELECT m.id AS id,
+               1 - (m.embedding <=> :vec) AS similarity,
+               m.image_url, m.text_content, m.tags
+        FROM materials m
+        WHERE m.user_id = :user_id
+          AND 1 - (m.embedding <=> :vec) >= :threshold
+        ORDER BY similarity DESC
+        LIMIT :limit
+    """)
+    rows = await db.execute(sql, {"vec": vec_str, "threshold": threshold, "limit": max_results, "user_id": user_id})
+    return [dict(row) for row in rows.mappings().all()]
+
+
 async def search_materials_fallback(
     db: AsyncSession,
     user_id: str,
