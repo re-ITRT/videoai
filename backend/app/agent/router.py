@@ -485,7 +485,13 @@ async def agent_chat(
                 resp.raise_for_status()
                 data = resp.json()
         except Exception as e:
-            raise HTTPException(status_code=502, detail=f"AI 调用失败: {str(e)}")
+            detail = str(e)
+            if hasattr(e, 'response') and e.response is not None:
+                try:
+                    detail += " | body: " + e.response.text[:500]
+                except Exception:
+                    pass
+            raise HTTPException(status_code=502, detail=f"AI 调用失败: {detail}")
 
         choice = data["choices"][0]
         msg = choice["message"]
