@@ -132,6 +132,30 @@ async def list_sessions(db: AsyncSession, user_id: int) -> list[AgentSession]:
     return list(result.scalars().all())
 
 
+import shutil
+
+
+async def delete_session(db: AsyncSession, session_id: int, user_id: int) -> bool:
+    """删除 Session（含级联消息/文件 + 物理目录）"""
+    result = await db.execute(
+        select(AgentSession).where(AgentSession.id == session_id, AgentSession.user_id == user_id)
+    )
+    sess = result.scalar_one_or_none()
+    if not sess:
+        return False
+    await db.delete(sess)
+    await db.commit()
+    # 清理物理目录
+    if sess.session_dir:
+        try:
+            root = json.loads(sess.session_dir)["root"]
+            if os.path.exists(root):
+                shutil.rmtree(root)
+        except Exception:
+            pass
+    return True
+
+
 async def get_session_messages(db: AsyncSession, session_id: int) -> list[AgentMessage]:
     result = await db.execute(
         select(AgentMessage)

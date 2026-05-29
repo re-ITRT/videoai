@@ -9,7 +9,7 @@ from app.auth.models import User
 from app.agent.models import (
     AgentSession, AgentMessage, SessionFile,
     SessionCreate, SessionResponse, MessageResponse, SessionFileResponse,
-    create_session, list_sessions, get_session_messages, get_session_files,
+    create_session, list_sessions, delete_session, get_session_messages, get_session_files,
 )
 
 router = APIRouter(prefix="/api/v1/agent", tags=["agent"])
@@ -46,6 +46,19 @@ async def create_agent_session(
     """创建新对话 Session"""
     sess = await create_session(db, current_user.id, req.title)
     return SessionResponse(id=sess.id, title=sess.title, message_count=0, created_at=sess.created_at)
+
+
+@router.delete("/sessions/{session_id}")
+async def delete_agent_session(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """删除对话 Session（含消息 + 文件）"""
+    ok = await delete_session(db, session_id, current_user.id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="会话不存在")
+    return {"ok": True}
 
 
 @router.get("/sessions/{session_id}/messages", response_model=list[MessageResponse])

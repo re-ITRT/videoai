@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Card, Button, Input, List, Typography, Tag, Spin, Space, Drawer, Modal } from 'antd'
+import { Card, Button, Input, List, Typography, Tag, Spin, Space, Drawer, Modal, message } from 'antd'
 import { SendOutlined, RobotOutlined, UserOutlined, FolderOpenOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 
 const { Text } = Typography
@@ -97,12 +97,17 @@ export default function AgentPanel() {
   }
 
   const deleteSession = async (sid: number) => {
-    // 暂时只从前端移除，后端后续可加 DELETE 接口
-    setSessions(sessions.filter(s => s.id !== sid))
-    if (currentSession === sid) {
-      setCurrentSession(null)
-      setMessages([])
-      setFiles([])
+    if (!confirm('确定删除该对话？')) return
+    try {
+      await api(`/sessions/${sid}`, { method: 'DELETE' })
+      setSessions(sessions.filter(s => s.id !== sid))
+      if (currentSession === sid) {
+        setCurrentSession(null)
+        setMessages([])
+        setFiles([])
+      }
+    } catch {
+      message.error('删除失败')
     }
   }
 
