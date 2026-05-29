@@ -57,7 +57,6 @@ function PromptEditor({ workflowName, visible, onClose }: { workflowName: string
 
 export default function WorkflowSettings() {
   const [configs, setConfigs] = useState<Record<string, any>>({})
-  const [avail, setAvail] = useState<Record<string, WorkflowField[]>>({})
   const [availMeta, setAvailMeta] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<string | null>(null)
@@ -70,7 +69,7 @@ export default function WorkflowSettings() {
         getAvailableWorkflows(),
       ])
       const cfgs: Record<string, any> = {}
-      for (const c of cfgRes as any[]) cfgs[c.workflow_name] = c
+      for (const c of (cfgRes as any)) cfgs[c.workflow_name] = c
       setConfigs(cfgs)
       setAvailMeta((availRes as any).workflows || {})
     } catch { message.error('加载工作流配置失败') }
