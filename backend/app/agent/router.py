@@ -398,29 +398,62 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
                 if "visual_desc" not in s and "visual_description" in s:
                     s["visual_desc"] = s.pop("visual_description")
             payload = {
+                "workflow_type": "generate",
                 "task_id": session_id,
                 "scenes": scenes,
                 "aspect_ratio": aspect_ratio,
             }
             result = await call_workflow("video-generate", payload)
-            clips = []
+            task_ids = []
             if isinstance(result, dict):
-                clips = result.get("video_clips", []) or result.get("data", result)
-                if isinstance(clips, dict) and "video_clips" in clips:
-                    clips = clips["video_clips"]
-            if isinstance(clips, list):
-                for clip in clips:
-                    video_url = clip.get("video_url", "")
-                    if video_url:
-                        sf = SessionFile(
-                            session_id=session_id, file_type="video_clip",
-                            filename=f"clip_{session_id}_scene{clip.get('scene_id', '')}.mp4",
-                            file_url=video_url,
-                            description=f"场景 {clip.get('scene_id', '')} 视频片段",
-                        )
-                        db.add(sf)
+                task_ids = result.get("task_ids", [])
+            # 保存 task_ids 到 session_file
+            if task_ids:
+                sf = SessionFile(
+                    session_id=session_id, file_type="video_task",
+                    filename=f"tasks_{session_id}.json",
+                    file_url="",
+                    description=json.dumps(task_ids, ensure_ascii=False),
+                )
+                db.add(sf)
                 await db.commit()
-            return json.dumps(result, ensure_ascii=False, indent=2)
+
+            # 启动后台轮询
+            async def poll_video():
+                for attempt in range(60):  # 60 * 30s = 30 min
+                    await asyncio.sleep(30)
+                    try:
+                        qr = await call_workflow("video-generate", {
+                            "workflow_type": "query",
+                            "task_ids": task_ids,
+                        })
+                        if isinstance(qr, dict):
+                            if qr.get("status") == "completed":
+                                clips = qr.get("video_clips", [])
+                                async with async_session() as bg_db:
+                                    for clip in clips:
+                                        vu = clip.get("video_url", "")
+                                        if vu:
+                                            bg_db.add(SessionFile(
+                                                session_id=session_id, file_type="video_clip",
+                                                filename=f"clip_{session_id}_scene{clip.get('scene_id', '')}.mp4",
+                                                file_url=vu,
+                                                description=f"场景 {clip.get('scene_id', '')} 视频片段",
+                                            ))
+                                    await bg_db.commit()
+                                logger.info("poll_video_done", session_id=session_id)
+                                return
+                        # still running, continue polling
+                    except Exception as e:
+                        logger.warning("poll_video_retry", session_id=session_id, error=str(e))
+                logger.warning("poll_video_timeout", session_id=session_id)
+            asyncio.create_task(poll_video())
+
+            return json.dumps({
+                "status": "submitted",
+                "message": f"视频生成任务已提交（{len(scenes)} 个分镜），后台正在生成中，约 10-15 分钟后完成。完成后会通知你。",
+                "task_ids": task_ids,
+            }, ensure_ascii=False)
 
         elif tool_name == "compose_video":
             # 从 SessionFile 读取已生成的视频片段和音频
