@@ -461,9 +461,15 @@ async def agent_chat(
                 msgs.append({"role": "tool", "tool_call_id": m.tool_call_id, "content": m.content or ""})
             elif m.tool_calls:
                 tc_list = json.loads(m.tool_calls)
-                msgs.append({"role": "assistant", "content": m.content, "tool_calls": tc_list})
+                entry = {"role": "assistant", "content": m.content, "tool_calls": tc_list}
+                if m.reasoning_content:
+                    entry["reasoning_content"] = m.reasoning_content
+                msgs.append(entry)
             else:
-                msgs.append({"role": m.role, "content": m.content or ""})
+                entry = {"role": m.role, "content": m.content or ""}
+                if m.reasoning_content:
+                    entry["reasoning_content"] = m.reasoning_content
+                msgs.append(entry)
 
         # 调 LLM
         headers = {
@@ -496,12 +502,14 @@ async def agent_chat(
         choice = data["choices"][0]
         msg = choice["message"]
         assistant_content = msg.get("content", "")
+        reasoning = msg.get("reasoning_content") or msg.get("reasoning")
         tool_calls = msg.get("tool_calls")
 
         if not tool_calls:
             # 没有工具调用，返回最终答案
             assistant_msg = AgentMessage(
                 session_id=session_id, role="assistant", content=assistant_content,
+                reasoning_content=reasoning,
             )
             db.add(assistant_msg)
             await db.commit()
@@ -525,6 +533,7 @@ async def agent_chat(
         assistant_msg = AgentMessage(
             session_id=session_id, role="assistant",
             content=assistant_content,
+            reasoning_content=reasoning,
             tool_calls=tc_json,
         )
         db.add(assistant_msg)

@@ -35,6 +35,7 @@ class AgentMessage(Base):
     session_id = Column(Integer, ForeignKey("agent_sessions.id", ondelete="CASCADE"), nullable=False)
     role = Column(String(32), nullable=False)  # user / assistant / tool
     content = Column(Text)
+    reasoning_content = Column(Text)  # DeepSeek 推理模式内容
     tool_calls = Column(Text)  # JSON: [{name, arguments}]
     tool_call_id = Column(String(64))
     tool_name = Column(String(64))
@@ -74,6 +75,7 @@ class MessageResponse(BaseModel):
     id: int
     role: str
     content: Optional[str] = None
+    reasoning_content: Optional[str] = None
     tool_calls: Optional[list] = None
     created_at: datetime
 
