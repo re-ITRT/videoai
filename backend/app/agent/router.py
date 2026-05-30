@@ -196,6 +196,7 @@ TOOLS_DEFINITIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {
+                    "script_name": {"type": "string", "description": "剧本名称（不带.json），留空自动生成。如果已存在同名剧本会覆盖"},
                     "product_info": {
                         "type": "object",
                         "description": "产品信息",
@@ -374,21 +375,23 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
             # 保存到 session 目录
             from app.agent.models import ensure_session_dir
             dirs = ensure_session_dir(session_id)
-            script_path = os.path.join(dirs["scripts"], f"script_{session_id}.json")
+            sname = args.get("script_name", "") or f"script_{session_id}"
+            script_filename = f"{sname}.json" if not sname.endswith(".json") else sname
+            script_path = os.path.join(dirs["scripts"], script_filename)
             with open(script_path, "w", encoding="utf-8") as f:
                 f.write(script_json)
             from app.core.signer import generate_signed_url
             signed = generate_signed_url(script_path.replace("/app/uploads", "/uploads"), expire_seconds=86400)
             sf = SessionFile(
                 session_id=session_id, file_type="script",
-                filename=f"script_{session_id}.json",
+                filename=script_filename,
                 file_url=f"http://114.117.242.17:3000{signed}",
                 description="生成的剧本",
             )
             db.add(sf)
             await db.commit()
             # 返回时加上 filename 供下个工具引用
-            result["filename"] = f"script_{session_id}.json"
+            result["filename"] = script_filename
             return json.dumps(result, ensure_ascii=False, indent=2)
 
         elif tool_name == "generate_video":
