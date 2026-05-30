@@ -792,15 +792,22 @@ async def agent_chat(
                     if script_name:
                         logger.info("auto_mode_video", session_id=session_id, script=script_name)
                         vresult = await execute_tool("generate_video", {"script_name": script_name, "session_id": session_id}, db, session_id, current_user)
-                        vmsg = AgentMessage(session_id=session_id, role="tool", content=vresult, tool_call_id="auto_video", tool_name="generate_video")
-                        db.add(vmsg)
-                        await db.commit()
-                        history = await get_session_messages(db, session_id)
-
                         logger.info("auto_mode_compose", session_id=session_id)
                         cresult = await execute_tool("compose_video", {"session_id": session_id}, db, session_id, current_user)
-                        cmsg = AgentMessage(session_id=session_id, role="tool", content=cresult, tool_call_id="auto_compose", tool_name="compose_video")
-                        db.add(cmsg)
+                        # 将自动执行结果合并保存（先创建 assistant tool_calls 再保存 tool）
+                        from datetime import datetime as _dt
+                        fake_asst = AgentMessage(
+                            session_id=session_id, role="assistant",
+                            content="已自动完成视频生成和合成",
+                            tool_calls=json.dumps([
+                                {"id": "auto_video", "type": "function", "function": {"name": "generate_video", "arguments": "{}"}},
+                                {"id": "auto_compose", "type": "function", "function": {"name": "compose_video", "arguments": "{}"}},
+                            ]),
+                        )
+                        db.add(fake_asst)
+                        await db.commit()
+                        for tid, tres in [("auto_video", vresult), ("auto_compose", cresult)]:
+                            db.add(AgentMessage(session_id=session_id, role="tool", content=tres, tool_call_id=tid, tool_name=""))
                         await db.commit()
                         history = await get_session_messages(db, session_id)
                 except Exception as e:
