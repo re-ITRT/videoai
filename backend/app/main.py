@@ -20,7 +20,7 @@ from app.agent.router import router as agent_router
 
 # ── 初始化日志 ──────────────────────────
 from app.core.logging import setup_logging
-from app.core.database import engine, Base
+from app.core.database import engine, Base, async_session
 from app.config import settings
 from sqlalchemy import text
 import asyncio
@@ -50,12 +50,21 @@ async def startup():
     async with engine.begin() as conn:
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.create_all)
-        # 确保 embedding 列存在（DB 重建场景）
-        for tbl in ["materials", "material_slices"]:
-            try:
-                await conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN IF NOT EXISTS embedding vector(1024)"))
-            except Exception:
-                pass
+        await conn.execute(text("ALTER TABLE materials ADD COLUMN IF NOT EXISTS embedding vector(1024)"))
+        await conn.execute(text("ALTER TABLE material_slices ADD COLUMN IF NOT EXISTS embedding vector(1024)"))
+    # 确保默认账号存在
+    try:
+        from app.auth.models import User
+        from passlib.hash import bcrypt
+        async with async_session() as s:
+            r = await s.execute(text("SELECT 1 FROM users WHERE username='admin'"))
+            if not r.scalar():
+                s.add(User(username="admin", hashed_password=bcrypt.hash("Admin123"), role="admin"))
+                s.add(User(username="testuser", hashed_password=bcrypt.hash("Test12345"), role="user"))
+                await s.commit()
+                print("Default accounts created")
+    except Exception as e:
+        print(f"Account init warning: {e}")
 
 app.add_middleware(
     CORSMiddleware,
