@@ -32,6 +32,11 @@ async def run_script_generate(
 
     # 读取 prompt 模板
     system_prompt = _read_prompt(template, "system.md")
+    # 追加输出格式（独立文件，不放在模板中，只读）
+    OUTPUT_FORMAT_PATH = os.path.join(PROMPT_DIR, "output_format.md")
+    if os.path.exists(OUTPUT_FORMAT_PATH):
+        with open(OUTPUT_FORMAT_PATH, "r", encoding="utf-8") as f:
+            system_prompt += "\n\n" + f.read()
     user_template = _read_prompt(template, "user.md.j2")
 
     # 渲染用户 prompt

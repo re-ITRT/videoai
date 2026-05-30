@@ -20,44 +20,8 @@
 # 场景设计规则
 - type: product（产品展示）/ scene（场景氛围）/ closing（结尾收束）
 - 每个场景的 visual_desc 要具体，包含镜头类型、主体动作、环境氛围
-- 每个 scene.duration 确保总和等于总时长
+- materials 数组引用可用素材中的 material_id
 
-# 输出格式
-仅返回如下格式的JSON，不要包含任何其他文本：
-{
-  "title": "剧本标题（不超过10字）",
-  "style": "风格",
-  "duration": 总时长,
-  "scenes": [
-    {
-      "scene_id": 1,
-      "duration": 10,
-      "type": "product/scene/closing",
-      "visual_desc": "画面描述（包含镜头语言、主体动作、环境）",
-      "materials": [1, 3],
-      "lines": [
-        {
-          "speaker": "旁白",
-          "text": "想喝奶茶又怕长肉？",
-          "tone": "亲切",
-          "start_sec": 0,
-          "end_sec": 3
-        },
-        {
-          "speaker": "女生",
-          "text": "哇这个也太好喝了吧！",
-          "tone": "惊喜",
-          "start_sec": 4,
-          "end_sec": 6
-        },
-        {
-          "speaker": "旁白",
-          "text": "0蔗糖0添加，口感像奶茶一样顺滑",
-          "tone": "专业",
-          "start_sec": 6,
-          "end_sec": 10
-        }
-      ]
-    }
-  ]
-}
+# 约束与规则
+- 所有场景的时长总和必须等于总时长
+- 每个场景的旁白时长应与场景时长相匹配（约每秒2-3个字）

@@ -127,6 +127,16 @@ async def list_all_templates():
     return {"templates": result}
 
 
+@router.get("/prompts/output-format")
+async def get_output_format():
+    """获取输出格式定义（只读，不包含在模板中）"""
+    fpath = os.path.join(PROMPT_DIR, "output_format.md")
+    if os.path.exists(fpath):
+        with open(fpath, "r", encoding="utf-8") as f:
+            return {"content": f.read()}
+    return {"content": ""}
+
+
 @router.get("/prompts/{workflow_name}")
 async def get_workflow_prompts(workflow_name: str):
     """读取工作流或模板的 prompt 文件"""
