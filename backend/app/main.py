@@ -21,6 +21,7 @@ from app.agent.router import router as agent_router
 # ── 初始化日志 ──────────────────────────
 from app.core.logging import setup_logging
 from app.core.database import engine, Base
+from app.config import settings
 from sqlalchemy import text
 import asyncio
 
@@ -31,6 +32,21 @@ app = FastAPI(title="Video-AI API", version="0.1.0", docs_url="/docs")
 
 @app.on_event("startup")
 async def startup():
+    # 确保 video_ai 数据库存在（Docker 重启后可能丢失）
+    try:
+        from sqlalchemy.ext.asyncio import create_async_engine
+        tmp_engine = create_async_engine(
+            settings.DATABASE_URL.replace("/video_ai", "/postgres"),
+            isolation_level="AUTOCOMMIT",
+        )
+        async with tmp_engine.begin() as conn:
+            row = await conn.execute(text("SELECT 1 FROM pg_database WHERE datname='video_ai'"))
+            if not row.scalar():
+                await conn.execute(text("CREATE DATABASE video_ai"))
+        await tmp_engine.dispose()
+    except Exception as e:
+        print(f"DB init warning: {e}")
+
     async with engine.begin() as conn:
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.create_all)
