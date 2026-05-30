@@ -482,29 +482,16 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
             return json.dumps({"error": "视频生成超时（30分钟）"}, ensure_ascii=False)
 
         elif tool_name == "compose_video":
-            # 从 SessionFile 读取已生成的视频片段和音频
             existing_files = await get_session_files(db, session_id)
-            tts_files = [f for f in existing_files if f.file_type == "tts"]
             video_files = [f for f in existing_files if f.file_type == "video_clip"]
-            # 如果只有一个 TTS 音频，给所有场景复用
-            fallback_audio = tts_files[0].file_url if tts_files else ""
             scenes_for_compose = []
-            full_text = args.get("script_text", "")
             for i, vf in enumerate(video_files):
                 sid = vf.description.replace("场景 ", "").replace(" 视频片段", "") if vf.description else ""
-                audio_url = ""
-                for af in tts_files:
-                    if sid and sid in (af.description or ""):
-                        audio_url = af.file_url or ""
-                        break
-                if not audio_url:
-                    audio_url = fallback_audio
                 scenes_for_compose.append({
                     "scene_id": int(sid) if sid and sid.isdigit() else i + 1,
                     "video_url": vf.file_url or "",
-                    "audio_url": audio_url,
                     "duration": 5,
-                    "subtitle": full_text,
+                    "lines": args.get("scenes", [])[i].get("lines", []) if i < len(args.get("scenes", [])) else [],
                 })
             if not scenes_for_compose:
                 # fallback: 用 args 中的 scenes
