@@ -21,6 +21,7 @@ from app.agent.router import router as agent_router
 # ── 初始化日志 ──────────────────────────
 from app.core.logging import setup_logging
 from app.core.database import engine, Base
+from sqlalchemy import text
 import asyncio
 
 setup_logging()
@@ -31,6 +32,7 @@ app = FastAPI(title="Video-AI API", version="0.1.0", docs_url="/docs")
 @app.on_event("startup")
 async def startup():
     async with engine.begin() as conn:
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.create_all)
 
 app.add_middleware(
