@@ -38,7 +38,6 @@ export default function ScriptTemplates() {
   const [editVisible, setEditVisible] = useState(false)
   const [editName, setEditName] = useState('')
   const [sysSections, setSysSections] = useState<Record<string, string>>({})
-  const [userPrompt, setUserPrompt] = useState('')
   const [saving, setSaving] = useState(false)
 
   const load = async () => {
@@ -60,7 +59,6 @@ export default function ScriptTemplates() {
       const res: any = await request.get(`/workflows/prompts/${name}`)
       const sys = res.files?.['system.md'] || ''
       setSysSections(parseSections(sys))
-      setUserPrompt(res.files?.['user.md.j2'] || '')
     } catch { message.error('加载模板失败') }
   }
 
@@ -68,9 +66,6 @@ export default function ScriptTemplates() {
     setSaving(true)
     try {
       await request.put(`/workflows/prompts/${editName}/system.md`, { content: buildSystemMd(sysSections) })
-      if (userPrompt) {
-        await request.put(`/workflows/prompts/${editName}/user.md.j2`, { content: userPrompt })
-      }
       message.success('模板已保存')
     } catch { message.error('保存失败') }
     setSaving(false)
@@ -93,8 +88,8 @@ export default function ScriptTemplates() {
 
       <Modal title={`编辑模板 - ${editName}`} open={editVisible} onCancel={() => setEditVisible(false)}
         width={700} footer={null} destroyOnClose>
-        <Tabs defaultActiveKey="role" items={[
-          ...sectionKeys.map(k => ({
+        {sectionKeys.length > 0 && (
+          <Tabs defaultActiveKey={sectionKeys[0]} items={sectionKeys.map(k => ({
             key: k,
             label: k,
             children: (
@@ -102,17 +97,8 @@ export default function ScriptTemplates() {
                 onChange={e => setSysSections({ ...sysSections, [k]: e.target.value })}
                 style={{ fontSize: 14 }} />
             ),
-          })),
-          {
-            key: 'user_prompt',
-            label: '用户 Prompt',
-            children: (
-              <TextArea rows={8} value={userPrompt}
-                onChange={e => setUserPrompt(e.target.value)}
-                style={{ fontFamily: 'monospace', fontSize: 13 }} />
-            ),
-          },
-        ]} />
+          }))} />
+        )}
         <Button type="primary" style={{ marginTop: 12 }} onClick={handleSave} loading={saving}>保存模板</Button>
       </Modal>
     </Card>
