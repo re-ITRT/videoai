@@ -236,8 +236,30 @@ TOOLS_DEFINITIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "script_name": {"type": "string", "description": "剧本文件名（从 generate_script 返回的 filename 字段获取）"},
+                    "script_name": {"type": "string", "description": "剧本名称（不带.json），从 generate_script 返回的 filename 获取，去掉.json 即可"},
                     "aspect_ratio": {"type": "string", "description": "画幅比例 9:16 或 16:9", "default": "9:16"},
+                },
+                "required": ["script_name"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "ls_script",
+            "description": "【列出剧本】列出当前 session 的所有可用剧本",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "read_script",
+            "description": "【读取剧本】读取指定剧本的完整内容",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "script_name": {"type": "string", "description": "剧本名称（不带.json）"},
                 },
                 "required": ["script_name"],
             },
@@ -283,6 +305,10 @@ SYSTEM_PROMPT = """你是 Video-AI 平台的 AI 助手，帮助用户生成电�
 
 ### 步骤 5 — 视频合成 (compose_video)
 将视频片段合成为最终视频，存入 final_videos/ 目录。
+
+### 剧本管理 (ls_script / read_script)
+- ls_script: 列出当前 session 的所有剧本
+- read_script: 读取指定剧本的完整内容（可用于查看/修改前确认）
 
 ## 核心规则
 - 必须按 1→2→3→4→5 顺序执行，不能跳步
@@ -396,10 +422,11 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
 
         elif tool_name == "generate_video":
             aspect_ratio = args.get("aspect_ratio", "9:16")
-            script_name = args.get("script_name", "")
+            script_name = args.get("script_name", "").replace(".json", "")
             # 从文件读剧本
             from app.agent.models import ensure_session_dir
-            script_path = os.path.join(ensure_session_dir(session_id)["scripts"], script_name or f"script_{session_id}.json")
+            sname = script_name or f"script_{session_id}"
+            script_path = os.path.join(ensure_session_dir(session_id)["scripts"], f"{sname}.json")
             if not os.path.exists(script_path):
                 return json.dumps({"error": f"剧本文件不存在: {script_name}"}, ensure_ascii=False)
             with open(script_path, "r", encoding="utf-8") as f:
@@ -500,6 +527,23 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
                     logger.warning("poll_retry", session_id=session_id, error=str(e))
                     continue
             return json.dumps({"error": "视频生成超时（30分钟）"}, ensure_ascii=False)
+
+        elif tool_name == "ls_script":
+            import glob as _glob
+            from app.agent.models import ensure_session_dir
+            scripts_dir = ensure_session_dir(session_id)["scripts"]
+            files = sorted(_glob.glob(os.path.join(scripts_dir, "*.json")))
+            names = [os.path.splitext(os.path.basename(f))[0] for f in files]
+            return json.dumps({"scripts": names}, ensure_ascii=False)
+
+        elif tool_name == "read_script":
+            script_name = args.get("script_name", "").replace(".json", "")
+            from app.agent.models import ensure_session_dir
+            spath = os.path.join(ensure_session_dir(session_id)["scripts"], f"{script_name}.json")
+            if not os.path.exists(spath):
+                return json.dumps({"error": f"剧本不存在: {script_name}"}, ensure_ascii=False)
+            with open(spath, "r", encoding="utf-8") as f:
+                return f.read()
 
         elif tool_name == "compose_video":
             existing_files = await get_session_files(db, session_id)
