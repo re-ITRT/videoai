@@ -235,42 +235,10 @@ TOOLS_DEFINITIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "title": {"type": "string", "description": "剧本标题"},
-                    "style": {"type": "string", "description": "视频风格"},
-                    "scenes": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "scene_id": {"type": "integer"},
-                                "duration": {"type": "integer", "description": "片段时长（秒）"},
-                                "visual_desc": {"type": "string", "description": "画面描述"},
-                                "lines": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "object",
-                                        "properties": {
-                                            "speaker": {"type": "string", "description": "说话人（旁白/角色名）"},
-                                            "text": {"type": "string", "description": "台词内容"},
-                                            "tone": {"type": "string", "description": "语气语调"},
-                                            "start_sec": {"type": "number", "description": "在该场景中开始秒数"},
-                                            "end_sec": {"type": "number", "description": "在该场景中结束秒数"},
-                                        },
-                                    },
-                                    "description": "台词时间轴列表",
-                                },
-                                "materials": {
-                                    "type": "array",
-                                    "items": {"type": "integer"},
-                                    "description": "用到的素材ID列表",
-                                },
-                            },
-                        },
-                        "description": "分镜列表（请从剧本中的 scenes 原样传入，含 lines 和 materials）",
-                    },
+                    "script_name": {"type": "string", "description": "剧本文件名（从 generate_script 返回的 filename 字段获取）"},
                     "aspect_ratio": {"type": "string", "description": "画幅比例 9:16 或 16:9", "default": "9:16"},
                 },
-                "required": ["scenes"],
+                "required": ["script_name"],
             },
         },
     },
@@ -310,7 +278,7 @@ SYSTEM_PROMPT = """你是 Video-AI 平台的 AI 助手，帮助用户生成电�
 
 ### 步骤 4 — 视频生成 (generate_video)
 根据剧本分镜生成 AI 视频片段，视频生成内部自动处理语音和音效。文件存入 session 的 video_clips/ 目录。
-传入的 scenes 应包含剧本中的 lines（台词时间轴）和 materials（素材ID列表），以便视频生成参考。
+传入剧本文件名 script_name（从 generate_script 返回的 filename 获取），系统会自动从文件读取剧本内容。
 
 ### 步骤 5 — 视频合成 (compose_video)
 将视频片段合成为最终视频，存入 final_videos/ 目录。
@@ -419,11 +387,25 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
             )
             db.add(sf)
             await db.commit()
+            # 返回时加上 filename 供下个工具引用
+            result["filename"] = f"script_{session_id}.json"
             return json.dumps(result, ensure_ascii=False, indent=2)
 
         elif tool_name == "generate_video":
-            scenes = args.get("scenes", [])
             aspect_ratio = args.get("aspect_ratio", "9:16")
+            script_name = args.get("script_name", "")
+            # 从文件读剧本
+            from app.agent.models import ensure_session_dir
+            script_path = os.path.join(ensure_session_dir(session_id)["scripts"], script_name or f"script_{session_id}.json")
+            if not os.path.exists(script_path):
+                return json.dumps({"error": f"剧本文件不存在: {script_name}"}, ensure_ascii=False)
+            with open(script_path, "r", encoding="utf-8") as f:
+                script_data = json.loads(f.read())
+            # 兼容 {script: {...}} 包裹
+            script_body = script_data.get("script", script_data)
+            scenes = script_body.get("scenes", [])
+            title = script_body.get("title", "")
+            style = script_body.get("style", "")
             for s in scenes:
                 if "visual_desc" not in s and "visual_description" in s:
                     s["visual_desc"] = s.pop("visual_description")
@@ -456,12 +438,12 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
                 if "lines" not in s:
                     s["lines"] = []
 
-            # 3. 提交任务（完整script格式）
+            # 4. 提交任务（从剧本文件读取的内容）
             result = await call_workflow("video-generate", {
                 "workflow_type": "generate",
                 "script": {
-                    "title": args.get("title", f"视频_{session_id}"),
-                    "style": args.get("style", "电商带货"),
+                    "title": title or script_body.get("title", f"视频_{session_id}"),
+                    "style": style or script_body.get("style", "电商带货"),
                     "aspect_ratio": aspect_ratio,
                     "duration": sum(s.get("duration", 5) for s in scenes),
                     "scenes": scenes,
