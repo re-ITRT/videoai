@@ -13,16 +13,19 @@ def generate_signed_url(filepath: str, expire_seconds: int = 3600) -> str:
     生成临时签名URL
     
     Args:
-        filepath: 文件路径，如 /uploads/abc.jpg
+        filepath: 文件路径，如 /uploads/abc.jpg 或 /uploads/agent_sessions/1/scripts/script_1.json
         expire_seconds: 过期时间（秒），默认1小时
     
     Returns:
-        签名后的URL路径: /signed/{token}/{filename}
+        签名后的URL路径: /signed/{token}/{relpath}
     """
     expires = int(time.time()) + expire_seconds
+    # 取 /uploads/ 之后的相对路径作为标识
+    parts = filepath.split("/uploads/")
+    relpath = parts[1] if len(parts) > 1 else filepath.split("/")[-1]
     filename = filepath.split("/")[-1]
     
-    message = f"{filename}:{expires}"
+    message = f"{relpath}:{expires}"
     sig = hmac.new(
         settings.SECRET_KEY.encode(),
         message.encode(),
@@ -30,7 +33,7 @@ def generate_signed_url(filepath: str, expire_seconds: int = 3600) -> str:
     ).hexdigest()[:16]
     
     token = base64.urlsafe_b64encode(f"{sig}:{expires}".encode()).decode().rstrip("=")
-    return f"/signed/{token}/{filename}"
+    return f"/signed/{token}/{relpath}"
 
 
 def verify_signed_url(token: str, filename: str) -> bool:

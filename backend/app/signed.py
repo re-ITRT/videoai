@@ -8,14 +8,14 @@ UPLOAD_DIR = Path("/app/uploads")
 router = APIRouter(tags=["signed"])
 
 
-@router.get("/signed/{token}/{filename}")
-async def serve_signed_file(token: str, filename: str):
+@router.get("/signed/{token}/{rest_of_path:path}")
+async def serve_signed_file(token: str, rest_of_path: str):
     """验证签名token后返回文件"""
-    if not verify_signed_url(token, filename):
+    if not verify_signed_url(token, rest_of_path):
         raise HTTPException(status_code=403, detail="签名无效或已过期")
 
-    filepath = UPLOAD_DIR / filename
+    filepath = UPLOAD_DIR / rest_of_path
     if not filepath.exists():
-        raise HTTPException(status_code=404, detail="文件不存在")
+        raise HTTPException(status_code=404, detail=f"文件不存在")
 
     return FileResponse(filepath)
