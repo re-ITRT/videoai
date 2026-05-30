@@ -18,7 +18,7 @@ const { Sider, Content, Header } = AntLayout
 const menuItems = [
   { key: '/', icon: <DashboardOutlined />, label: '工作台' },
   { key: '/material', icon: <VideoCameraOutlined />, label: '素材管理' },
-  { key: '/script', icon: <FileTextOutlined />, label: '剧本中心' },
+  { key: '/script', icon: <FileTextOutlined />, label: '剧本模板' },
   { key: '/creation', icon: <ThunderboltOutlined />, label: '视频创作' },
   { key: '/reference', icon: <PlayCircleOutlined />, label: '参考视频' },
   { key: '/templates', icon: <BookOutlined />, label: '灵感模板' },

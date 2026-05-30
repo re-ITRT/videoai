@@ -95,6 +95,36 @@ async def update_workflow_config(
 
 
 PROMPT_DIR = os.path.join(os.path.dirname(__file__), "prompts")
+TEMPLATES_DIR = os.path.join(PROMPT_DIR, "templates")
+
+
+@router.get("/prompts")
+async def list_all_templates():
+    """列出所有模板（含名称/描述/prompt预览）"""
+    if not os.path.isdir(TEMPLATES_DIR):
+        return {"templates": {}}
+    result = {}
+    for tname in sorted(os.listdir(TEMPLATES_DIR)):
+        tdir = os.path.join(TEMPLATES_DIR, tname)
+        if not os.path.isdir(tdir):
+            continue
+        info = {}
+        info_path = os.path.join(tdir, "template_info.json")
+        if os.path.exists(info_path):
+            with open(info_path, "r", encoding="utf-8") as f:
+                info = json.loads(f.read())
+        sp = os.path.join(tdir, "system.md")
+        preview = ""
+        if os.path.exists(sp):
+            with open(sp, "r", encoding="utf-8") as f:
+                preview = f.read()[:200]
+        result[tname] = {
+            "display_name": info.get("name", tname),
+            "description": info.get("description", ""),
+            "tags": info.get("tags", []),
+            "prompt_preview": preview,
+        }
+    return {"templates": result}
 
 
 @router.get("/prompts/{workflow_name}")
