@@ -205,17 +205,38 @@ TOOLS_DEFINITIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {
+                    "title": {"type": "string", "description": "剧本标题"},
+                    "style": {"type": "string", "description": "视频风格"},
                     "scenes": {
                         "type": "array",
                         "items": {
                             "type": "object",
                             "properties": {
                                 "scene_id": {"type": "integer"},
-                                "visual_description": {"type": "string", "description": "画面描述"},
                                 "duration": {"type": "integer", "description": "片段时长（秒）"},
+                                "visual_desc": {"type": "string", "description": "画面描述"},
+                                "lines": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "speaker": {"type": "string", "description": "说话人（旁白/角色名）"},
+                                            "text": {"type": "string", "description": "台词内容"},
+                                            "tone": {"type": "string", "description": "语气语调"},
+                                            "start_sec": {"type": "number", "description": "在该场景中开始秒数"},
+                                            "end_sec": {"type": "number", "description": "在该场景中结束秒数"},
+                                        },
+                                    },
+                                    "description": "台词时间轴列表",
+                                },
+                                "materials": {
+                                    "type": "array",
+                                    "items": {"type": "integer"},
+                                    "description": "用到的素材ID列表",
+                                },
                             },
                         },
-                        "description": "分镜列表，每个分镜需要描述画面内容",
+                        "description": "分镜列表（请从剧本中的 scenes 原样传入，含 lines 和 materials）",
                     },
                     "aspect_ratio": {"type": "string", "description": "画幅比例 9:16 或 16:9", "default": "9:16"},
                 },
