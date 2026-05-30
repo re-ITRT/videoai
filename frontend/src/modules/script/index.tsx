@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Table, Button, Card, Tag, message, Space, Modal, Input, Tabs } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
+import { Table, Button, Card, message, Space, Modal, Input, Tabs } from 'antd'
+import { PlusOutlined, EditOutlined } from '@ant-design/icons'
 import request from '../../utils/request'
 
 const { TextArea } = Input
