@@ -634,6 +634,7 @@ async def agent_chat(
 ):
     """发送消息给 Agent，自动执行工具调用循环"""
     message = body.get("message", "")
+    auto_mode = body.get("auto_mode", False)
     if not message:
         raise HTTPException(status_code=400, detail="消息不能为空")
 
@@ -774,6 +775,31 @@ async def agent_chat(
             await db.commit()
 
         # 刷新 history 进入下一轮
+        history = await get_session_messages(db, session_id)
+
+        # ── 自动模式：生成剧本后自动走完视频生成+合成 ──
+        if auto_mode:
+            last_tool = history[-1] if history else None
+            if last_tool and last_tool.role == "tool" and last_tool.tool_name == "generate_script":
+                try:
+                    sresult = json.loads(last_tool.content or "{}")
+                    script_name = (sresult.get("filename") or "").replace(".json", "")
+                    if script_name:
+                        logger.info("auto_mode_video", session_id=session_id, script=script_name)
+                        vresult = await execute_tool("generate_video", {"script_name": script_name, "session_id": session_id}, db, session_id, current_user)
+                        vmsg = AgentMessage(session_id=session_id, role="tool", content=vresult, tool_call_id="auto_video", tool_name="generate_video")
+                        db.add(vmsg)
+                        await db.commit()
+                        history = await get_session_messages(db, session_id)
+
+                        logger.info("auto_mode_compose", session_id=session_id)
+                        cresult = await execute_tool("compose_video", {"session_id": session_id}, db, session_id, current_user)
+                        cmsg = AgentMessage(session_id=session_id, role="tool", content=cresult, tool_call_id="auto_compose", tool_name="compose_video")
+                        db.add(cmsg)
+                        await db.commit()
+                        history = await get_session_messages(db, session_id)
+                except Exception as e:
+                    logger.error("auto_mode_error", session_id=session_id, error=str(e))
         history = await get_session_messages(db, session_id)
 
     # 超过 10 轮强制返回

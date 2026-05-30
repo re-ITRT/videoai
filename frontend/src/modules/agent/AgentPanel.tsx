@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Button, Input, List, Typography, Tag, Spin, Drawer, Modal, message, Card } from 'antd'
+import { Button, Input, List, Typography, Tag, Spin, Drawer, Modal, message, Card, Switch } from 'antd'
 import { SendOutlined, RobotOutlined, UserOutlined, FolderOpenOutlined, DeleteOutlined, PlusOutlined, LoadingOutlined } from '@ant-design/icons'
 import ScriptEditor from './ScriptEditor'
 
@@ -39,6 +39,7 @@ export default function AgentPanel() {
   const [newModal, setNewModal] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [scriptEditorOpen, setScriptEditorOpen] = useState(false)
+  const [autoMode, setAutoMode] = useState(false)
   const msgEnd = useRef<HTMLDivElement>(null)
 
   const loadSessions = async () => { try { setSessions(await api('/sessions')) } catch {} }
@@ -97,7 +98,7 @@ export default function AgentPanel() {
     try {
       await api(`/sessions/${currentSession}/chat`, {
         method: 'POST',
-        body: JSON.stringify({ message: userMsg.content }),
+        body: JSON.stringify({ message: userMsg.content, auto_mode: autoMode }),
       })
       // Reload all messages to capture tool calls + final response
       const [msgs, f] = await Promise.all([
@@ -151,9 +152,15 @@ export default function AgentPanel() {
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
           <Text strong>{currentSession ? `对话 #${currentSession}` : '选择或创建对话'}</Text>
-          {currentSession && (
-            <Button size="small" icon={<FolderOpenOutlined />} onClick={() => setFileDrawer(true)}>文件</Button>
-          )}
+          <Space>
+            <Space size={4}>
+              <Text type="secondary" style={{ fontSize: 12 }}>一站式</Text>
+              <Switch size="small" checked={autoMode} onChange={setAutoMode} />
+            </Space>
+            {currentSession && (
+              <Button size="small" icon={<FolderOpenOutlined />} onClick={() => setFileDrawer(true)}>文件</Button>
+            )}
+          </Space>
         </div>
 
         {/* 消息列表 */}
