@@ -89,13 +89,19 @@ export default function ScriptTemplates() {
   }
 
   const columns = [
-    { title: '模板名称', dataIndex: 'name', render: (v: string, r: any) =>
-      v === 'default' ? <span>{r.display_name || v} <Tag color="blue">默认</Tag></span>
-      : <a onClick={() => openEdit(v)}>{r.display_name || v}</a> },
+    { title: '模板名称', dataIndex: 'display_name', render: (v: string, r: any) =>
+      r.name === 'default' ? <span>{v || r.name} <Tag color="blue">默认</Tag></span>
+      : <a onClick={() => openEdit(r.name)}>{v || r.name}</a> },
     { title: '描述', dataIndex: 'description' },
     { title: 'Prompt 预览', dataIndex: 'prompt_preview', ellipsis: true },
     { title: '操作', render: (_: any, r: any) => (
-      <Space><Button size="small" icon={<EditOutlined />} onClick={() => openEdit(r.name)}>编辑</Button></Space>
+      <Space>
+        <Button size="small" icon={<EditOutlined />} disabled={r.name === 'default'} onClick={() => openEdit(r.name)}>编辑</Button>
+        {r.name !== 'default' && <Button size="small" danger onClick={async () => {
+          try { await request.delete(`/workflows/templates/${r.name}`); message.success('已删除'); load() }
+          catch { message.error('删除失败') }
+        }}>删除</Button>}
+      </Space>
     )},
   ]
 

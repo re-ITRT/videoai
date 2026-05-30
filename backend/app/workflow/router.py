@@ -188,6 +188,18 @@ async def create_template(body: dict):
     return {"ok": True, "name": name}
 
 
+@router.delete("/templates/{template_name}")
+async def delete_template(template_name: str):
+    """删除模板"""
+    if template_name == "default":
+        raise HTTPException(status_code=400, detail="不能删除默认模板")
+    tdir = os.path.join(TEMPLATES_DIR, template_name)
+    if not os.path.isdir(tdir):
+        raise HTTPException(status_code=404, detail="模板不存在")
+    shutil.rmtree(tdir)
+    return {"ok": True}
+
+
 @router.post("/configs/{workflow_name}/scan-models")
 async def scan_workflow_models(
     workflow_name: str,
