@@ -248,14 +248,13 @@ TOOLS_DEFINITIONS = [
         "type": "function",
         "function": {
             "name": "compose_video",
-            "description": "【步骤6】将视频片段 + 音频 + 字幕合成为最终带货视频，文件存入 session 的 final_videos/ 目录",
+            "description": "【步骤5】将视频片段合成为最终视频（视频已自带语音，只需拼接+字幕），存入 final_videos/ 目录",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "script_text": {"type": "string", "description": "旁白文字（用于字幕）"},
                     "aspect_ratio": {"type": "string", "description": "画幅比例 9:16 或 16:9", "default": "9:16"},
                 },
-                "required": ["script_text"],
+                "required": [],
             },
         },
     },
