@@ -256,35 +256,6 @@ TOOLS_DEFINITIONS = [
             },
         },
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "edit_script",
-            "description": "【修改剧本】修改已生成的剧本内容，支持修改 scenes 中的任意字段",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "script_name": {"type": "string", "description": "剧本文件名"},
-                    "edits": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "scene_id": {"type": "integer", "description": "要修改的场景ID"},
-                                "visual_desc": {"type": "string", "description": "新的画面描述"},
-                                "duration": {"type": "integer", "description": "新的时长"},
-                                "lines": {"type": "array", "description": "新的台词列表"},
-                                "materials": {"type": "array", "items": {"type": "integer"}, "description": "新的素材ID列表"},
-                            },
-                            "required": ["scene_id"],
-                        },
-                        "description": "要修改的场景列表，每个元素指定 scene_id 和要替换的字段",
-                    },
-                },
-                "required": ["script_name", "edits"],
-            },
-        },
-    },
 ]
 
 
@@ -311,9 +282,6 @@ SYSTEM_PROMPT = """你是 Video-AI 平台的 AI 助手，帮助用户生成电�
 
 ### 步骤 5 — 视频合成 (compose_video)
 将视频片段合成为最终视频，存入 final_videos/ 目录。
-
-### 修改剧本 (edit_script)
-在步骤 3 之后可以随时修改剧本内容，传入 script_name 和 edits 即可。
 
 ## 核心规则
 - 必须按 1→2→3→4→5 顺序执行，不能跳步
@@ -529,31 +497,6 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
                     logger.warning("poll_retry", session_id=session_id, error=str(e))
                     continue
             return json.dumps({"error": "视频生成超时（30分钟）"}, ensure_ascii=False)
-
-        elif tool_name == "edit_script":
-            script_name = args.get("script_name", "")
-            edits = args.get("edits", [])
-            from app.agent.models import ensure_session_dir
-            spath = os.path.join(ensure_session_dir(session_id)["scripts"], script_name or f"script_{session_id}.json")
-            if not os.path.exists(spath):
-                return json.dumps({"error": f"剧本文件不存在: {script_name}"}, ensure_ascii=False)
-            with open(spath, "r", encoding="utf-8") as f:
-                script = json.loads(f.read())
-            script_body = script.get("script", script)
-            scenes = {s["scene_id"]: s for s in script_body.get("scenes", [])}
-            for edit in edits:
-                sid = edit["scene_id"]
-                if sid not in scenes:
-                    continue
-                for key in ["visual_desc", "duration", "lines", "materials", "visual_description"]:
-                    if key in edit:
-                        scenes[sid][key] = edit[key]
-            script_body["scenes"] = list(scenes.values())
-            if "script" in script:
-                script["script"] = script_body
-            with open(spath, "w", encoding="utf-8") as f:
-                f.write(json.dumps(script, ensure_ascii=False, indent=2))
-            return json.dumps({"ok": True, "message": f"已修改 {len(edits)} 个场景"}, ensure_ascii=False)
 
         elif tool_name == "compose_video":
             existing_files = await get_session_files(db, session_id)
