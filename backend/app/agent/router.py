@@ -660,7 +660,11 @@ async def agent_chat(
         for tc in tool_calls:
             func_name = tc["function"]["name"]
             try:
-                func_args = json.loads(tc["function"]["arguments"])
+                raw_args = tc["function"]["arguments"]
+                # 清理 LLM 常见的 JSON 错误：末尾逗号、多余换行
+                import re as _re
+                raw_args = _re.sub(r",\s*([}\]])", r"\1", raw_args)
+                func_args = json.loads(raw_args)
                 # 自动注入 session_id
                 if "session_id" not in func_args:
                     func_args["session_id"] = session_id
