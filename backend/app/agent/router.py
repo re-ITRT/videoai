@@ -1,6 +1,7 @@
 """AI Agent 路由 — Session 管理 + 聊天 + 工具调用"""
 import asyncio
 import json
+import os
 import time
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -373,15 +374,21 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
                 result = await call_workflow("script-generate", payload)
             # 保存到 session_file
             script_json = json.dumps(result, ensure_ascii=False)
+            # 保存到 session 目录
+            from app.agent.models import ensure_session_dir
+            dirs = ensure_session_dir(session_id)
+            script_path = os.path.join(dirs["scripts"], f"script_{session_id}.json")
+            with open(script_path, "w", encoding="utf-8") as f:
+                f.write(script_json)
+            from app.core.signer import generate_signed_url
+            signed = generate_signed_url(script_path.replace("/app/uploads", "/uploads"), expire_seconds=86400)
             sf = SessionFile(
                 session_id=session_id, file_type="script",
                 filename=f"script_{session_id}.json",
-                file_url=f"/api/v1/agent/sessions/{session_id}/files/script",
+                file_url=f"http://114.117.242.17:3000{signed}",
                 description="生成的剧本",
             )
             db.add(sf)
-            await db.commit()
-            return json.dumps(result, ensure_ascii=False, indent=2)
             await db.commit()
             return json.dumps(result, ensure_ascii=False, indent=2)
 
