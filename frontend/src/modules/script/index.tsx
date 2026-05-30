@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Table, Button, Card, message, Space, Modal, Input, Tabs } from 'antd'
+import { Table, Button, Card, message, Space, Modal, Input, Tabs, Tag } from 'antd'
 import { PlusOutlined, EditOutlined } from '@ant-design/icons'
 import request from '../../utils/request'
 
@@ -39,6 +39,9 @@ export default function ScriptTemplates() {
   const [editName, setEditName] = useState('')
   const [sysSections, setSysSections] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
+  const [createVisible, setCreateVisible] = useState(false)
+  const [createName, setCreateName] = useState('')
+  const [creating, setCreating] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -53,6 +56,7 @@ export default function ScriptTemplates() {
   useEffect(() => { load() }, [])
 
   const openEdit = async (name: string) => {
+    if (name === 'default') return message.warning('默认模板不能修改')
     setEditName(name)
     setEditVisible(true)
     try {
@@ -71,8 +75,23 @@ export default function ScriptTemplates() {
     setSaving(false)
   }
 
+  const handleCreate = async () => {
+    if (!createName.trim()) return message.warning('请输入模板名称')
+    setCreating(true)
+    try {
+      await request.post('/workflows/templates', { name: createName.trim() })
+      message.success('模板已创建')
+      setCreateVisible(false)
+      setCreateName('')
+      load()
+    } catch (e: any) { message.error(e?.response?.data?.detail || '创建失败') }
+    setCreating(false)
+  }
+
   const columns = [
-    { title: '模板名称', dataIndex: 'name', render: (v: string, r: any) => <a onClick={() => openEdit(v)}>{r.display_name || v}</a> },
+    { title: '模板名称', dataIndex: 'name', render: (v: string, r: any) =>
+      v === 'default' ? <span>{r.display_name || v} <Tag color="blue">默认</Tag></span>
+      : <a onClick={() => openEdit(v)}>{r.display_name || v}</a> },
     { title: '描述', dataIndex: 'description' },
     { title: 'Prompt 预览', dataIndex: 'prompt_preview', ellipsis: true },
     { title: '操作', render: (_: any, r: any) => (
@@ -83,8 +102,12 @@ export default function ScriptTemplates() {
   const sectionKeys = Object.keys(sysSections)
 
   return (
-    <Card title="剧本模板" extra={<Button type="primary" icon={<PlusOutlined />}>新建模板</Button>}>
+    <Card title="剧本模板" extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateVisible(true)}>新建模板</Button>}>
       <Table dataSource={templates} columns={columns} rowKey="name" loading={loading} />
+
+      <Modal title="新建模板" open={createVisible} onCancel={() => setCreateVisible(false)} onOk={handleCreate} confirmLoading={creating}>
+        <Input placeholder="输入模板名称" value={createName} onChange={e => setCreateName(e.target.value)} onPressEnter={handleCreate} />
+      </Modal>
 
       <Modal title={`编辑模板 - ${editName}`} open={editVisible} onCancel={() => setEditVisible(false)}
         width={700} footer={null} destroyOnClose>

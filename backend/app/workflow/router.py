@@ -10,7 +10,7 @@ from app.workflow.models import (
     WorkflowConfig, WorkflowConfigResponse, WorkflowConfigUpdate,
     AVAILABLE_WORKFLOWS,
 )
-import os, httpx
+import os, httpx, shutil
 
 router = APIRouter(prefix="/api/v1/workflows", tags=["workflows"])
 
@@ -172,6 +172,20 @@ async def update_workflow_prompt(workflow_name: str, filename: str, body: dict):
     with open(fpath, "w", encoding="utf-8") as f:
         f.write(body.get("content", ""))
     return {"ok": True}
+
+
+@router.post("/templates")
+async def create_template(body: dict):
+    """创建新模板（复制 default 模板）"""
+    name = body.get("name", "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="模板名称不能为空")
+    src = os.path.join(TEMPLATES_DIR, "default")
+    dst = os.path.join(TEMPLATES_DIR, name)
+    if os.path.exists(dst):
+        raise HTTPException(status_code=400, detail=f"模板 '{name}' 已存在")
+    shutil.copytree(src, dst)
+    return {"ok": True, "name": name}
 
 
 @router.post("/configs/{workflow_name}/scan-models")
