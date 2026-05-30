@@ -586,14 +586,19 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
         elif tool_name == "compose_video":
             existing_files = await get_session_files(db, session_id)
             video_files = [f for f in existing_files if f.file_type == "video_clip"]
-            scenes_for_compose = []
-            for i, vf in enumerate(video_files):
+            # 按 scene_id 排序（从 description 提取）
+            def _scene_id(vf):
                 sid = vf.description.replace("场景 ", "").replace(" 视频片段", "") if vf.description else ""
+                return int(sid) if sid.isdigit() else 0
+            video_files.sort(key=_scene_id)
+            scenes_for_compose = []
+            for vf in video_files:
+                sid = _scene_id(vf)
                 scenes_for_compose.append({
-                    "scene_id": int(sid) if sid and sid.isdigit() else i + 1,
+                    "scene_id": sid,
                     "video_url": vf.file_url or "",
                     "duration": 5,
-                    "lines": args.get("scenes", [])[i].get("lines", []) if i < len(args.get("scenes", [])) else [],
+                    "lines": [],
                 })
             if not scenes_for_compose:
                 # fallback: 用 args 中的 scenes
