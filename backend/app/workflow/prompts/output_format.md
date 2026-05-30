@@ -46,4 +46,4 @@
     - text: 台词内容
     - tone: 语气语调
     - start_sec: 在该场景中开始秒数（从0开始）
-    - end_sec: 在该场景中结束秒数（≤ duration - 1）
+    - end_sec: 在该场景中结束秒数（硬性要求 ≤ duration - 1，如 duration=5 时最大 4.0）

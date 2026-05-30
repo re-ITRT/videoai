@@ -6,7 +6,7 @@
 - **start_sec**: 在该场景中开始说话的时间（秒，从0开始）
 - **end_sec**: 在该场景中结束说话的时间（秒）
 台词时间轴必须与 scene.duration 匹配，所有台词的起止时间不能超出场景时长。
-**重要：每条 scene 的最后一个 line 的 end_sec 必须比 duration 至少小 1 秒**（预留收尾余量），即 lines[-1].end_sec <= duration - 1。
+**绝对规则：每条 scene 的最后一个 line 的 end_sec 必须 ≤ duration - 1，违者视为无效剧本。** 例如 duration=5 时，最后一句 end_sec 最大只能 4.0，不能是 4.5 或 5.0。
 
 # 素材引用规则
 每个场景的 `materials` 数组引用可用的素材ID，指明该场景用到哪些素材（可为空数组）。
