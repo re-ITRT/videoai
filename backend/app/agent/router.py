@@ -663,8 +663,17 @@ async def agent_chat(
     for _round in range(10):
         # 构建 messages
         msgs = [{"role": "system", "content": SYSTEM_PROMPT}]
+        seen_tool_ids = set()
+        # 先收集所有 assistant 消息的 tool_call_id
+        for m in history:
+            if m.tool_calls:
+                for tc in json.loads(m.tool_calls):
+                    seen_tool_ids.add(tc["id"])
         for m in history:
             if m.role == "tool":
+                # 跳过没有对应 assistant tool_calls 的 tool 消息
+                if m.tool_call_id and m.tool_call_id not in seen_tool_ids:
+                    continue
                 msgs.append({"role": "tool", "tool_call_id": m.tool_call_id, "content": m.content or ""})
             elif m.tool_calls:
                 tc_list = json.loads(m.tool_calls)
