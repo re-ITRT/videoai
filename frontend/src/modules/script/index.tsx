@@ -89,7 +89,7 @@ export default function ScriptTemplates() {
   }
 
   const columns = [
-    { title: '模板名称', dataIndex: 'name', render: (v: string, r: any) =>
+    { title: '模板名称', dataIndex: 'name', render: (v: string) =>
       v === 'default' ? <span>{v} <Tag color="blue">默认</Tag></span>
       : <a onClick={() => openEdit(v)}>{v}</a> },
     { title: '描述', dataIndex: 'description' },
