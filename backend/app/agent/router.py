@@ -428,6 +428,17 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
             )
             db.add(sf)
             await db.commit()
+            # 强制修正：每条 scene 最后一个 line 的 end_sec ≤ duration - 1
+            script_body = result.get("script", result) if isinstance(result, dict) else result
+            scenes = script_body.get("scenes", []) if isinstance(script_body, dict) else []
+            for sc in scenes:
+                dur = sc.get("duration", 5)
+                lines = sc.get("lines", [])
+                if lines:
+                    lines[-1]["end_sec"] = min(lines[-1]["end_sec"], dur - 1)
+            # 重新写入文件
+            with open(script_path, "w", encoding="utf-8") as f:
+                f.write(json.dumps(result, ensure_ascii=False, indent=2))
             # 返回时加上 filename 供下个工具引用
             result["filename"] = script_filename
             return json.dumps(result, ensure_ascii=False, indent=2)
