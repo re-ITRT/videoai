@@ -11,8 +11,10 @@
 - **tone**: 语气语调（如"温柔"、"激昂"、"俏皮"、"严肃"、"惊讶"）
 - **start_sec**: 在该场景中开始说话的时间（秒，从0开始）
 - **end_sec**: 在该场景中结束说话的时间（秒）
-
 台词时间轴必须与 scene.duration 匹配，所有台词的起止时间不能超出场景时长。
+
+# 素材引用规则
+每个场景的 `materials` 数组引用可用的素材ID，指明该场景用到哪些素材（可为空数组）。
 
 # 场景设计规则
 - type: product（产品展示）/ scene（场景氛围）/ closing（结尾收束）
@@ -31,6 +33,7 @@
       "duration": 10,
       "type": "product/scene/closing",
       "visual_desc": "画面描述（包含镜头语言、主体动作、环境）",
+      "materials": [1, 3],
       "lines": [
         {
           "speaker": "旁白",
