@@ -200,24 +200,8 @@ TOOLS_DEFINITIONS = [
     {
         "type": "function",
         "function": {
-            "name": "generate_tts",
-            "description": "【步骤4】根据剧本旁白生成语音音频，文件存入 session 的 tts/ 目录",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "script_text": {"type": "string", "description": "旁白文字内容"},
-                    "voice": {"type": "string", "description": "音色，默认女声"},
-                    "speed": {"type": "number", "description": "语速倍率，默认1.0"},
-                },
-                "required": ["script_text"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
             "name": "generate_video",
-            "description": "【步骤5】根据剧本分镜描述生成 AI 视频片段，文件存入 session 的 video_clips/ 目录",
+            "description": "【步骤4】根据剧本分镜描述生成 AI 视频片段，文件存入 session 的 video_clips/ 目录",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -272,19 +256,17 @@ SYSTEM_PROMPT = """你是 Video-AI 平台的 AI 助手，帮助用户生成电�
 如果素材不够，可以调整阈值重新搜索。
 
 ### 步骤 3 — 剧本生成 (generate_script)
-基于产品信息和选定的素材，生成结构化剧本。
+基于产品信息和选定的素材，生成结构化剧本（含台词时间轴 lines 和素材引用 materials）。
 
-### 步骤 4 — 语音合成 (generate_tts)
-根据剧本旁白生成语音，文件自动存入 session 的 tts/ 目录。
+### 步骤 4 — 视频生成 (generate_video)
+根据剧本分镜生成 AI 视频片段，视频生成内部自动处理语音和音效。文件存入 session 的 video_clips/ 目录。
+传入的 scenes 应包含剧本中的 lines（台词时间轴）和 materials（素材ID列表），以便视频生成参考。
 
-### 步骤 5 — 视频生成 (generate_video)
-根据剧本分镜生成视频片段，文件自动存入 video_clips/ 目录。
-
-### 步骤 6 — 视频合成 (compose_video)
-将视频片段 + 音频合成为最终视频，存入 final_videos/ 目录。
+### 步骤 5 — 视频合成 (compose_video)
+将视频片段合成为最终视频，存入 final_videos/ 目录。
 
 ## 核心规则
-- 必须按 1→2→3→4→5→6 顺序执行，不能跳步
+- 必须按 1→2→3→4→5 顺序执行，不能跳步
 - 每步完成后向用户说明结果
 - 工具执行结果会通过 role=tool 消息返回，自动记录到数据库
 - 用户可以在中间步骤调整参数（如换关键词、选不同素材）
@@ -380,39 +362,7 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
             db.add(sf)
             await db.commit()
             return json.dumps(result, ensure_ascii=False, indent=2)
-
-        elif tool_name == "generate_tts":
-            scenes = args.get("scenes", [])
-            if not scenes:
-                # fallback: wrap flat script_text into a single scene
-                scenes = [{"scene_id": 1, "visual_desc": args.get("script_text", ""), "duration": 15}]
-            # 确保字段名对齐 workflow
-            for s in scenes:
-                if "visual_desc" not in s and "visual_description" in s:
-                    s["visual_desc"] = s.pop("visual_description")
-                # TTS 需要 text 字段
-                if "text" not in s:
-                    s["text"] = s.get("subtitle", "") or s.get("visual_desc", "") or args.get("script_text", "")
-            payload = {"scenes": scenes}
-            result = await call_workflow("tts-generate", payload)
-            # tts-generate 输出 {audio_segments: [{scene_id, audio_url, duration}, ...]}
-            segments = []
-            if isinstance(result, dict):
-                segments = result.get("audio_segments", []) or result.get("data", result)
-                if isinstance(segments, dict) and "audio_segments" in segments:
-                    segments = segments["audio_segments"]
-            if isinstance(segments, list):
-                for seg in segments:
-                    audio_url = seg.get("audio_url", "")
-                    if audio_url:
-                        sf = SessionFile(
-                            session_id=session_id, file_type="tts",
-                            filename=f"tts_{session_id}_scene{seg.get('scene_id', '')}.mp3",
-                            file_url=audio_url,
-                            description=f"场景 {seg.get('scene_id', '')} TTS 语音",
-                        )
-                        db.add(sf)
-                await db.commit()
+            await db.commit()
             return json.dumps(result, ensure_ascii=False, indent=2)
 
         elif tool_name == "generate_video":
