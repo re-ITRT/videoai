@@ -4,11 +4,15 @@ import os
 import httpx
 from jinja2 import Template
 
-PROMPT_DIR = os.path.join(os.path.dirname(__file__), "..", "prompts", "script_generate")
+PROMPT_DIR = os.path.join(os.path.dirname(__file__), "..", "prompts")
+TEMPLATE_DIR = os.path.join(PROMPT_DIR, "templates")
 
 
-def _read_prompt(filename: str) -> str:
-    path = os.path.join(PROMPT_DIR, filename)
+def _read_prompt(template: str, filename: str) -> str:
+    path = os.path.join(TEMPLATE_DIR, template, filename)
+    if not os.path.exists(path):
+        # fallback to script_generate dir
+        path = os.path.join(PROMPT_DIR, "script_generate", filename)
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
 
@@ -18,6 +22,7 @@ async def run_script_generate(
     base_url: str,
     model: str,
     params: dict,
+    template: str = "default",
 ) -> dict:
     """本地执行剧本生成"""
     product_info = params.get("product_info", {})
@@ -26,8 +31,8 @@ async def run_script_generate(
     materials = params.get("materials", []) or params.get("selected_materials", [])
 
     # 读取 prompt 模板
-    system_prompt = _read_prompt("system.md")
-    user_template = _read_prompt("user.md.j2")
+    system_prompt = _read_prompt(template, "system.md")
+    user_template = _read_prompt(template, "user.md.j2")
 
     # 渲染用户 prompt
     up_tpl = Template(user_template)

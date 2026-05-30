@@ -197,6 +197,7 @@ TOOLS_DEFINITIONS = [
                 "type": "object",
                 "properties": {
                     "script_name": {"type": "string", "description": "剧本名称（不带.json），留空自动生成。如果已存在同名剧本会覆盖"},
+                    "template": {"type": "string", "description": "模板名称，留空用默认模板。用 ls_template 查看可用模板"},
                     "product_info": {
                         "type": "object",
                         "description": "产品信息",
@@ -254,6 +255,14 @@ TOOLS_DEFINITIONS = [
     {
         "type": "function",
         "function": {
+            "name": "ls_template",
+            "description": "【列出模板】列出所有可用的剧本生成模板（名称/用途/prompt内容）",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "read_script",
             "description": "【读取剧本】读取指定剧本的完整内容",
             "parameters": {
@@ -298,6 +307,7 @@ SYSTEM_PROMPT = """你是 Video-AI 平台的 AI 助手，帮助用户生成电�
 
 ### 步骤 3 — 剧本生成 (generate_script)
 基于产品信息和选定的素材，生成结构化剧本（含台词时间轴 lines 和素材引用 materials）。
+可通过 template 参数指定模板（用 ls_template 查看可用模板），留空为默认模板。
 
 ### 步骤 4 — 视频生成 (generate_video)
 根据剧本分镜生成 AI 视频片段，视频生成内部自动处理语音和音效。文件存入 session 的 video_clips/ 目录。
@@ -306,9 +316,10 @@ SYSTEM_PROMPT = """你是 Video-AI 平台的 AI 助手，帮助用户生成电�
 ### 步骤 5 — 视频合成 (compose_video)
 将视频片段合成为最终视频，存入 final_videos/ 目录。
 
-### 剧本管理 (ls_script / read_script)
+### 剧本管理
 - ls_script: 列出当前 session 的所有剧本
-- read_script: 读取指定剧本的完整内容（可用于查看/修改前确认）
+- read_script: 读取指定剧本的完整内容
+- ls_template: 列出所有可用的剧本生成模板（名称/用途/prompt内容）
 
 ## 核心规则
 - 必须按 1→2→3→4→5 顺序执行，不能跳步
@@ -391,6 +402,7 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
                         base_url=cfg["base_url"],
                         model=cfg["model"],
                         params=payload,
+                        template=args.get("template", "default"),
                     )
                 else:
                     result = await call_workflow("script-generate", payload)
@@ -535,6 +547,32 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
             files = sorted(_glob.glob(os.path.join(scripts_dir, "*.json")))
             names = [os.path.splitext(os.path.basename(f))[0] for f in files]
             return json.dumps({"scripts": names}, ensure_ascii=False)
+
+        elif tool_name == "ls_template":
+            templates_dir = os.path.join(os.path.dirname(__file__), "..", "workflow", "prompts", "templates")
+            if not os.path.isdir(templates_dir):
+                return json.dumps({"templates": []}, ensure_ascii=False)
+            items = []
+            for tname in sorted(os.listdir(templates_dir)):
+                tdir = os.path.join(templates_dir, tname)
+                if not os.path.isdir(tdir):
+                    continue
+                info_path = os.path.join(tdir, "template_info.json")
+                info = {}
+                if os.path.exists(info_path):
+                    with open(info_path, "r", encoding="utf-8") as f:
+                        info = json.loads(f.read())
+                sp = os.path.join(tdir, "system.md")
+                system_prompt = ""
+                if os.path.exists(sp):
+                    with open(sp, "r", encoding="utf-8") as f:
+                        system_prompt = f.read()[:200]
+                items.append({
+                    "name": info.get("name", tname),
+                    "description": info.get("description", ""),
+                    "prompt_preview": system_prompt,
+                })
+            return json.dumps({"templates": items}, ensure_ascii=False)
 
         elif tool_name == "read_script":
             script_name = args.get("script_name", "").replace(".json", "")
