@@ -85,3 +85,10 @@ export const updateWorkflowConfig = (name: string, data: any) =>
 export const getAvailableWorkflows = () => request.get('/workflows/available')
 export const scanWorkflowModels = (name: string, data: any) =>
   request.post(`/workflows/configs/${name}/scan-models`, data)
+
+// ==============================
+// Agent Script Editor
+// ==============================
+export const getSessionScript = (sessionId: number) => request.get(`/agent/sessions/${sessionId}/script`)
+export const updateSessionScript = (sessionId: number, data: any) =>
+  request.put(`/agent/sessions/${sessionId}/script`, data)

@@ -99,6 +99,35 @@ async def get_session_files_endpoint(
     return [SessionFileResponse.model_validate(f) for f in files]
 
 
+@router.get("/sessions/{session_id}/script")
+async def get_session_script(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """获取 session 的剧本内容"""
+    from app.agent.models import ensure_session_dir
+    spath = os.path.join(ensure_session_dir(session_id)["scripts"], f"script_{session_id}.json")
+    if os.path.exists(spath):
+        with open(spath, "r", encoding="utf-8") as f:
+            return json.loads(f.read())
+    return {"script": None}
+
+
+@router.put("/sessions/{session_id}/script")
+async def update_session_script(
+    session_id: int, body: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """更新剧本内容"""
+    from app.agent.models import ensure_session_dir
+    spath = os.path.join(ensure_session_dir(session_id)["scripts"], f"script_{session_id}.json")
+    with open(spath, "w", encoding="utf-8") as f:
+        f.write(json.dumps(body.get("script", {}), ensure_ascii=False, indent=2))
+    return {"ok": True}
+
+
 # ── 工具定义 ───────────────────────────────
 
 TOOLS_DEFINITIONS = [

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Button, Input, List, Typography, Tag, Spin, Drawer, Modal, message, Card } from 'antd'
 import { SendOutlined, RobotOutlined, UserOutlined, FolderOpenOutlined, DeleteOutlined, PlusOutlined, LoadingOutlined } from '@ant-design/icons'
+import ScriptEditor from './ScriptEditor'
 
 const { Text } = Typography
 const { TextArea } = Input
@@ -37,6 +38,7 @@ export default function AgentPanel() {
   const [fileDrawer, setFileDrawer] = useState(false)
   const [newModal, setNewModal] = useState(false)
   const [newTitle, setNewTitle] = useState('')
+  const [scriptEditorOpen, setScriptEditorOpen] = useState(false)
   const msgEnd = useRef<HTMLDivElement>(null)
 
   const loadSessions = async () => { try { setSessions(await api('/sessions')) } catch {} }
@@ -259,8 +261,10 @@ export default function AgentPanel() {
                     <div style={{ marginTop: 4 }}>
                       {type === 'final_video' || type === 'video_clip'
                         ? <video src={f.file_url} controls style={{ width: '100%', maxHeight: 200 }} />
-                        : type === 'tts'
+                      : f.file_type === 'tts'
                         ? <audio src={f.file_url} controls style={{ width: '100%' }} />
+                        : f.file_type === 'script'
+                        ? <Button size="small" onClick={() => setScriptEditorOpen(true)}>编辑剧本</Button>
                         : <a href={f.file_url} target="_blank">查看</a>
                       }
                     </div>
@@ -272,6 +276,8 @@ export default function AgentPanel() {
         })}
         {files.length === 0 && <Text type="secondary">暂无文件</Text>}
       </Drawer>
+
+      <ScriptEditor sessionId={currentSession || 0} visible={scriptEditorOpen} onClose={() => setScriptEditorOpen(false)} />
     </div>
   )
 }
