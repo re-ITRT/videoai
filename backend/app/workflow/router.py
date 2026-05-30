@@ -185,6 +185,14 @@ async def create_template(body: dict):
     if os.path.exists(dst):
         raise HTTPException(status_code=400, detail=f"模板 '{name}' 已存在")
     shutil.copytree(src, dst)
+    # 更新 info.json 中的名称
+    info_path = os.path.join(dst, "template_info.json")
+    if os.path.exists(info_path):
+        with open(info_path, "r", encoding="utf-8") as f:
+            info = json.loads(f.read())
+        info["name"] = name
+        with open(info_path, "w", encoding="utf-8") as f:
+            f.write(json.dumps(info, ensure_ascii=False, indent=2))
     return {"ok": True, "name": name}
 
 
