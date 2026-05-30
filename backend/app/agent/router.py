@@ -421,12 +421,45 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
             for s in scenes:
                 if "visual_desc" not in s and "visual_description" in s:
                     s["visual_desc"] = s.pop("visual_description")
-            # 1. 提交任务
+
+            # 1. 查找素材URL并签发公网地址
+            from app.material.models import Material
+            from app.core.signer import generate_signed_url
+            from sqlalchemy import select as _s2
+
+            all_mids = set()
+            for s in scenes:
+                for mid in s.get("materials", []):
+                    all_mids.add(mid)
+            material_urls = {}
+            if all_mids:
+                mat_result = await db.execute(
+                    _s2(Material).where(Material.id.in_(list(all_mids)))
+                )
+                for m in mat_result.scalars().all():
+                    if m.image_url:
+                        signed = generate_signed_url(m.image_url, expire_seconds=86400)
+                        material_urls[m.id] = f"http://114.117.242.17:3000{signed}"
+
+            # 2. 构建 reference_images
+            for s in scenes:
+                s["reference_images"] = [
+                    {"url": material_urls[mid], "role": "reference_image"}
+                    for mid in s.get("materials", []) if mid in material_urls
+                ]
+                if "lines" not in s:
+                    s["lines"] = []
+
+            # 3. 提交任务（完整script格式）
             result = await call_workflow("video-generate", {
                 "workflow_type": "generate",
-                "task_id": session_id,
-                "scenes": scenes,
-                "aspect_ratio": aspect_ratio,
+                "script": {
+                    "title": args.get("title", f"视频_{session_id}"),
+                    "style": args.get("style", "电商带货"),
+                    "aspect_ratio": aspect_ratio,
+                    "duration": sum(s.get("duration", 5) for s in scenes),
+                    "scenes": scenes,
+                },
             })
             logger.info("generate_raw_response", session_id=session_id, raw=json.dumps(result, ensure_ascii=False)[:500])
             # Coze 返回格式：{"result": {"task_ids": [...]}, "run_id": "..."}
