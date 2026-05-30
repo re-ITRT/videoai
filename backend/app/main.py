@@ -34,6 +34,12 @@ async def startup():
     async with engine.begin() as conn:
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.create_all)
+        # 确保 embedding 列存在（DB 重建场景）
+        for tbl in ["materials", "material_slices"]:
+            try:
+                await conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN IF NOT EXISTS embedding vector(1024)"))
+            except Exception:
+                pass
 
 app.add_middleware(
     CORSMiddleware,
