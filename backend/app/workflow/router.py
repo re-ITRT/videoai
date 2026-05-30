@@ -129,14 +129,18 @@ async def list_all_templates():
 
 @router.get("/prompts/{workflow_name}")
 async def get_workflow_prompts(workflow_name: str):
-    """读取工作流的 prompt 文件"""
-    wf_dir = os.path.join(PROMPT_DIR, workflow_name)
-    if not os.path.isdir(wf_dir):
+    """读取工作流或模板的 prompt 文件"""
+    # 先查 templates 目录，再查 prompts 根目录
+    for base in [TEMPLATES_DIR, PROMPT_DIR]:
+        wf_dir = os.path.join(base, workflow_name)
+        if os.path.isdir(wf_dir):
+            break
+    else:
         return {"files": {}}
     files = {}
     for fname in os.listdir(wf_dir):
         fpath = os.path.join(wf_dir, fname)
-        if os.path.isfile(fpath) and fname.endswith((".md", ".j2")):
+        if os.path.isfile(fpath) and fname.endswith((".md", ".j2", ".json")):
             with open(fpath, "r", encoding="utf-8") as f:
                 files[fname] = f.read()
     return {"files": files}
@@ -144,14 +148,19 @@ async def get_workflow_prompts(workflow_name: str):
 
 @router.put("/prompts/{workflow_name}/{filename}")
 async def update_workflow_prompt(workflow_name: str, filename: str, body: dict):
-    """更新工作流的 prompt 文件"""
-    if not filename.endswith((".md", ".j2")):
-        raise HTTPException(status_code=400, detail="只支持 .md 和 .j2 文件")
-    fpath = os.path.join(PROMPT_DIR, workflow_name, filename)
-    content = body.get("content", "")
+    """更新工作流或模板的 prompt 文件"""
+    if not filename.endswith((".md", ".j2", ".json")):
+        raise HTTPException(status_code=400, detail="不支持的文件类型")
+    # 优先 templates 目录
+    for base in [TEMPLATES_DIR, PROMPT_DIR]:
+        fpath = os.path.join(base, workflow_name, filename)
+        if os.path.exists(fpath) or base == TEMPLATES_DIR:
+            break
+    else:
+        fpath = os.path.join(TEMPLATES_DIR, workflow_name, filename)
     os.makedirs(os.path.dirname(fpath), exist_ok=True)
     with open(fpath, "w", encoding="utf-8") as f:
-        f.write(content)
+        f.write(body.get("content", ""))
     return {"ok": True}
 
 
