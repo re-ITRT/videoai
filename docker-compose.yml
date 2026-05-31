@@ -9,6 +9,12 @@ services:
       - "5432:5432"
     volumes:
       - /data/pgdata:/var/lib/postgresql/data
+    restart: always
+    healthcheck:
+      test: pg_isready -U postgres
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
@@ -35,10 +41,14 @@ services:
     volumes:
       - uploads_data:/app/uploads
       - logs_data:/app/logs
+    restart: always
     depends_on:
-      - postgres
-      - redis
-      - minio
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
 
   celery-worker:
     build: ./backend
