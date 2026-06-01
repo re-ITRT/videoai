@@ -37,7 +37,7 @@
 - duration: 总时长（与输入一致）
 - scenes: 分镜列表
   - scene_id: 场景ID（从1开始递增）
-  - duration: 场景时长（秒）
+  - duration: 场景时长（秒，限 4/8/12 三档）
   - type: product（产品展示）/ scene（场景氛围）/ closing（结尾收束）
   - visual_desc: 画面描述（具体的镜头语言、主体动作、环境）
   - materials: **必填**，用到的素材ID数组，每个场景至少一个

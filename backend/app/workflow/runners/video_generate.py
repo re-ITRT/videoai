@@ -52,6 +52,9 @@ async def run_video_generate(api_key: str, params: dict) -> dict:
             body = {"model": MODEL_EP, "content": content_items, "return_last_frame": False}
             if aspect_ratio:
                 body["ratio"] = aspect_ratio
+            dur = scene.get("duration")
+            if dur in (4, 8, 12):
+                body["duration"] = dur
 
             # 提交 + 429 重试
             task_id = None
