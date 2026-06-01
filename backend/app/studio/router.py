@@ -186,22 +186,25 @@ async def studio_generate_video(body: dict, db: AsyncSession = Depends(get_db), 
 
     # 4. 提交任务
     aspect_ratio = body.get("aspect_ratio", "9:16")
-    result = await call_workflow("video-generate", {
-        "workflow_type": "generate",
-        "script": {
-            "title": title or script_body.get("title", f"视频_{session_id}"),
-            "style": style or "电商带货",
-            "aspect_ratio": aspect_ratio,
-            "duration": sum(s.get("duration", 5) for s in scenes),
-            "scenes": [{
-                "scene_id": s.get("scene_id", i+1),
-                "visual_desc": s.get("visual_desc", ""),
-                "duration": s.get("duration", 5),
-                "lines": s.get("lines", []),
-                "reference_images": s.get("reference_images", []),
-            } for i, s in enumerate(scenes)],
-        },
-    })
+    try:
+        result = await call_workflow("video-generate", {
+            "workflow_type": "generate",
+            "script": {
+                "title": title or script_body.get("title", f"视频_{session_id}"),
+                "style": style or "电商带货",
+                "aspect_ratio": aspect_ratio,
+                "duration": sum(s.get("duration", 5) for s in scenes),
+                "scenes": [{
+                    "scene_id": s.get("scene_id", i+1),
+                    "visual_desc": s.get("visual_desc", ""),
+                    "duration": s.get("duration", 5),
+                    "lines": s.get("lines", []),
+                    "reference_images": s.get("reference_images", []),
+                } for i, s in enumerate(scenes)],
+            },
+        })
+    except Exception as e:
+        raise HTTPException(502, f"Coze workflow 返回错误: {str(e)}")
     inner = result.get("result", result) if isinstance(result, dict) else result
     task_ids = inner.get("task_ids", []) if isinstance(inner, dict) else []
     if not task_ids:
