@@ -25,7 +25,7 @@ export default function StudioPage() {
 
   const [videoCollections, setVideoCollections] = useState<any[]>([])
   const [selectedVideoCol, setSelectedVideoCol] = useState<number | null>(null)
-  const [finalVideos, setFinalVideos] = useState<any[]>([])
+  const [_fv, _sfv] = useState<any[]>([])
 
   const [generating, setGenerating] = useState<string | null>(null)
 
@@ -79,7 +79,7 @@ export default function StudioPage() {
   }
 
   // ── 素材搜索 ──
-  const searchMaterials = async () => {
+  // const searchMaterials = async () => {
     try {
       const res: any = await request.post('/studio/materials/search', { threshold, tags: [] })
       setMaterials(res?.materials || [])
