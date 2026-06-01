@@ -45,8 +45,14 @@ async def run_video_generate(api_key: str, params: dict) -> dict:
                 for l in lines:
                     s = l.get('start_sec', 0)
                     e = l.get('end_sec', 5)
-                    prompt += f"{s}-{e}秒: {l.get('speaker', '')}说「{l.get('text', '')}」(语气: {l.get('tone', '中性')})\n"
-                prompt += "\n以上台词顺序必须严格遵守，时间轴不能颠倒。"
+                    speaker = l.get('speaker', '')
+                    text = l.get('text', '')
+                    tone = l.get('tone', '中性')
+                    if speaker == '旁白':
+                        prompt += f"{s}-{e}秒: 旁白配音（不出现在画面中）「{text}」(语气: {tone})\n"
+                    else:
+                        prompt += f"{s}-{e}秒: 画面中的{speaker}说出「{text}」(语气: {tone})\n"
+                prompt += "\n【区分说明】旁白是画外音不出镜，其他角色须在画面中出现并说出台词。以上顺序不能颠倒。"
             content_items.append({"type": "text", "text": prompt})
 
             body = {"model": MODEL_EP, "content": content_items, "return_last_frame": False}
