@@ -220,8 +220,8 @@ async def studio_generate_video(body: dict, db: AsyncSession = Depends(get_db), 
 
 
 @router.post("/poll-generate/{session_id}")
-async def studio_poll_generate(session_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    """轮询视频生成状态"""
+async def studio_poll_generate(session_id: int, db: AsyncSession = Depends(get_db)):
+    """轮询视频生成状态（无需登录）"""
     from app.agent.models import SessionFile, get_session_files as _gsf
     from app.workers.workflow import call_workflow
     import json
@@ -233,10 +233,13 @@ async def studio_poll_generate(session_id: int, db: AsyncSession = Depends(get_d
 
     latest = tasks[-1]
     task_ids = json.loads(latest.description)
-    qr = await call_workflow("video-generate", {
-        "workflow_type": "query",
-        "task_ids": task_ids,
-    })
+    try:
+        qr = await call_workflow("video-generate", {
+            "workflow_type": "query",
+            "task_ids": task_ids,
+        })
+    except Exception:
+        return {"status": "error", "detail": "Coze query failed"}
     qr_inner = qr.get("result", qr) if isinstance(qr, dict) else qr
     if not isinstance(qr_inner, dict):
         return {"status": "unknown", "clips": []}
