@@ -161,14 +161,17 @@ export default function StudioPage() {
   }
 
   // 生成视频 → 异步提交 + 前端轮询
+  const generatingRef = useRef(false)
   const genVideo = async () => {
+    if (generatingRef.current) return
+    generatingRef.current = true
     const sid = sessionIdRef.current
-    if (!sid) return
+    if (!sid) { generatingRef.current = false; return }
     setGenerating('生成视频')
     try {
       // 提交任务
       const submitRes: any = await request.post('/studio/generate-video', { session_id: sid, script_name: `script_${sid}` })
-      if (!submitRes?.submitted) return message.error('提交失败')
+      if (!submitRes?.submitted) { generatingRef.current = false; return message.error('提交失败') }
 
       message.info('视频生成已提交，等待中...')
 
@@ -199,6 +202,7 @@ export default function StudioPage() {
       if (!done) message.warning('生成超时，可稍后刷新查看')
       loadClips()
     } catch { message.error('生成失败') }
+    generatingRef.current = false
     setGenerating(null)
   }
 
