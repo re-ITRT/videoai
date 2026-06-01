@@ -96,15 +96,20 @@ export default function StudioPage() {
     if (!coll) return message.warning('请选择素材集合')
     setGenerating('生成剧本')
     try {
-      const matInfo = coll.material_ids?.length
-        ? `可用素材ID: [${coll.material_ids.join(', ')}]`
-        : ''
-      await request.post(`/agent/sessions/${sessionId}/chat`, {
-        message: `用模板"${state.selected_template}"为以下产品生成剧本。\n\n产品信息：${prod.content}\n\n${matInfo}`,
-        auto_mode: false,
+      // 获取素材详情（ID+描述+标签）
+      const matDetails = materials
+        .filter((m: any) => coll.material_ids.includes(m.id))
+        .map((m: any) => ({ id: m.id, description: m.tags?.join(', ') || '', tags: m.tags || [] }))
+      const res: any = await request.post('/studio/generate-script', {
+        product_content: prod.content,
+        template: state.selected_template,
+        materials: matDetails,
       })
       message.success('剧本已生成')
-    } catch { message.error('生成失败') }
+      console.log('剧本结果:', res)
+    } catch {
+      message.error('生成失败')
+    }
     setGenerating(null)
   }
 

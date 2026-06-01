@@ -86,6 +86,41 @@ async def semantic_search(body: dict, db: AsyncSession = Depends(get_db), user: 
     return {"materials": all_results, "total": len(all_results)}
 
 
+@router.post("/generate-script")
+async def studio_generate_script(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """直接生成剧本（不走LLM对话，直接调 runner 或 workflow）"""
+    from app.workflow.runners.script_generate import run_script_generate
+    from app.workflow.models import WorkflowConfig
+    from sqlalchemy import select as _s
+    import json, os
+
+    product_content = body.get("product_content", "")
+    template = body.get("template", "default")
+    materials = body.get("materials", [])  # [{id, description, tags}]
+
+    params = {
+        "product_info": {"product_id": 1, "name": product_content[:30], "description": product_content, "selling_points": []},
+        "style": "电商带货",
+        "duration": 30,
+        "selected_materials": materials,
+    }
+
+    # 查工作流配置
+    wf = await db.execute(_s(WorkflowConfig).where(WorkflowConfig.user_id == user.id, WorkflowConfig.workflow_name == "script-generate"))
+    wf_cfg = wf.scalar_one_or_none()
+    script_dir = "/tmp"  # 临时返回，不存文件
+
+    if wf_cfg and wf_cfg.enabled:
+        cfg = json.loads(wf_cfg.config or "{}")
+        if cfg.get("api_key") and cfg.get("base_url") and cfg.get("model"):
+            result = await run_script_generate(api_key=cfg["api_key"], base_url=cfg["base_url"], model=cfg["model"], params=params, template=template)
+            return result
+    # fallback: 调 Coze workflow
+    from app.workers.workflow import call_workflow
+    result = await call_workflow("script-generate", params)
+    return result
+
+
 @router.post("/materials/search")
 async def search_studio_materials(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
     """搜索素材（带阈值和标签）"""
