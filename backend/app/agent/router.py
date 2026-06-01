@@ -480,20 +480,23 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
                 if "lines" not in s:
                     s["lines"] = []
 
-            # 3. 提交任务（旧格式：task_id + scenes，Coze 工作流按此解析）
-            payload = {
+            # 3. 提交任务（script 格式，Coze 工作流已更新为此格式）
+            result = await call_workflow("video-generate", {
                 "workflow_type": "generate",
-                "task_id": session_id,
-                "scenes": [{
-                    "scene_id": s.get("scene_id", i+1),
-                    "visual_desc": s.get("visual_desc", ""),
-                    "duration": s.get("duration", 5),
-                    "lines": s.get("lines", []),
-                    "reference_images": s.get("reference_images", []),
-                } for i, s in enumerate(scenes)],
-                "aspect_ratio": aspect_ratio,
-            }
-            result = await call_workflow("video-generate", payload)
+                "script": {
+                    "title": title or script_body.get("title", f"视频_{session_id}"),
+                    "style": style or script_body.get("style", "电商带货"),
+                    "aspect_ratio": aspect_ratio,
+                    "duration": sum(s.get("duration", 5) for s in scenes),
+                    "scenes": [{
+                        "scene_id": s.get("scene_id", i+1),
+                        "visual_desc": s.get("visual_desc", ""),
+                        "duration": s.get("duration", 5),
+                        "lines": s.get("lines", []),
+                        "reference_images": s.get("reference_images", []),
+                    } for i, s in enumerate(scenes)],
+                },
+            })
             logger.info("generate_raw_response", session_id=session_id, raw=json.dumps(result, ensure_ascii=False)[:500])
             # Coze 返回格式：{"result": {"task_ids": [...]}, "run_id": "..."}
             inner = result.get("result", result) if isinstance(result, dict) else result
