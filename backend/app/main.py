@@ -66,24 +66,6 @@ async def startup():
                 print("Default accounts created")
     except Exception as e:
         print(f"Account init warning: {e}")
-    # 恢复素材：如果 materials 表为空但 /app/uploads 有文件
-    try:
-        import os as _os
-        upload_dir = "/app/uploads"
-        files = sorted(_os.listdir(upload_dir))
-        img_files = [f for f in files if f.endswith((".png", ".jpg", ".jpeg")) and _os.path.isfile(_os.path.join(upload_dir, f))]
-        if img_files:
-            from app.material.models import Material as _Material
-            async with async_session() as s:
-                cnt = await s.execute(text("SELECT count(*) FROM materials"))
-                if cnt.scalar() == 0:
-                    for fname in img_files[:20]:  # 最多恢复20个
-                        ext = _os.path.splitext(fname)[1].lower()
-                        s.add(_Material(user_id="1", material_type="product" if ext == ".png" else "image", input_type="image", image_url=f"/uploads/{fname}", source="auto_recovery"))
-                    await s.commit()
-                    print(f"Auto-recovered {min(len(img_files), 20)} materials")
-    except Exception as e:
-        print(f"Material recovery warning: {e}")
 
 app.add_middleware(
     CORSMiddleware,
