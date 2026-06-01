@@ -255,7 +255,7 @@ async def studio_poll_generate(session_id: int, db: AsyncSession = Depends(get_d
 
     if qr_inner.get("status") == "completed":
         clips = qr_inner.get("video_clips", [])
-        saved = 0
+        saved_ids = []
         for clip in clips:
             vu = clip.get("video_url", "")
             if vu:
@@ -266,13 +266,15 @@ async def studio_poll_generate(session_id: int, db: AsyncSession = Depends(get_d
                     description=f"场景 {clip.get('scene_id', '')} 视频片段",
                 )
                 db.add(sf)
-                saved += 1
+                await db.flush()
+                saved_ids.append(sf.id)
         await db.commit()
-        # 返回新 clips
+        # 只返回本次新保存的 clips
         fresh = await _gsf(db, session_id)
-        new_clips = [{"id": f.id, "scene_id": (f.description or "").replace("场景 ", "").replace(" 视频片段", ""), "url": f.file_url}
-                     for f in fresh if f.file_type == "video_clip"]
-        return {"status": "completed", "clips": new_clips, "saved": saved, "total": len(new_clips)}
+        all_clips = {f.id: {"id": f.id, "scene_id": (f.description or "").replace("场景 ", "").replace(" 视频片段", ""), "url": f.file_url}
+                     for f in fresh if f.file_type == "video_clip"}
+        new_clips = [all_clips[cid] for cid in saved_ids if cid in all_clips]
+        return {"status": "completed", "clips": new_clips, "saved": len(new_clips), "total": len(all_clips)}
     elif qr_inner.get("status") == "running":
         return {"status": "running", "clips": []}
     else:
