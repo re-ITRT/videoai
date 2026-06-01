@@ -40,7 +40,7 @@
   - duration: 场景时长（秒）
   - type: product（产品展示）/ scene（场景氛围）/ closing（结尾收束）
   - visual_desc: 画面描述（具体的镜头语言、主体动作、环境）
-  - materials: 用到的素材ID数组（可为空）
+  - materials: **必填**，用到的素材ID数组，每个场景至少一个
   - lines: 台词时间轴列表（可为空）
     - speaker: 说话人（"旁白"或角色名）
     - text: 台词内容

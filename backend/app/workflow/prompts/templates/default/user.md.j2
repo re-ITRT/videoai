@@ -20,6 +20,6 @@
 1. 所有场景时长总和必须等于{{ duration }}秒
 2. 每个场景用 `lines` 数组控制台词时间轴
 3. lines 中每条台词需指定：speaker（说话人）、text（台词）、tone（语气语调）、start_sec/end_sec（在场景内的起止秒数）
-4. 每个 scene 用 materials 数组引用可用素材ID，指明用到哪些素材
+4. **每个场景必须用 materials 数组引用可用素材ID，至少引用一个，根据场景画面内容选择合适的素材**
 5. 至少有一些旁白台词，也可以加入角色对话增加代入感
 6. 每个 scene 的最后一个 line 的 end_sec 必须 ≤ duration - 0.5（预留收尾余量）

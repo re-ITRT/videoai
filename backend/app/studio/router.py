@@ -131,14 +131,14 @@ async def studio_generate_script(body: dict, db: AsyncSession = Depends(get_db),
 
 
 def _inject_materials(script_data: dict, materials: list) -> dict:
-    """强制将素材ID列表注入每个场景的 materials 字段"""
+    """强制将素材ID列表注入每个场景的 materials 字段（仅补充空场景）"""
     script_body = script_data.get("script", script_data)
     scenes = script_body.get("scenes", [])
     mid_list = [m.get("material_id") or m.get("id") for m in materials if m.get("material_id") or m.get("id")]
     if mid_list:
         for s in scenes:
             if not s.get("materials"):
-                s["materials"] = mid_list
+                s["materials"] = mid_list  # fallback: 全部注入
     return script_data
 
 
