@@ -351,15 +351,33 @@ async def studio_poll_generate(session_id: int, db: AsyncSession = Depends(get_d
 
 @router.post("/compose-video")
 async def studio_compose_video(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    """直接合成视频（不走LLM对话）"""
-    from app.agent.router import execute_tool
+    """合成视频：将选中 clip 标记为最终视频（不做TTS/配音）"""
+    from app.agent.models import SessionFile, get_session_files as _gsf
+    from sqlalchemy import select as _s
+
     session_id = body.get("session_id", 0)
     clip_ids = body.get("clip_ids")
-    args = {"session_id": session_id}
+
+    files = await _gsf(db, session_id)
+    clips = [f for f in files if f.file_type == "video_clip"]
     if clip_ids:
-        args["clip_ids"] = clip_ids
-    result = await execute_tool("compose_video", args, db, session_id, user)
-    return json.loads(result)
+        clips = [f for f in clips if f.id in clip_ids]
+    if not clips:
+        raise HTTPException(400, "没有可合成的视频片段")
+
+    saved = []
+    for vf in clips:
+        sf = SessionFile(
+            session_id=session_id, file_type="final_video",
+            filename=f"final_{session_id}_{vf.id}.mp4",
+            file_url=vf.file_url,
+            description=f"合成自场景 {vf.description}",
+        )
+        db.add(sf)
+        await db.flush()
+        saved.append({"id": sf.id, "url": sf.file_url})
+    await db.commit()
+    return {"composed": True, "videos": saved}
 
 
 @router.get("/clips/{session_id}")
