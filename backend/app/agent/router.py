@@ -490,6 +490,7 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
                     "duration": sum(s.get("duration", 5) for s in scenes),
                     "scenes": [{
                         "scene_id": s.get("scene_id", i+1),
+                        "type": s.get("type", "scene"),
                         "visual_desc": s.get("visual_desc", ""),
                         "duration": s.get("duration", 5),
                         "lines": s.get("lines", []),

@@ -196,6 +196,7 @@ async def studio_generate_video(body: dict, db: AsyncSession = Depends(get_db), 
                 "duration": sum(s.get("duration", 5) for s in scenes),
                 "scenes": [{
                     "scene_id": s.get("scene_id", i+1),
+                    "type": s.get("type", "scene"),
                     "visual_desc": s.get("visual_desc", ""),
                     "duration": s.get("duration", 5),
                     "lines": s.get("lines", []),
