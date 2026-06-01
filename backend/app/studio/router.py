@@ -365,13 +365,6 @@ async def studio_compose_video(body: dict, db: AsyncSession = Depends(get_db), u
     if not clips:
         raise HTTPException(400, "没有可合成的视频片段")
 
-    # 清空旧最终视频，只保留本次合成的
-    old = [f for f in files if f.file_type == "final_video"]
-    if old:
-        for o in old:
-            await db.delete(o)
-        await db.commit()
-
     saved = []
     for vf in clips:
         sf = SessionFile(
