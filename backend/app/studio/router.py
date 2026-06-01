@@ -40,6 +40,50 @@ async def save_workflow_state(session_id: int, body: dict, user: User = Depends(
     return {"ok": True}
 
 
+@router.post("/semantic-search")
+async def semantic_search(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """产品介绍 → query-generate → material-search → 返回素材相似度列表"""
+    from app.workers.workflow import call_workflow
+    from app.material.search import search_materials_by_embeddings
+    
+    product_info = body.get("product_info", {})
+    threshold = body.get("threshold", 30) / 100.0
+
+    # 1. 调用 query-generate 生成关键词
+    qg = await call_workflow("query-generate", {
+        "product_info": {"product_id": 1, "name": product_info.get("title", ""), "description": product_info.get("content", "")},
+        "video_style": "电商带货",
+        "target_duration": 30,
+    })
+    product_queries = qg.get("product_queries", []) if isinstance(qg, dict) else []
+    general_queries = qg.get("general_queries", []) if isinstance(qg, dict) else []
+
+    # 2. 调用 material-search 生成向量
+    ms = await call_workflow("material-search", {
+        "product_queries": product_queries,
+        "general_queries": general_queries,
+    })
+    embeddings = ms.get("product_embeddings", []) if isinstance(ms, dict) else []
+
+    # 3. 用向量搜索 PG
+    all_results = []
+    seen = set()
+    for emb in embeddings:
+        vector = emb.get("embedding", [])
+        if not vector:
+            continue
+        items = await search_materials_by_embeddings(db, str(user.id), vector, threshold)
+        for item in items:
+            item.pop("text_content", None)
+            mid = item.get("id")
+            if mid not in seen:
+                seen.add(mid)
+                all_results.append(item)
+
+    all_results.sort(key=lambda r: r.get("similarity", 0), reverse=True)
+    return {"materials": all_results, "total": len(all_results)}
+
+
 @router.post("/materials/search")
 async def search_studio_materials(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
     """搜索素材（带阈值和标签）"""

@@ -89,11 +89,24 @@ export default function StudioPage() {
     const prod = state.products.find((p: any) => p.id === state.selected_product_id)
     if (!prod) return message.warning('请选择产品介绍')
     if (!state.selected_template) return message.warning('请选择模板')
-    setGenerating('script')
+    setGenerating('生成剧本')
     try {
       await request.post(`/agent/sessions/${sessionId}/chat`, { message: `用模板"${state.selected_template}"生成剧本：${prod.content}`, auto_mode: false })
       message.success('剧本已生成')
     } catch { message.error('生成失败') }
+    setGenerating(null)
+  }
+
+  const semanticSearch = async () => {
+    const prod = state.products.find((p: any) => p.id === state.selected_product_id)
+    if (!prod) return message.warning('请先选择产品介绍')
+    setGenerating('嵌入搜索')
+    try {
+      const res: any = await request.post('/studio/semantic-search', { product_info: { title: prod.title, content: prod.content }, threshold: state.threshold })
+      setMaterials(res?.materials || [])
+      if (res?.total > 0) message.success(`找到 ${res.total} 个相关素材`)
+      else message.info('未找到匹配素材')
+    } catch { message.error('搜索失败') }
     setGenerating(null)
   }
 
@@ -152,6 +165,7 @@ export default function StudioPage() {
               </List.Item>
             )} />
           </StepBox>
+          <GenBtn label="嵌入搜索" onClick={semanticSearch} />
         </div>
         <Arrow />
 
