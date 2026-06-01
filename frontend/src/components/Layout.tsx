@@ -10,7 +10,7 @@ import {
   UserOutlined,
   TeamOutlined,
   LogoutOutlined,
-  AppstoreOutlined,
+  AppstoreOutlined
 } from '@ant-design/icons'
 import { useAuth } from '../hooks/useAuth'
 
