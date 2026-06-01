@@ -170,7 +170,7 @@ export default function StudioPage() {
     setGenerating('生成视频')
     try {
       // 提交任务
-      const submitRes: any = await request.post('/studio/generate-video', { session_id: sid, script_name: `script_${sid}` })
+      const submitRes: any = await request.post('/studio/generate-video', { session_id: sid, script_name: `script_${sid}` }, { timeout: 300000 })
       if (!submitRes?.submitted) { generatingRef.current = false; return message.error('提交失败') }
 
       message.info('视频生成已提交，等待中...')
