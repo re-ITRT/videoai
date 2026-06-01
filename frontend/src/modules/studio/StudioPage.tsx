@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Select, Button, Card, Input, Slider, Modal, Space, message, List, Popconfirm, Collapse } from 'antd'
+import { Select, Button, Card, Input, Slider, Modal, Space, message, List, Collapse } from 'antd'
 import { PlusOutlined, RightOutlined, PlayCircleOutlined, EditOutlined, DeleteOutlined, VideoCameraOutlined } from '@ant-design/icons'
 import request from '../../utils/request'
 import ScriptEditor from '../agent/ScriptEditor'
@@ -313,9 +313,7 @@ export default function StudioPage() {
               <List.Item onClick={() => saveState({ selected_collection_id: c.id })}
                 style={{ cursor: 'pointer', background: state.selected_collection_id === c.id ? '#e6f4ff' : undefined }}
                 actions={[
-                  <Popconfirm key="del" title="删除此素材集合？" onConfirm={() => deleteCollection(c.id)}>
-                    <DeleteOutlined style={{ color: '#ff4d4f' }} />
-                  </Popconfirm>
+                  <DeleteOutlined key="del" style={{ color: '#ff4d4f' }} onClick={() => deleteCollection(c.id)} />
                 ]}>
                 <span style={{ fontSize: 12 }}>{c.name} ({c.material_ids?.length || 0} 素材)</span>
               </List.Item>
@@ -338,9 +336,7 @@ export default function StudioPage() {
                 ✅ 剧本: <strong>{state.last_script.script.title}</strong>
                 <br /><span style={{ color: '#666' }}>{state.last_script.script.scenes?.length || 0} 个场景</span>
                 <Button size="small" type="link" icon={<EditOutlined />} onClick={() => setScriptEditorOpen(true)} style={{ padding: 0, marginLeft: 8 }}>编辑</Button>
-                <Popconfirm key="del" title="删除此剧本？" onConfirm={deleteScript}>
-                  <Button size="small" type="link" danger icon={<DeleteOutlined />} style={{ padding: 0, marginLeft: 4 }} />
-                </Popconfirm>
+                <Button size="small" type="link" danger icon={<DeleteOutlined />} onClick={deleteScript} style={{ padding: 0, marginLeft: 4 }} />
               </div>
             )}
           </StepBox>
@@ -360,9 +356,7 @@ export default function StudioPage() {
                   <List.Item onClick={() => saveState({ selected_clip_collection_id: c.id })}
                     style={{ cursor: 'pointer', background: state.selected_clip_collection_id === c.id ? '#e6f4ff' : undefined }}
                     actions={[
-                      <Popconfirm key="del" title="删除此运行结果？" onConfirm={() => deleteClipCollection(c.id)}>
-                        <DeleteOutlined style={{ color: '#ff4d4f' }} />
-                      </Popconfirm>
+                      <DeleteOutlined key="del" style={{ color: '#ff4d4f' }} onClick={() => deleteClipCollection(c.id)} />
                     ]}>
                     <Space>
                       <VideoCameraOutlined />
