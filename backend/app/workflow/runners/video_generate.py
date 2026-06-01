@@ -41,10 +41,12 @@ async def run_video_generate(api_key: str, params: dict) -> dict:
             # 构建提示词：台词必须严格呈现
             prompt = visual_desc
             if lines:
-                prompt += "\n\n【必须出现在视频中的台词】视频画面中的人物必须说出以下台词，字幕必须呈现：\n"
+                prompt += "\n\n【画面时间轴·严格按此顺序】\n"
                 for l in lines:
-                    prompt += f"- {l.get('speaker', '')}: 「{l.get('text', '')}」(语气: {l.get('tone', '中性')}, 时间: {l.get('start_sec', 0)}-{l.get('end_sec', 5)}秒)\n"
-                prompt += "\n以上台词必须完全匹配，不能删改。"
+                    s = l.get('start_sec', 0)
+                    e = l.get('end_sec', 5)
+                    prompt += f"{s}-{e}秒: {l.get('speaker', '')}说「{l.get('text', '')}」(语气: {l.get('tone', '中性')})\n"
+                prompt += "\n以上台词顺序必须严格遵守，时间轴不能颠倒。"
             content_items.append({"type": "text", "text": prompt})
 
             body = {"model": MODEL_EP, "content": content_items, "return_last_frame": False}
