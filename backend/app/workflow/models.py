@@ -49,4 +49,13 @@ AVAILABLE_WORKFLOWS = {
             {"key": "temperature", "label": "温度 (0-1)", "type": "text", "placeholder": "0.8"},
         ],
     },
+    "video-generate": {
+        "name": "视频生成",
+        "description": "本地直接调用火山方舟 Doubao-Seedance-1.5-pro 生成视频片段，不走 Coze 工作流",
+        "fields": [
+            {"key": "api_key", "label": "火山方舟 API Key", "type": "password", "placeholder": "ark-..."},
+            {"key": "base_url", "label": "API 地址（固定）", "type": "text", "placeholder": "https://ark.cn-beijing.volces.com/api/v3", "disabled": True},
+            {"key": "model", "label": "模型（固定）", "type": "text", "placeholder": "ep-20260514120705-pqv86", "disabled": True},
+        ],
+    },
 }

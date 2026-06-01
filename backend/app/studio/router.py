@@ -186,41 +186,65 @@ async def studio_generate_video(body: dict, db: AsyncSession = Depends(get_db), 
 
     # 4. 提交任务
     aspect_ratio = body.get("aspect_ratio", "9:16")
-    try:
-        result = await call_workflow("video-generate", {
-            "workflow_type": "generate",
-            "script": {
-                "title": title or script_body.get("title", f"视频_{session_id}"),
-                "style": style or "电商带货",
-                "aspect_ratio": aspect_ratio,
-                "duration": sum(s.get("duration", 5) for s in scenes),
-                "scenes": [{
-                    "scene_id": s.get("scene_id", i+1),
-                    "type": s.get("type", "scene"),
-                    "visual_desc": s.get("visual_desc", ""),
-                    "duration": s.get("duration", 5),
-                    "lines": s.get("lines", []),
-                    "reference_images": s.get("reference_images", []),
-                } for i, s in enumerate(scenes)],
-            },
-        })
-    except Exception as e:
-        print(f"[generate-video] Coze ERROR: {e}")
-        raise HTTPException(502, f"Coze workflow 返回错误: {str(e)}")
-    print(f"[generate-video] Coze OK, type={type(result)}")
+    params = {
+        "workflow_type": "generate",
+        "script": {
+            "title": title or script_body.get("title", f"视频_{session_id}"),
+            "style": style or "电商带货",
+            "aspect_ratio": aspect_ratio,
+            "duration": sum(s.get("duration", 5) for s in scenes),
+            "scenes": [{
+                "scene_id": s.get("scene_id", i+1),
+                "type": s.get("type", "scene"),
+                "visual_desc": s.get("visual_desc", ""),
+                "duration": s.get("duration", 5),
+                "lines": s.get("lines", []),
+                "reference_images": s.get("reference_images", []),
+            } for i, s in enumerate(scenes)],
+        },
+    }
+
+    # 检查本地工作流配置
+    from app.workflow.models import WorkflowConfig
+    wf = await db.execute(
+        _s(WorkflowConfig).where(WorkflowConfig.user_id == user.id, WorkflowConfig.workflow_name == "video-generate")
+    )
+    wf_cfg = wf.scalar_one_or_none()
+    local_api_key = None
+    if wf_cfg and wf_cfg.enabled:
+        cfg = json.loads(wf_cfg.config or "{}")
+        local_api_key = cfg.get("api_key")
+
+    if local_api_key:
+        # 本地模式：调火山方舟 API
+        from app.workflow.runners.video_generate import run_video_generate
+        try:
+            result = await run_video_generate(local_api_key, params)
+        except Exception as e:
+            raise HTTPException(502, f"本地视频生成失败: {str(e)}")
+        save_mode = "local"
+    else:
+        # 兜底：调 Coze workflow
+        try:
+            result = await call_workflow("video-generate", params)
+        except Exception as e:
+            print(f"[generate-video] Coze ERROR: {e}")
+            raise HTTPException(502, f"Coze workflow 返回错误: {str(e)}")
+        save_mode = "coze"
+
     inner = result.get("result", result) if isinstance(result, dict) else result
     task_ids = inner.get("task_ids", []) if isinstance(inner, dict) else []
     print(f"[generate-video] task_ids count={len(task_ids)}")
     if not task_ids:
         raise HTTPException(500, "提交视频生成任务失败")
 
-    # 5. 保存 task_ids
-    print(f"[generate-video] saving task_ids... session_id={session_id}")
+    # 5. 保存 task_ids（含模式标记）
+    print(f"[generate-video] saving task_ids... session_id={session_id}, mode={save_mode}")
     sf = SessionFile(
         session_id=session_id, file_type="video_task",
         filename=f"tasks_{session_id}.json",
         file_url="",
-        description=json.dumps(task_ids, ensure_ascii=False),
+        description=json.dumps({"mode": save_mode, "task_ids": task_ids, "api_key": local_api_key or ""}, ensure_ascii=False),
     )
     db.add(sf)
     await db.commit()
@@ -241,15 +265,33 @@ async def studio_poll_generate(session_id: int, db: AsyncSession = Depends(get_d
         return {"status": "no_task", "clips": [], "total": 0}
 
     latest = tasks[-1]
-    task_ids = json.loads(latest.description)
-    try:
-        qr = await call_workflow("video-generate", {
-            "workflow_type": "query",
-            "task_ids": task_ids,
-        })
-    except Exception:
-        return {"status": "error", "detail": "Coze query failed"}
-    qr_inner = qr.get("result", qr) if isinstance(qr, dict) else qr
+    raw = json.loads(latest.description)
+    # 兼容新旧格式: 旧格式直接是 list，新格式是 {"mode":..., "task_ids":..., "api_key":...}
+    if isinstance(raw, dict) and "task_ids" in raw:
+        task_ids = raw["task_ids"]
+        mode = raw.get("mode", "coze")
+        api_key = raw.get("api_key", "")
+    else:
+        task_ids = raw
+        mode = "coze"
+        api_key = ""
+
+    if mode == "local" and api_key:
+        from app.workflow.runners.video_generate import query_video_status
+        try:
+            qr = await query_video_status(api_key, task_ids)
+        except Exception:
+            return {"status": "error", "detail": "Local query failed"}
+        qr_inner = qr
+    else:
+        try:
+            qr = await call_workflow("video-generate", {
+                "workflow_type": "query",
+                "task_ids": task_ids,
+            })
+        except Exception:
+            return {"status": "error", "detail": "Coze query failed"}
+        qr_inner = qr.get("result", qr) if isinstance(qr, dict) else qr
     if not isinstance(qr_inner, dict):
         return {"status": "unknown", "clips": []}
 
