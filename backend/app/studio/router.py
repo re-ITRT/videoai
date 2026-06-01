@@ -16,6 +16,7 @@ DEFAULT_STATE = {
     "selected_material_ids": [],
     "collections": [],
     "selected_template": "",
+    "cached_materials": [],
 }
 
 

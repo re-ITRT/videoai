@@ -30,7 +30,10 @@ export default function StudioPage() {
   // 切换 Session 时加载状态
   useEffect(() => {
     if (!sessionId) return
-    request.get(`/studio/state/${sessionId}`).then((r: any) => setState(r || {})).catch(() => {})
+    request.get(`/studio/state/${sessionId}`).then((r: any) => {
+      setState(r || {})
+      setMaterials(r?.cached_materials || [])
+    }).catch(() => {})
     request.post('/studio/materials/search', { threshold: 30, tags: [] }).then((r: any) => setMaterials(r?.materials || [])).catch(() => {})
   }, [sessionId])
 
@@ -104,6 +107,7 @@ export default function StudioPage() {
     try {
       const res: any = await request.post('/studio/semantic-search', { product_info: { title: prod.title, content: prod.content }, threshold: state.threshold })
       setMaterials(res?.materials || [])
+      saveState({ cached_materials: res?.materials || [] })
       if (res?.total > 0) message.success(`找到 ${res.total} 个相关素材`)
       else message.info('未找到匹配素材')
     } catch { message.error('搜索失败') }
