@@ -35,9 +35,12 @@ AVAILABLE_WORKFLOWS = list(WORKFLOW_URLS.keys())
 
 WORKFLOW_TIMEOUT = 600  # seconds (10 min, for slow video gen)
 
+import asyncio
+import random
+
 
 async def call_workflow(workflow_name: str, payload: dict) -> dict:
-    """调用扣子工作流 webhook"""
+    """调用扣子工作流 webhook，支持 429 自动重试（最多3次）"""
     if workflow_name not in WORKFLOW_URLS:
         raise ValueError(f"未知工作流: {workflow_name}，可用: {AVAILABLE_WORKFLOWS}")
 
@@ -49,9 +52,16 @@ async def call_workflow(workflow_name: str, payload: dict) -> dict:
         "Content-Type": "application/json",
     }
 
-    async with httpx.AsyncClient(timeout=WORKFLOW_TIMEOUT) as client:
-        response = await client.post(url, json=payload, headers=headers)
-        response.raise_for_status()
-        result = response.json()
+    for attempt in range(3):
+        async with httpx.AsyncClient(timeout=WORKFLOW_TIMEOUT) as client:
+            response = await client.post(url, json=payload, headers=headers)
+            if response.status_code == 429:
+                wait = (attempt + 1) * 10 + random.randint(0, 5)
+                print(f"[call_workflow] 429 rate limit, retry in {wait}s (attempt {attempt+1}/3)")
+                await asyncio.sleep(wait)
+                continue
+            response.raise_for_status()
+            return response.json()
 
-    return result
+    response.raise_for_status()  # 三次都失败，抛最后一次的异常
+    return response.json()
