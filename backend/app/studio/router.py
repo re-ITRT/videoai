@@ -18,6 +18,7 @@ DEFAULT_STATE = {
     "selected_collection_id": None,
     "selected_template": "",
     "cached_materials": [],
+    "last_script": None,
 }
 
 
@@ -108,17 +109,27 @@ async def studio_generate_script(body: dict, db: AsyncSession = Depends(get_db),
     # 查工作流配置
     wf = await db.execute(_s(WorkflowConfig).where(WorkflowConfig.user_id == user.id, WorkflowConfig.workflow_name == "script-generate"))
     wf_cfg = wf.scalar_one_or_none()
-    script_dir = "/tmp"  # 临时返回，不存文件
 
     if wf_cfg and wf_cfg.enabled:
         cfg = json.loads(wf_cfg.config or "{}")
         if cfg.get("api_key") and cfg.get("base_url") and cfg.get("model"):
             result = await run_script_generate(api_key=cfg["api_key"], base_url=cfg["base_url"], model=cfg["model"], params=params, template=template)
+            _save_script(body.get("session_id", 0), result)
             return result
     # fallback: 调 Coze workflow
     from app.workers.workflow import call_workflow
     result = await call_workflow("script-generate", params)
+    _save_script(body.get("session_id", 0), result)
     return result
+
+
+def _save_script(session_id: int, script_data: dict):
+    """保存剧本到 session 目录"""
+    import json, os
+    d = ensure_session_dir(session_id)
+    spath = os.path.join(d["scripts"], f"script_{session_id}.json")
+    with open(spath, "w", encoding="utf-8") as f:
+        f.write(json.dumps(script_data, ensure_ascii=False, indent=2))
 
 
 @router.post("/materials/search")

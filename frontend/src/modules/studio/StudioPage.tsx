@@ -104,9 +104,10 @@ export default function StudioPage() {
         product_content: prod.content,
         template: state.selected_template,
         materials: matDetails,
+        session_id: sessionId,
       })
       message.success('剧本已生成')
-      console.log('剧本结果:', res)
+      saveState({ last_script: res })
     } catch {
       message.error('生成失败')
     }
