@@ -351,9 +351,10 @@ async def studio_poll_generate(session_id: int, db: AsyncSession = Depends(get_d
 
 @router.post("/compose-video")
 async def studio_compose_video(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    """合成视频：将选中 clip 标记为最终视频（不做TTS/配音）"""
+    """合成视频：FFmpeg 拼接选中 clip，不做TTS/配音"""
     from app.agent.models import SessionFile, get_session_files as _gsf
-    from sqlalchemy import select as _s
+    from app.core.signer import generate_signed_url
+    import subprocess, tempfile, os, httpx, uuid
 
     session_id = body.get("session_id", 0)
     clip_ids = body.get("clip_ids")
@@ -365,19 +366,67 @@ async def studio_compose_video(body: dict, db: AsyncSession = Depends(get_db), u
     if not clips:
         raise HTTPException(400, "没有可合成的视频片段")
 
-    saved = []
-    for vf in clips:
-        sf = SessionFile(
-            session_id=session_id, file_type="final_video",
-            filename=f"final_{session_id}_{vf.id}.mp4",
-            file_url=vf.file_url,
-            description=f"合成自场景 {vf.description}",
-        )
-        db.add(sf)
-        await db.flush()
-        saved.append({"id": sf.id, "url": sf.file_url})
+    # 下载 clip 到临时文件
+    tmpdir = tempfile.mkdtemp()
+    inputs = []
+    async with httpx.AsyncClient(timeout=60) as client:
+        for vf in clips:
+            url = vf.file_url or ""
+            if not url.startswith("http"):
+                url = "http://114.117.242.17:3000" + url
+            try:
+                resp = await client.get(url)
+                resp.raise_for_status()
+                path = os.path.join(tmpdir, f"clip_{vf.id}.mp4")
+                with open(path, "wb") as f:
+                    f.write(resp.content)
+                inputs.append(path)
+            except Exception:
+                continue
+
+    if len(inputs) < 1:
+        return {"composed": False, "error": "无法下载视频片段"}
+
+    # 生成 concat 文件列表
+    list_path = os.path.join(tmpdir, "files.txt")
+    with open(list_path, "w") as f:
+        for p in inputs:
+            f.write(f"file '{p}'\n")
+
+    # FFmpeg 拼接
+    out_path = os.path.join(tmpdir, f"final_{session_id}_{uuid.uuid4().hex[:8]}.mp4")
+    result = subprocess.run(
+        ["ffmpeg", "-f", "concat", "-safe", "0", "-i", list_path,
+         "-c", "copy", "-y", out_path],
+        capture_output=True, text=True, timeout=120,
+    )
+    if result.returncode != 0:
+        return {"composed": False, "error": f"FFmpeg 拼接失败: {result.stderr[:200]}"}
+
+    # 复制到 uploads 目录
+    uploads_dir = "/app/uploads/composed"
+    os.makedirs(uploads_dir, exist_ok=True)
+    dest = os.path.join(uploads_dir, f"final_{session_id}_{uuid.uuid4().hex[:8]}.mp4")
+    with open(out_path, "rb") as src, open(dest, "wb") as dst:
+        dst.write(src.read())
+
+    signed = generate_signed_url(dest.replace("/app/uploads", "/uploads"), expire_seconds=86400)
+    url = f"http://114.117.242.17:3000{signed}"
+
+    sf = SessionFile(
+        session_id=session_id, file_type="final_video",
+        filename=os.path.basename(dest),
+        file_url=url,
+        description="FFmpeg 合成视频",
+    )
+    db.add(sf)
     await db.commit()
-    return {"composed": True, "videos": saved}
+
+    # 清理临时文件
+    import shutil
+    shutil.rmtree(tmpdir, ignore_errors=True)
+
+    return {"composed": True, "videos": [{"id": sf.id, "url": url}]}
 
 
 @router.get("/clips/{session_id}")
