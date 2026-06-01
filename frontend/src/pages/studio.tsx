@@ -20,7 +20,7 @@ export default function StudioPage() {
 
   const [templates, setTemplates] = useState<string[]>([])
   const [selectedTemplate, setSelectedTemplate] = useState('')
-  const [scripts, setScripts] = useState<any[]>([])
+  const [_sc, _ssc] = useState<any[]>([])
   const [selectedScript, setSelectedScript] = useState('')
 
   const [_vc, _svc] = useState<any[]>([])
