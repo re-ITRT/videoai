@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { Select, Button, Card, Input, Slider, Modal, Space, message, List, Popconfirm } from 'antd'
-import { PlusOutlined, RightOutlined, PlayCircleOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
+import { Select, Button, Card, Input, Slider, Modal, Space, message, List, Popconfirm, Collapse } from 'antd'
+import { PlusOutlined, RightOutlined, PlayCircleOutlined, EditOutlined, DeleteOutlined, VideoCameraOutlined } from '@ant-design/icons'
 import request from '../../utils/request'
 import ScriptEditor from '../agent/ScriptEditor'
 
@@ -15,7 +15,12 @@ export default function StudioPage() {
   const [sessionTitle, setSessionTitle] = useState('')
 
   // 所有工作流状态存在 session 文件夹的 workflow_state.json 里
-  const [state, setState] = useState<any>({ products: [], selected_product_id: null, threshold: 30, selected_material_ids: [], collections: [], selected_template: '' })
+  const [state, setState] = useState<any>({
+    products: [], selected_product_id: null, threshold: 30,
+    selected_material_ids: [], collections: [], selected_template: '',
+    clip_collections: [], selected_clip_collection_id: null,
+    final_videos: [],
+  })
   const stateRef = useRef(state)
   stateRef.current = state
 
@@ -40,25 +45,31 @@ export default function StudioPage() {
       request.get(`/studio/state/${sessionId}`),
       request.get(`/studio/clips/${sessionId}`).catch(() => ({ clips: [], final_videos: [] })),
     ]).then(([stateRes, clipsRes]: any[]) => {
-      const merged = { ...(stateRes || {}), video_clips: clipsRes?.clips || [], final_videos: clipsRes?.final_videos || [] }
+      const merged = {
+        ...(stateRes || {}),
+        clip_collections: stateRes?.clip_collections || [],
+        selected_clip_collection_id: stateRes?.selected_clip_collection_id || null,
+        final_videos: clipsRes?.final_videos || [],
+      }
       setState(merged)
       if (merged.cached_materials?.length) setMaterials(merged.cached_materials)
       else request.post('/studio/materials/search', { threshold: 30, tags: [] }).then((r2: any) => setMaterials(r2?.materials || [])).catch(() => {})
-      // 持久化 clips 到 state 文件
+      // 持久化到 state 文件
       request.put(`/studio/state/${sessionId}`, merged).catch(() => {})
     }).catch(() => {})
   }, [sessionId])
 
+  // 刷新最终视频（不覆盖 clip_collections）
   const loadClips = async () => {
     const sid = sessionIdRef.current
     if (!sid) return
     try {
       const res: any = await request.get(`/studio/clips/${sid}`)
-      saveState({ video_clips: res?.clips || [], final_videos: res?.final_videos || [] })
+      saveState({ final_videos: res?.final_videos || [] })
     } catch {}
   }
 
-  // 保存状态到文件
+  // 保存状态到文件（用 ref 避免闭包竞态）
   const saveState = async (patch: any) => {
     const merged = { ...stateRef.current, ...patch }
     setState(merged)
@@ -118,7 +129,6 @@ export default function StudioPage() {
     if (!coll) return message.warning('请选择素材集合')
     setGenerating('生成剧本')
     try {
-      // 获取素材详情（ID+描述+标签）
       const matDetails = materials
         .filter((m: any) => coll.material_ids.includes(m.id))
         .map((m: any) => ({ id: m.id, description: m.tags?.join(', ') || '', tags: m.tags || [] }))
@@ -150,20 +160,41 @@ export default function StudioPage() {
     setGenerating(null)
   }
 
+  // 生成视频 → 创建 clip_collection
   const genVideo = async () => {
+    const sid = sessionIdRef.current
+    if (!sid) return
     setGenerating('生成视频')
     try {
-      await request.post('/studio/generate-video', { session_id: sessionId, script_name: `script_${sessionId}` })
+      // 记录生成前的 clip ID
+      const oldRes: any = await request.get(`/studio/clips/${sid}`)
+      const oldIds = new Set((oldRes?.clips || []).map((c: any) => c.id))
+
+      await request.post('/studio/generate-video', { session_id: sid, script_name: `script_${sid}` })
       message.success('视频生成完成')
+
+      // 识别新生成的 clips
+      const newRes: any = await request.get(`/studio/clips/${sid}`)
+      const newClips = (newRes?.clips || []).filter((c: any) => !oldIds.has(c.id))
+      if (newClips.length > 0) {
+        const cols = [...(stateRef.current.clip_collections || [])]
+        const col = { id: Date.now(), name: `视频运行 #${cols.length + 1}`, clips: newClips, created_at: new Date().toISOString() }
+        cols.push(col)
+        saveState({ clip_collections: cols, selected_clip_collection_id: col.id })
+      }
       loadClips()
     } catch { message.error('生成失败') }
     setGenerating(null)
   }
 
+  // 合成视频 → 用选中集合的 clip_ids
   const composeVid = async () => {
+    const st = stateRef.current
+    const coll = (st.clip_collections || []).find((c: any) => c.id === st.selected_clip_collection_id)
+    if (!coll || !coll.clips?.length) return message.warning('请先选择视频片段集合')
     setGenerating('合成视频')
     try {
-      await request.post('/studio/compose-video', { session_id: sessionId })
+      await request.post('/studio/compose-video', { session_id: sessionIdRef.current, clip_ids: coll.clips.map((c: any) => c.id) })
       message.success('合成完成')
       loadClips()
     } catch { message.error('合成失败') }
@@ -179,6 +210,9 @@ export default function StudioPage() {
       <Button type="primary" icon={<PlayCircleOutlined />} loading={generating === label} onClick={onClick} style={{ width: 180 }}>{label}</Button>
     </div>
   )
+
+  // 当前选中的 clip 集合
+  const selectedClipColl = (state.clip_collections || []).find((c: any) => c.id === state.selected_clip_collection_id)
 
   return (
     <div style={{ padding: 0, display: 'flex', flexDirection: 'column', height: 'calc(100vh - 180px)' }}>
@@ -269,21 +303,72 @@ export default function StudioPage() {
         </div>
         <Arrow />
 
-        {/* 4. 视频生成 */}
+        {/* 4. 视频片段生成 */}
         <div>
-          <StepBox title="视频生成">
-            {state.video_clips?.length > 0 && <div style={{ fontSize: 12, color: '#52c41a' }}>✅ {state.video_clips.length} 个视频片段</div>}
-            {(!state.video_clips || state.video_clips.length === 0) && <div style={{ fontSize: 12, color: '#999' }}>生成剧本后点击生成</div>}
+          <StepBox title="视频片段" extra={state.clip_collections?.length > 0 ? <span style={{ fontSize: 12, color: '#52c41a' }}>{state.clip_collections.length} 次运行</span> : undefined}>
+            {!state.last_script?.script?.title ? (
+              <div style={{ color: '#999', fontSize: 12, textAlign: 'center', padding: 20 }}>生成剧本后点击生成</div>
+            ) : (
+              <>
+                {/* 视频运行集合列表 */}
+                <List size="small" dataSource={state.clip_collections} renderItem={(c: any) => (
+                  <List.Item onClick={() => saveState({ selected_clip_collection_id: c.id })}
+                    style={{ cursor: 'pointer', background: state.selected_clip_collection_id === c.id ? '#e6f4ff' : undefined }}>
+                    <Space>
+                      <VideoCameraOutlined />
+                      <span style={{ fontSize: 12 }}>{c.name} ({c.clips?.length || 0} 片段)</span>
+                    </Space>
+                  </List.Item>
+                )} />
+                {(!state.clip_collections || state.clip_collections.length === 0) && (
+                  <div style={{ color: '#999', fontSize: 12, textAlign: 'center', padding: 20 }}>点击下方按钮开始生成</div>
+                )}
+
+                {/* 选中集合的片段详情 */}
+                {selectedClipColl && (
+                  <Collapse ghost size="small" items={[{
+                    key: 'clips',
+                    label: <span style={{ fontSize: 12 }}>查看片段 ({selectedClipColl.clips?.length || 0})</span>,
+                    children: (
+                      <div style={{ maxHeight: 200, overflow: 'auto' }}>
+                        {selectedClipColl.clips?.map((clip: any) => (
+                          <div key={clip.id} style={{ fontSize: 12, padding: '4px 0', borderBottom: '1px solid #f0f0f0' }}>
+                            <a href={clip.url} target="_blank" rel="noreferrer">场景 {clip.scene_id}</a>
+                          </div>
+                        ))}
+                      </div>
+                    ),
+                  }]} />
+                )}
+              </>
+            )}
           </StepBox>
-          <GenBtn label="生成视频" onClick={genVideo} />
+          {state.last_script?.script?.title && <GenBtn label="生成视频" onClick={genVideo} />}
         </div>
         <Arrow />
 
         {/* 5. 视频合成 */}
         <div>
           <StepBox title="视频合成">
-            {state.final_videos?.length > 0 && <div style={{ fontSize: 12, color: '#52c41a' }}>✅ 最终视频已生成</div>}
-            {(!state.final_videos || state.final_videos.length === 0) && <div style={{ fontSize: 12, color: '#999' }}>生成视频后点击合成</div>}
+            {!selectedClipColl ? (
+              <div style={{ color: '#999', fontSize: 12, textAlign: 'center', padding: 20 }}>选一个视频片段集合后点击合成</div>
+            ) : (
+              <div style={{ marginBottom: 8, fontSize: 12, color: '#666' }}>素材: {selectedClipColl.name} ({selectedClipColl.clips?.length} 片段)</div>
+            )}
+
+            {/* 最终视频列表 */}
+            {state.final_videos?.length > 0 && (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 4, color: '#52c41a' }}>✅ 最终视频</div>
+                <List size="small" dataSource={state.final_videos} renderItem={(v: any) => (
+                  <List.Item>
+                    <a href={v.url} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>
+                      <PlayCircleOutlined style={{ marginRight: 4 }} />视频 {v.id}
+                    </a>
+                  </List.Item>
+                )} />
+              </div>
+            )}
           </StepBox>
           <GenBtn label="合成视频" onClick={composeVid} />
         </div>

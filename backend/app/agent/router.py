@@ -592,6 +592,10 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
         elif tool_name == "compose_video":
             existing_files = await get_session_files(db, session_id)
             video_files = [f for f in existing_files if f.file_type == "video_clip"]
+            # 支持按 clip_ids 过滤
+            clip_ids = args.get("clip_ids")
+            if clip_ids:
+                video_files = [f for f in video_files if f.id in clip_ids]
             # 按 scene_id 排序（从 description 提取）
             def _scene_id(vf):
                 sid = vf.description.replace("场景 ", "").replace(" 视频片段", "") if vf.description else ""

@@ -19,7 +19,8 @@ DEFAULT_STATE = {
     "selected_template": "",
     "cached_materials": [],
     "last_script": None,
-    "video_clips": [],
+    "clip_collections": [],
+    "selected_clip_collection_id": None,
     "final_videos": [],
 }
 
@@ -149,7 +150,11 @@ async def studio_compose_video(body: dict, db: AsyncSession = Depends(get_db), u
     """直接合成视频（不走LLM对话）"""
     from app.agent.router import execute_tool
     session_id = body.get("session_id", 0)
-    result = await execute_tool("compose_video", {"session_id": session_id}, db, session_id, user)
+    clip_ids = body.get("clip_ids")
+    args = {"session_id": session_id}
+    if clip_ids:
+        args["clip_ids"] = clip_ids
+    result = await execute_tool("compose_video", args, db, session_id, user)
     return json.loads(result)
 
 
