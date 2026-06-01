@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { List, Button, Card, Input, Select, Slider, Modal, Space, message, Tag } from 'antd'
-import { PlusOutlined, RightOutlined, PlayCircleOutlined, DeleteOutlined } from '@ant-design/icons'
+import { PlusOutlined, RightOutlined, PlayCircleOutlined } from '@ant-design/icons'
 import request from '../../utils/request'
 
 const { TextArea } = Input
@@ -222,6 +222,10 @@ export default function StudioPage() {
         </div>
       </div>
       </div>
+
+      <Modal title="新建工作流" open={sessionModal} onOk={createSession} onCancel={() => setSessionModal(false)}>
+        <Input placeholder="工作流名称" value={sessionTitle} onChange={e => setSessionTitle(e.target.value)} onPressEnter={createSession} />
+      </Modal>
 
       <Modal title="添加产品介绍" open={productModal} onOk={addProduct} onCancel={() => setProductModal(false)} width={600}>
         <Input placeholder="产品名称（选填）" value={productTitle} onChange={e => setProductTitle(e.target.value)} style={{ marginBottom: 8 }} />
