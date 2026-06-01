@@ -274,7 +274,7 @@ async def studio_poll_generate(session_id: int, db: AsyncSession = Depends(get_d
     if not tasks:
         return {"status": "no_task", "clips": [], "total": 0}
 
-    latest = tasks[-1]
+    latest = tasks[0]  # 最新的 task（created_at DESC）
     raw = json.loads(latest.description)
     # 兼容新旧格式: 旧格式直接是 list，新格式是 {"mode":..., "task_ids":..., "api_key":...}
     if isinstance(raw, dict) and "task_ids" in raw:
