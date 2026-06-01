@@ -239,9 +239,19 @@ export default function StudioPage() {
   }
 
   const deleteFinalVideo = async (id: number) => {
-    try { await request.post('/studio/delete-clip', { clip_id: id }) } catch {}
+    try {
+      await request.post('/studio/delete-clip', { clip_id: id })
+    } catch { return message.error('删除失败') }
     const videos = (stateRef.current.final_videos || []).filter((v: any) => v.id !== id)
     saveState({ final_videos: videos })
+  }
+
+  const clearFinalVideos = async () => {
+    const ids = (stateRef.current.final_videos || []).map((v: any) => v.id)
+    for (const id of ids) {
+      try { await request.post('/studio/delete-clip', { clip_id: id }) } catch {}
+    }
+    saveState({ final_videos: [] })
   }
 
   const StepBox = ({ title, extra, children }: any) => (
@@ -413,7 +423,11 @@ export default function StudioPage() {
             {/* 最终视频列表 */}
             {state.final_videos?.length > 0 && (
               <div style={{ marginTop: 8 }}>
-                <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 4, color: '#52c41a' }}>✅ 最终视频</div>
+                <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 4, color: '#52c41a' }}>
+                  ✅ 最终视频
+                  <Button size="small" type="link" danger style={{ fontSize: 11, padding: 0, marginLeft: 8 }}
+                    onClick={clearFinalVideos}>清空全部</Button>
+                </div>
                 <List size="small" dataSource={state.final_videos} renderItem={(v: any) => (
                   <List.Item actions={[
                     <span key="del" onClick={e => { e.stopPropagation(); deleteFinalVideo(v.id) }}>
