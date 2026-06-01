@@ -6,6 +6,7 @@ import Register from './pages/register'
 import Dashboard from './pages/dashboard'
 import Reference from './pages/reference'
 import Templates from './pages/templates'
+import Studio from './pages/studio'
 import MaterialList from './modules/material/index'
 import MaterialUpload from './modules/material/upload'
 import ScriptList from './modules/script/index'
@@ -26,6 +27,7 @@ function App() {
           <Route index element={<Dashboard />} />
           <Route path="reference" element={<Reference />} />
           <Route path="templates" element={<Templates />} />
+          <Route path="studio" element={<Studio />} />
           <Route path="material" element={<MaterialList />} />
           <Route path="material/upload" element={<MaterialUpload />} />
           <Route path="script" element={<ScriptList />} />

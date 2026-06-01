@@ -17,6 +17,7 @@ from app.signed import router as signed_router
 from app.material.embed_view import router as embed_router
 from app.ai.router import router as ai_router
 from app.agent.router import router as agent_router
+from app.studio.router import router as studio_router
 
 # ── 初始化日志 ──────────────────────────
 from app.core.logging import setup_logging
@@ -107,6 +108,7 @@ app.include_router(signed_router)
 app.include_router(embed_router)
 app.include_router(ai_router)
 app.include_router(agent_router)
+app.include_router(studio_router)
 
 # ── 静态文件 ──────────────────────────
 import os
