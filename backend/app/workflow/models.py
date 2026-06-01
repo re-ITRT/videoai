@@ -55,7 +55,7 @@ AVAILABLE_WORKFLOWS = {
         "fields": [
             {"key": "api_key", "label": "火山方舟 API Key", "type": "password", "placeholder": "ark-..."},
             {"key": "base_url", "label": "API 地址（固定）", "type": "text", "placeholder": "https://ark.cn-beijing.volces.com/api/v3", "disabled": True},
-            {"key": "model", "label": "模型（固定）", "type": "text", "placeholder": "ep-20260514120705-pqv86", "disabled": True},
+            {"key": "model", "label": "EP（模型端点 ID）", "type": "text", "placeholder": "ep-20260514120705-pqv86", "disabled": True},
         ],
     },
 }
