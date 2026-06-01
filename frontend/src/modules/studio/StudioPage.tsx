@@ -34,9 +34,9 @@ export default function StudioPage() {
     if (!sessionId) return
     request.get(`/studio/state/${sessionId}`).then((r: any) => {
       setState(r || {})
-      setMaterials(r?.cached_materials || [])
+      if (r?.cached_materials?.length) setMaterials(r.cached_materials)
+      else request.post('/studio/materials/search', { threshold: 30, tags: [] }).then((r2: any) => setMaterials(r2?.materials || [])).catch(() => {})
     }).catch(() => {})
-    request.post('/studio/materials/search', { threshold: 30, tags: [] }).then((r: any) => setMaterials(r?.materials || [])).catch(() => {})
     loadClips()
   }, [sessionId])
 
