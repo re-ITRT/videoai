@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Select, Button, Card, Input, Slider, Modal, Space, message, List, Popconfirm } from 'antd'
-import { PlusOutlined, RightOutlined, PlayCircleOutlined, DeleteOutlined } from '@ant-design/icons'
+import { PlusOutlined, RightOutlined, PlayCircleOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import request from '../../utils/request'
+import ScriptEditor from '../agent/ScriptEditor'
 
 const { TextArea } = Input
 
@@ -20,6 +21,7 @@ export default function StudioPage() {
   const [productContent, setProductContent] = useState('')
   const [templates, setTemplates] = useState<string[]>([])
   const [generating, setGenerating] = useState<string | null>(null)
+  const [scriptEditorOpen, setScriptEditorOpen] = useState(false)
 
   // 加载 Session 列表
   useEffect(() => {
@@ -237,6 +239,7 @@ export default function StudioPage() {
               <div style={{ marginTop: 8, padding: 8, background: '#f6ffed', borderRadius: 4, fontSize: 13 }}>
                 ✅ 剧本: <strong>{state.last_script.script.title}</strong>
                 <br /><span style={{ color: '#666' }}>{state.last_script.script.scenes?.length || 0} 个场景</span>
+                <Button size="small" type="link" icon={<EditOutlined />} onClick={() => setScriptEditorOpen(true)} style={{ padding: 0, marginLeft: 8 }}>编辑</Button>
               </div>
             )}
           </StepBox>
@@ -266,6 +269,8 @@ export default function StudioPage() {
         <Input placeholder="产品名称（选填）" value={productTitle} onChange={e => setProductTitle(e.target.value)} style={{ marginBottom: 8 }} />
         <TextArea rows={12} placeholder="粘贴完整的产品介绍文案..." value={productContent} onChange={e => setProductContent(e.target.value)} />
       </Modal>
+
+      <ScriptEditor sessionId={sessionId || 0} visible={scriptEditorOpen} onClose={() => setScriptEditorOpen(false)} />
     </div>
   )
 }
