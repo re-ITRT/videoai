@@ -37,7 +37,16 @@ export default function StudioPage() {
       setMaterials(r?.cached_materials || [])
     }).catch(() => {})
     request.post('/studio/materials/search', { threshold: 30, tags: [] }).then((r: any) => setMaterials(r?.materials || [])).catch(() => {})
+    loadClips()
   }, [sessionId])
+
+  const loadClips = async () => {
+    if (!sessionId) return
+    try {
+      const res: any = await request.get(`/studio/clips/${sessionId}`)
+      saveState({ video_clips: res?.clips || [], final_videos: res?.final_videos || [] })
+    } catch {}
+  }
 
   // 保存状态到文件
   const saveState = async (patch: any) => {
@@ -134,7 +143,8 @@ export default function StudioPage() {
     setGenerating('生成视频')
     try {
       await request.post('/studio/generate-video', { session_id: sessionId, script_name: `script_${sessionId}` })
-      message.success('视频生成中...')
+      message.success('视频生成完成')
+      loadClips()
     } catch { message.error('生成失败') }
     setGenerating(null)
   }
@@ -144,6 +154,7 @@ export default function StudioPage() {
     try {
       await request.post('/studio/compose-video', { session_id: sessionId })
       message.success('合成完成')
+      loadClips()
     } catch { message.error('合成失败') }
     setGenerating(null)
   }
@@ -249,14 +260,20 @@ export default function StudioPage() {
 
         {/* 4. 视频生成 */}
         <div>
-          <StepBox title="视频生成" />
+          <StepBox title="视频生成">
+            {state.video_clips?.length > 0 && <div style={{ fontSize: 12, color: '#52c41a' }}>✅ {state.video_clips.length} 个视频片段</div>}
+            {(!state.video_clips || state.video_clips.length === 0) && <div style={{ fontSize: 12, color: '#999' }}>生成剧本后点击生成</div>}
+          </StepBox>
           <GenBtn label="生成视频" onClick={genVideo} />
         </div>
         <Arrow />
 
         {/* 5. 视频合成 */}
         <div>
-          <StepBox title="视频合成" />
+          <StepBox title="视频合成">
+            {state.final_videos?.length > 0 && <div style={{ fontSize: 12, color: '#52c41a' }}>✅ 最终视频已生成</div>}
+            {(!state.final_videos || state.final_videos.length === 0) && <div style={{ fontSize: 12, color: '#999' }}>生成视频后点击合成</div>}
+          </StepBox>
           <GenBtn label="合成视频" onClick={composeVid} />
         </div>
       </div>

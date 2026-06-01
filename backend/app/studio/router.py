@@ -19,6 +19,8 @@ DEFAULT_STATE = {
     "selected_template": "",
     "cached_materials": [],
     "last_script": None,
+    "video_clips": [],
+    "final_videos": [],
 }
 
 
@@ -149,6 +151,16 @@ async def studio_compose_video(body: dict, db: AsyncSession = Depends(get_db), u
     session_id = body.get("session_id", 0)
     result = await execute_tool("compose_video", {"session_id": session_id}, db, session_id, user)
     return json.loads(result)
+
+
+@router.get("/clips/{session_id}")
+async def get_session_clips(session_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """获取 session 的视频片段"""
+    from app.agent.models import SessionFile, get_session_files as _gsf
+    files = await _gsf(db, session_id)
+    clips = [{"id": f.id, "scene_id": (f.description or "").replace("场景 ", "").replace(" 视频片段", ""), "url": f.file_url} for f in files if f.file_type == "video_clip"]
+    final = [{"id": f.id, "url": f.file_url} for f in files if f.file_type == "final_video"]
+    return {"clips": clips, "final_videos": final}
 
 
 @router.post("/materials/search")
