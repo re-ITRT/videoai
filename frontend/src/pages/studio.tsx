@@ -62,7 +62,7 @@ export default function StudioPage() {
   // ── 产品 ──
   const addProduct = async () => {
     if (!productContent.trim()) return
-    await request.post('/studio/products', { session_id: sessionId, title: productTitle || '未命名', content: productContent })
+      await request.post('/studio/products', { session_id: sessionId, title: productTitle || '未命名', content: productContent })
     message.success('产品已添加')
     setProductModal(false)
     setProductTitle('')
@@ -104,7 +104,7 @@ export default function StudioPage() {
     if (!selectedTemplate) return message.warning('请选择剧本模板')
     setGenerating('script')
     try {
-      const res: any = await request.post(`/agent/sessions/${sessionId}/chat`, {
+      await request.post(`/agent/sessions/${sessionId}/chat`, {
         message: `根据以下产品信息生成剧本：${selectedProduct.content}`,
         auto_mode: false,
       })
@@ -120,7 +120,7 @@ export default function StudioPage() {
     if (!selectedScript) return message.warning('请选择剧本')
     setGenerating('video')
     try {
-      const res: any = await request.post(`/agent/sessions/${sessionId}/chat`, {
+      await request.post(`/agent/sessions/${sessionId}/chat`, {
         message: `用剧本 ${selectedScript} 生成视频`,
         auto_mode: false,
       })
@@ -133,7 +133,7 @@ export default function StudioPage() {
   const composeVideo = async () => {
     setGenerating('compose')
     try {
-      const res: any = await request.post(`/agent/sessions/${sessionId}/chat`, {
+      await request.post(`/agent/sessions/${sessionId}/chat`, {
         message: '合成最终视频',
         auto_mode: false,
       })
