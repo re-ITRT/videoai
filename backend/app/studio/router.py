@@ -132,6 +132,25 @@ def _save_script(session_id: int, script_data: dict):
         f.write(json.dumps(script_data, ensure_ascii=False, indent=2))
 
 
+@router.post("/generate-video")
+async def studio_generate_video(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """直接生成视频（不走LLM对话）"""
+    from app.agent.router import execute_tool
+    session_id = body.get("session_id", 0)
+    script_name = body.get("script_name", f"script_{session_id}")
+    result = await execute_tool("generate_video", {"script_name": script_name, "session_id": session_id}, db, session_id, user)
+    return json.loads(result)
+
+
+@router.post("/compose-video")
+async def studio_compose_video(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """直接合成视频（不走LLM对话）"""
+    from app.agent.router import execute_tool
+    session_id = body.get("session_id", 0)
+    result = await execute_tool("compose_video", {"session_id": session_id}, db, session_id, user)
+    return json.loads(result)
+
+
 @router.post("/materials/search")
 async def search_studio_materials(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
     """搜索素材（带阈值和标签）"""

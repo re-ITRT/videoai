@@ -131,18 +131,18 @@ export default function StudioPage() {
   }
 
   const genVideo = async () => {
-    setGenerating('video')
+    setGenerating('生成视频')
     try {
-      await request.post(`/agent/sessions/${sessionId}/chat`, { message: `用剧本 script_${sessionId}.json 生成视频`, auto_mode: false })
+      await request.post('/studio/generate-video', { session_id: sessionId, script_name: `script_${sessionId}` })
       message.success('视频生成中...')
     } catch { message.error('生成失败') }
     setGenerating(null)
   }
 
   const composeVid = async () => {
-    setGenerating('compose')
+    setGenerating('合成视频')
     try {
-      await request.post(`/agent/sessions/${sessionId}/chat`, { message: '合成最终视频', auto_mode: false })
+      await request.post('/studio/compose-video', { session_id: sessionId })
       message.success('合成完成')
     } catch { message.error('合成失败') }
     setGenerating(null)
