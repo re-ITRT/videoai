@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Select, Button, Card, Input, Slider, Modal, Space, message, List, Popconfirm } from 'antd'
 import { PlusOutlined, RightOutlined, PlayCircleOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import request from '../../utils/request'
@@ -9,11 +9,15 @@ const { TextArea } = Input
 export default function StudioPage() {
   const [sessions, setSessions] = useState<any[]>([])
   const [sessionId, setSessionId] = useState<number | null>(null)
+  const sessionIdRef = useRef(sessionId)
+  sessionIdRef.current = sessionId
   const [sessionModal, setSessionModal] = useState(false)
   const [sessionTitle, setSessionTitle] = useState('')
 
   // 所有工作流状态存在 session 文件夹的 workflow_state.json 里
   const [state, setState] = useState<any>({ products: [], selected_product_id: null, threshold: 30, selected_material_ids: [], collections: [], selected_template: '' })
+  const stateRef = useRef(state)
+  stateRef.current = state
 
   const [materials, setMaterials] = useState<any[]>([])
   const [productModal, setProductModal] = useState(false)
@@ -32,28 +36,35 @@ export default function StudioPage() {
   // 切换 Session 时加载状态
   useEffect(() => {
     if (!sessionId) return
-    request.get(`/studio/state/${sessionId}`).then((r: any) => {
-      setState(r || {})
-      if (r?.cached_materials?.length) setMaterials(r.cached_materials)
+    Promise.all([
+      request.get(`/studio/state/${sessionId}`),
+      request.get(`/studio/clips/${sessionId}`).catch(() => ({ clips: [], final_videos: [] })),
+    ]).then(([stateRes, clipsRes]: any[]) => {
+      const merged = { ...(stateRes || {}), video_clips: clipsRes?.clips || [], final_videos: clipsRes?.final_videos || [] }
+      setState(merged)
+      if (merged.cached_materials?.length) setMaterials(merged.cached_materials)
       else request.post('/studio/materials/search', { threshold: 30, tags: [] }).then((r2: any) => setMaterials(r2?.materials || [])).catch(() => {})
+      // 持久化 clips 到 state 文件
+      request.put(`/studio/state/${sessionId}`, merged).catch(() => {})
     }).catch(() => {})
-    loadClips()
   }, [sessionId])
 
   const loadClips = async () => {
-    if (!sessionId) return
+    const sid = sessionIdRef.current
+    if (!sid) return
     try {
-      const res: any = await request.get(`/studio/clips/${sessionId}`)
+      const res: any = await request.get(`/studio/clips/${sid}`)
       saveState({ video_clips: res?.clips || [], final_videos: res?.final_videos || [] })
     } catch {}
   }
 
   // 保存状态到文件
   const saveState = async (patch: any) => {
-    const merged = { ...state, ...patch }
+    const merged = { ...stateRef.current, ...patch }
     setState(merged)
-    if (sessionId) {
-      request.put(`/studio/state/${sessionId}`, merged).catch(() => {})
+    const sid = sessionIdRef.current
+    if (sid) {
+      request.put(`/studio/state/${sid}`, merged).catch(() => {})
     }
   }
 
