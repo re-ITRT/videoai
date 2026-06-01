@@ -79,12 +79,6 @@ export default function StudioPage() {
   }
 
   // ── 素材搜索 ──
-  // const searchMaterials = async () => {
-    try {
-      const res: any = await request.post('/studio/materials/search', { threshold, tags: [] })
-      setMaterials(res?.materials || [])
-    } catch {}
-  }
 
   // ── 素材集合 ──
   const createCollection = async () => {
