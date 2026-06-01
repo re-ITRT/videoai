@@ -160,28 +160,43 @@ export default function StudioPage() {
     setGenerating(null)
   }
 
-  // 生成视频 → 创建 clip_collection
+  // 生成视频 → 异步提交 + 前端轮询
   const genVideo = async () => {
     const sid = sessionIdRef.current
     if (!sid) return
     setGenerating('生成视频')
     try {
-      // 记录生成前的 clip ID
-      const oldRes: any = await request.get(`/studio/clips/${sid}`)
-      const oldIds = new Set((oldRes?.clips || []).map((c: any) => c.id))
+      // 提交任务
+      const submitRes: any = await request.post('/studio/generate-video', { session_id: sid, script_name: `script_${sid}` })
+      if (!submitRes?.submitted) return message.error('提交失败')
 
-      await request.post('/studio/generate-video', { session_id: sid, script_name: `script_${sid}` })
-      message.success('视频生成完成')
+      message.info('视频生成已提交，等待中...')
 
-      // 识别新生成的 clips
-      const newRes: any = await request.get(`/studio/clips/${sid}`)
-      const newClips = (newRes?.clips || []).filter((c: any) => !oldIds.has(c.id))
-      if (newClips.length > 0) {
-        const cols = [...(stateRef.current.clip_collections || [])]
-        const col = { id: Date.now(), name: `视频运行 #${cols.length + 1}`, clips: newClips, created_at: new Date().toISOString() }
-        cols.push(col)
-        saveState({ clip_collections: cols, selected_clip_collection_id: col.id })
+      // 轮询等待完成
+      let done = false
+      for (let i = 0; i < 60; i++) {  // 最多 60 次（30 分钟）
+        await new Promise(r => setTimeout(r, 30000))  // 每 30 秒
+        try {
+          const pollRes: any = await request.post(`/studio/poll-generate/${sid}`)
+          if (pollRes?.status === 'completed') {
+            const newClips = pollRes.clips || []
+            if (newClips.length > 0) {
+              const cols = [...(stateRef.current.clip_collections || [])]
+              const col = { id: Date.now(), name: `视频运行 #${cols.length + 1}`, clips: newClips, created_at: new Date().toISOString() }
+              cols.push(col)
+              saveState({ clip_collections: cols, selected_clip_collection_id: col.id })
+            }
+            message.success(`生成完成，${pollRes.saved || 0} 个片段`)
+            done = true
+            break
+          } else if (pollRes?.status === 'running') {
+            // 继续等
+          } else {
+            // unknown / no_task — 可能还得等
+          }
+        } catch { /* 继续轮询 */ }
       }
+      if (!done) message.warning('生成超时，可稍后刷新查看')
       loadClips()
     } catch { message.error('生成失败') }
     setGenerating(null)

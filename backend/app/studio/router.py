@@ -137,12 +137,134 @@ def _save_script(session_id: int, script_data: dict):
 
 @router.post("/generate-video")
 async def studio_generate_video(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    """直接生成视频（不走LLM对话）"""
-    from app.agent.router import execute_tool
+    """提交视频生成任务（异步，立即返回）"""
+    from app.agent.models import ensure_session_dir, SessionFile, get_session_files as _gsf
+    from app.workers.workflow import call_workflow
+    from app.core.signer import generate_signed_url
+    import json, os, asyncio
+
     session_id = body.get("session_id", 0)
     script_name = body.get("script_name", f"script_{session_id}")
-    result = await execute_tool("generate_video", {"script_name": script_name, "session_id": session_id}, db, session_id, user)
-    return json.loads(result)
+
+    # 1. 读剧本文件
+    sname = script_name or f"script_{session_id}"
+    script_path = os.path.join(ensure_session_dir(session_id)["scripts"], f"{sname}.json")
+    if not os.path.exists(script_path):
+        raise HTTPException(404, f"剧本文件不存在: {script_name}")
+    with open(script_path, "r", encoding="utf-8") as f:
+        script_data = json.loads(f.read())
+    script_body = script_data.get("script", script_data)
+    scenes = script_body.get("scenes", [])
+    title = script_body.get("title", "")
+    style = script_body.get("style", "电商带货")
+    if not scenes:
+        raise HTTPException(400, "剧本没有场景")
+
+    # 2. 获取素材图片（signed URL）
+    from sqlalchemy import select as _s
+    from app.material.models import Material
+    scene_mids = set()
+    for s in scenes:
+        for mid in s.get("materials", []):
+            scene_mids.add(mid)
+    material_urls = {}
+    if scene_mids:
+        r = await db.execute(_s(Material).where(Material.id.in_(scene_mids)))
+        for m in r.scalars().all():
+            if m.image_url:
+                signed = generate_signed_url(m.image_url, expire_seconds=86400)
+                material_urls[m.id] = f"http://114.117.242.17:3000{signed}"
+
+    # 3. 构建 reference_images
+    for s in scenes:
+        s["reference_images"] = [
+            {"url": material_urls[mid], "role": "reference_image"}
+            for mid in s.get("materials", []) if mid in material_urls
+        ]
+        if "lines" not in s:
+            s["lines"] = []
+
+    # 4. 提交任务
+    aspect_ratio = body.get("aspect_ratio", "9:16")
+    result = await call_workflow("video-generate", {
+        "workflow_type": "generate",
+        "script": {
+            "title": title or script_body.get("title", f"视频_{session_id}"),
+            "style": style or "电商带货",
+            "aspect_ratio": aspect_ratio,
+            "duration": sum(s.get("duration", 5) for s in scenes),
+            "scenes": [{
+                "scene_id": s.get("scene_id", i+1),
+                "visual_desc": s.get("visual_desc", ""),
+                "duration": s.get("duration", 5),
+                "lines": s.get("lines", []),
+                "reference_images": s.get("reference_images", []),
+            } for i, s in enumerate(scenes)],
+        },
+    })
+    inner = result.get("result", result) if isinstance(result, dict) else result
+    task_ids = inner.get("task_ids", []) if isinstance(inner, dict) else []
+    if not task_ids:
+        raise HTTPException(500, "提交视频生成任务失败")
+
+    # 5. 保存 task_ids
+    sf = SessionFile(
+        session_id=session_id, file_type="video_task",
+        filename=f"tasks_{session_id}.json",
+        file_url="",
+        description=json.dumps(task_ids, ensure_ascii=False),
+    )
+    db.add(sf)
+    await db.commit()
+    return {"submitted": True, "task_ids": task_ids, "session_id": session_id}
+
+
+@router.post("/poll-generate/{session_id}")
+async def studio_poll_generate(session_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """轮询视频生成状态"""
+    from app.agent.models import SessionFile, get_session_files as _gsf
+    from app.workers.workflow import call_workflow
+    import json
+
+    files = await _gsf(db, session_id)
+    tasks = [f for f in files if f.file_type == "video_task"]
+    if not tasks:
+        return {"status": "no_task", "clips": [], "total": 0}
+
+    latest = tasks[-1]
+    task_ids = json.loads(latest.description)
+    qr = await call_workflow("video-generate", {
+        "workflow_type": "query",
+        "task_ids": task_ids,
+    })
+    qr_inner = qr.get("result", qr) if isinstance(qr, dict) else qr
+    if not isinstance(qr_inner, dict):
+        return {"status": "unknown", "clips": []}
+
+    if qr_inner.get("status") == "completed":
+        clips = qr_inner.get("video_clips", [])
+        saved = 0
+        for clip in clips:
+            vu = clip.get("video_url", "")
+            if vu:
+                sf = SessionFile(
+                    session_id=session_id, file_type="video_clip",
+                    filename=f"clip_{session_id}_scene{clip.get('scene_id', '')}.mp4",
+                    file_url=vu,
+                    description=f"场景 {clip.get('scene_id', '')} 视频片段",
+                )
+                db.add(sf)
+                saved += 1
+        await db.commit()
+        # 返回新 clips
+        fresh = await _gsf(db, session_id)
+        new_clips = [{"id": f.id, "scene_id": (f.description or "").replace("场景 ", "").replace(" 视频片段", ""), "url": f.file_url}
+                     for f in fresh if f.file_type == "video_clip"]
+        return {"status": "completed", "clips": new_clips, "saved": saved, "total": len(new_clips)}
+    elif qr_inner.get("status") == "running":
+        return {"status": "running", "clips": []}
+    else:
+        return {"status": "unknown", "detail": str(qr_inner)}
 
 
 @router.post("/compose-video")
