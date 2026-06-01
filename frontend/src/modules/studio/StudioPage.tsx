@@ -190,7 +190,17 @@ export default function StudioPage() {
             )} />
           </StepBox>
           <GenBtn label="生成素材集合" onClick={createCollection} />
-          {state.collections.length > 0 && <div style={{ textAlign: 'center', fontSize: 12, color: '#999' }}>{state.collections.length} 个集合</div>}
+        </div>
+        <Arrow />
+
+        {/* 2.5 素材集合 */}
+        <div>
+          <StepBox title="素材集合">
+            <List size="small" dataSource={state.collections} renderItem={(c: any) => (
+              <List.Item style={{ fontSize: 12 }}>{c.name} ({c.material_ids?.length || 0} 素材)</List.Item>
+            )} />
+            {state.collections.length === 0 && <div style={{ color: '#999', fontSize: 12, textAlign: 'center', padding: 20 }}>选素材后点击生成</div>}
+          </StepBox>
         </div>
         <Arrow />
 
