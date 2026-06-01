@@ -237,4 +237,8 @@ async def scan_workflow_models(
     cfg["available_models"] = models
     config.config = json.dumps(cfg)
     await db.commit()
+    # 视频生成工作流返回用户已知的 EP（不做模型扫描）
+    if workflow_name == "video-generate":
+        ep = "ep-20260514120705-pqv86"
+        return {"models": [f"Doubao-Seedance-1.5-pro: {ep}"], "selected": ep}
     return {"models": models, "selected": cfg.get("model", models[0] if models else "")}
