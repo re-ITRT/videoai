@@ -220,25 +220,26 @@ export default function StudioPage() {
     setGenerating(null)
   }
 
-  const deleteCollection = (id: number) => {
+  const deleteCollection = async (id: number) => {
     const cols = (stateRef.current.collections || []).filter((c: any) => c.id !== id)
     const patch: any = { collections: cols }
     if (stateRef.current.selected_collection_id === id) patch.selected_collection_id = null
-    saveState(patch)
+    try { await saveState(patch) } catch { message.error('删除失败') }
   }
 
   const deleteScript = () => {
-    saveState({ last_script: null })
+    try { saveState({ last_script: null }) } catch {}
   }
 
-  const deleteClipCollection = (id: number) => {
+  const deleteClipCollection = async (id: number) => {
     const cols = (stateRef.current.clip_collections || []).filter((c: any) => c.id !== id)
     const patch: any = { clip_collections: cols }
     if (stateRef.current.selected_clip_collection_id === id) patch.selected_clip_collection_id = null
-    saveState(patch)
+    try { await saveState(patch) } catch { message.error('删除失败') }
   }
 
-  const deleteFinalVideo = (id: number) => {
+  const deleteFinalVideo = async (id: number) => {
+    try { await request.post('/studio/delete-clip', { clip_id: id }) } catch {}
     const videos = (stateRef.current.final_videos || []).filter((v: any) => v.id !== id)
     saveState({ final_videos: videos })
   }

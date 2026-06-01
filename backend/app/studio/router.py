@@ -346,6 +346,23 @@ async def get_session_clips(session_id: int, db: AsyncSession = Depends(get_db),
     return {"clips": clips, "final_videos": final}
 
 
+@router.post("/delete-clip")
+async def studio_delete_clip(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """删除指定 SessionFile（视频片段或最终视频）"""
+    from app.agent.models import SessionFile
+    from sqlalchemy import select as _s
+    clip_id = body.get("clip_id")
+    if not clip_id:
+        raise HTTPException(400, "clip_id required")
+    r = await db.execute(_s(SessionFile).where(SessionFile.id == clip_id))
+    sf = r.scalar_one_or_none()
+    if not sf:
+        return {"ok": False, "error": "not found"}
+    await db.delete(sf)
+    await db.commit()
+    return {"ok": True}
+
+
 @router.post("/materials/search")
 async def search_studio_materials(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
     """搜索素材（带阈值和标签）"""
