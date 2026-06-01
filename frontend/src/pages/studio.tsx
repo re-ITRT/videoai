@@ -23,8 +23,8 @@ export default function StudioPage() {
   const [scripts, setScripts] = useState<any[]>([])
   const [selectedScript, setSelectedScript] = useState('')
 
-  const [videoCollections, setVideoCollections] = useState<any[]>([])
-  const [selectedVideoCol, setSelectedVideoCol] = useState<number | null>(null)
+  const [_vc, _svc] = useState<any[]>([])
+  const [_sv, _ssv] = useState<number | null>(null)
   const [_fv, _sfv] = useState<any[]>([])
 
   const [generating, setGenerating] = useState<string | null>(null)
