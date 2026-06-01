@@ -220,6 +220,24 @@ export default function StudioPage() {
     setGenerating(null)
   }
 
+  const deleteCollection = (id: number) => {
+    const cols = (stateRef.current.collections || []).filter((c: any) => c.id !== id)
+    const patch: any = { collections: cols }
+    if (stateRef.current.selected_collection_id === id) patch.selected_collection_id = null
+    saveState(patch)
+  }
+
+  const deleteScript = () => {
+    saveState({ last_script: null })
+  }
+
+  const deleteClipCollection = (id: number) => {
+    const cols = (stateRef.current.clip_collections || []).filter((c: any) => c.id !== id)
+    const patch: any = { clip_collections: cols }
+    if (stateRef.current.selected_clip_collection_id === id) patch.selected_clip_collection_id = null
+    saveState(patch)
+  }
+
   const StepBox = ({ title, extra, children }: any) => (
     <Card title={title} size="small" extra={extra} style={{ width: 280, flexShrink: 0, minHeight: 380 }}>{children}</Card>
   )
@@ -293,7 +311,12 @@ export default function StudioPage() {
           <StepBox title="素材集合">
             <List size="small" dataSource={state.collections} renderItem={(c: any) => (
               <List.Item onClick={() => saveState({ selected_collection_id: c.id })}
-                style={{ cursor: 'pointer', background: state.selected_collection_id === c.id ? '#e6f4ff' : undefined }}>
+                style={{ cursor: 'pointer', background: state.selected_collection_id === c.id ? '#e6f4ff' : undefined }}
+                actions={[
+                  <Popconfirm key="del" title="删除此素材集合？" onConfirm={() => deleteCollection(c.id)}>
+                    <DeleteOutlined style={{ color: '#ff4d4f' }} />
+                  </Popconfirm>
+                ]}>
                 <span style={{ fontSize: 12 }}>{c.name} ({c.material_ids?.length || 0} 素材)</span>
               </List.Item>
             )} />
@@ -315,6 +338,9 @@ export default function StudioPage() {
                 ✅ 剧本: <strong>{state.last_script.script.title}</strong>
                 <br /><span style={{ color: '#666' }}>{state.last_script.script.scenes?.length || 0} 个场景</span>
                 <Button size="small" type="link" icon={<EditOutlined />} onClick={() => setScriptEditorOpen(true)} style={{ padding: 0, marginLeft: 8 }}>编辑</Button>
+                <Popconfirm key="del" title="删除此剧本？" onConfirm={deleteScript}>
+                  <Button size="small" type="link" danger icon={<DeleteOutlined />} style={{ padding: 0, marginLeft: 4 }} />
+                </Popconfirm>
               </div>
             )}
           </StepBox>
@@ -322,9 +348,9 @@ export default function StudioPage() {
         </div>
         <Arrow />
 
-        {/* 4. 视频片段生成 */}
+        {/* 4. 结果视频 */}
         <div>
-          <StepBox title="视频片段" extra={state.clip_collections?.length > 0 ? <span style={{ fontSize: 12, color: '#52c41a' }}>{state.clip_collections.length} 次运行</span> : undefined}>
+          <StepBox title="结果视频" extra={state.clip_collections?.length > 0 ? <span style={{ fontSize: 12, color: '#52c41a' }}>{state.clip_collections.length} 次运行</span> : undefined}>
             {!state.last_script?.script?.title ? (
               <div style={{ color: '#999', fontSize: 12, textAlign: 'center', padding: 20 }}>生成剧本后点击生成</div>
             ) : (
@@ -332,7 +358,12 @@ export default function StudioPage() {
                 {/* 视频运行集合列表 */}
                 <List size="small" dataSource={state.clip_collections} renderItem={(c: any) => (
                   <List.Item onClick={() => saveState({ selected_clip_collection_id: c.id })}
-                    style={{ cursor: 'pointer', background: state.selected_clip_collection_id === c.id ? '#e6f4ff' : undefined }}>
+                    style={{ cursor: 'pointer', background: state.selected_clip_collection_id === c.id ? '#e6f4ff' : undefined }}
+                    actions={[
+                      <Popconfirm key="del" title="删除此运行结果？" onConfirm={() => deleteClipCollection(c.id)}>
+                        <DeleteOutlined style={{ color: '#ff4d4f' }} />
+                      </Popconfirm>
+                    ]}>
                     <Space>
                       <VideoCameraOutlined />
                       <span style={{ fontSize: 12 }}>{c.name} ({c.clips?.length || 0} 片段)</span>
