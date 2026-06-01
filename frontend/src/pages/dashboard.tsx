@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Card, Row, Col, Statistic, Skeleton, Tabs } from 'antd'
-import { VideoCameraOutlined, FileTextOutlined, ThunderboltOutlined, RobotOutlined } from '@ant-design/icons'
+import { VideoCameraOutlined, FileTextOutlined, ThunderboltOutlined, AppstoreOutlined } from '@ant-design/icons'
 import { getMaterials, getTasks } from '../utils/api'
-import AgentPanel from '../modules/agent/AgentPanel'
+import StudioPage from '../modules/studio/StudioPage'
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true)
@@ -50,8 +50,8 @@ export default function Dashboard() {
         },
         {
           key: 'agent',
-          label: <span><RobotOutlined /> AI 助手</span>,
-          children: <AgentPanel />,
+          label: <span><AppstoreOutlined /> 工作流</span>,
+          children: <StudioPage />,
         },
       ]}
     />
