@@ -101,6 +101,7 @@ async def studio_generate_script(body: dict, db: AsyncSession = Depends(get_db),
     product_content = body.get("product_content", "")
     template = body.get("template", "default")
     materials = body.get("materials", [])  # [{id, description, tags}]
+    session_id = body.get("session_id", 0)
 
     params = {
         "product_info": {"product_id": 1, "name": product_content[:30], "description": product_content, "selling_points": []},
@@ -117,13 +118,28 @@ async def studio_generate_script(body: dict, db: AsyncSession = Depends(get_db),
         cfg = json.loads(wf_cfg.config or "{}")
         if cfg.get("api_key") and cfg.get("base_url") and cfg.get("model"):
             result = await run_script_generate(api_key=cfg["api_key"], base_url=cfg["base_url"], model=cfg["model"], params=params, template=template)
-            _save_script(body.get("session_id", 0), result)
+            # 注入素材ID到每个场景（LLM可能忽略）
+            result = _inject_materials(result, materials)
+            _save_script(session_id, result)
             return result
     # fallback: 调 Coze workflow
     from app.workers.workflow import call_workflow
     result = await call_workflow("script-generate", params)
-    _save_script(body.get("session_id", 0), result)
+    result = _inject_materials(result, materials)
+    _save_script(session_id, result)
     return result
+
+
+def _inject_materials(script_data: dict, materials: list) -> dict:
+    """强制将素材ID列表注入每个场景的 materials 字段"""
+    script_body = script_data.get("script", script_data)
+    scenes = script_body.get("scenes", [])
+    mid_list = [m.get("material_id") or m.get("id") for m in materials if m.get("material_id") or m.get("id")]
+    if mid_list:
+        for s in scenes:
+            if not s.get("materials"):
+                s["materials"] = mid_list
+    return script_data
 
 
 def _save_script(session_id: int, script_data: dict):
