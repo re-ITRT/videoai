@@ -238,6 +238,11 @@ export default function StudioPage() {
     saveState(patch)
   }
 
+  const deleteFinalVideo = (id: number) => {
+    const videos = (stateRef.current.final_videos || []).filter((v: any) => v.id !== id)
+    saveState({ final_videos: videos })
+  }
+
   const StepBox = ({ title, extra, children }: any) => (
     <Card title={title} size="small" extra={extra} style={{ width: 280, flexShrink: 0, minHeight: 380 }}>{children}</Card>
   )
@@ -313,7 +318,9 @@ export default function StudioPage() {
               <List.Item onClick={() => saveState({ selected_collection_id: c.id })}
                 style={{ cursor: 'pointer', background: state.selected_collection_id === c.id ? '#e6f4ff' : undefined }}
                 actions={[
-                  <DeleteOutlined key="del" style={{ color: '#ff4d4f' }} onClick={() => deleteCollection(c.id)} />
+                  <span key="del" onClick={e => { e.stopPropagation(); deleteCollection(c.id) }}>
+                    <DeleteOutlined style={{ color: '#ff4d4f' }} />
+                  </span>
                 ]}>
                 <span style={{ fontSize: 12 }}>{c.name} ({c.material_ids?.length || 0} 素材)</span>
               </List.Item>
@@ -336,7 +343,7 @@ export default function StudioPage() {
                 ✅ 剧本: <strong>{state.last_script.script.title}</strong>
                 <br /><span style={{ color: '#666' }}>{state.last_script.script.scenes?.length || 0} 个场景</span>
                 <Button size="small" type="link" icon={<EditOutlined />} onClick={() => setScriptEditorOpen(true)} style={{ padding: 0, marginLeft: 8 }}>编辑</Button>
-                <Button size="small" type="link" danger icon={<DeleteOutlined />} onClick={deleteScript} style={{ padding: 0, marginLeft: 4 }} />
+                <Button size="small" type="link" danger icon={<DeleteOutlined />} onClick={e => { e.stopPropagation(); deleteScript() }} style={{ padding: 0, marginLeft: 4 }} />
               </div>
             )}
           </StepBox>
@@ -356,7 +363,9 @@ export default function StudioPage() {
                   <List.Item onClick={() => saveState({ selected_clip_collection_id: c.id })}
                     style={{ cursor: 'pointer', background: state.selected_clip_collection_id === c.id ? '#e6f4ff' : undefined }}
                     actions={[
-                      <DeleteOutlined key="del" style={{ color: '#ff4d4f' }} onClick={() => deleteClipCollection(c.id)} />
+                      <span key="del" onClick={e => { e.stopPropagation(); deleteClipCollection(c.id) }}>
+                        <DeleteOutlined style={{ color: '#ff4d4f' }} />
+                      </span>
                     ]}>
                     <Space>
                       <VideoCameraOutlined />
@@ -405,7 +414,11 @@ export default function StudioPage() {
               <div style={{ marginTop: 8 }}>
                 <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 4, color: '#52c41a' }}>✅ 最终视频</div>
                 <List size="small" dataSource={state.final_videos} renderItem={(v: any) => (
-                  <List.Item>
+                  <List.Item actions={[
+                    <span key="del" onClick={e => { e.stopPropagation(); deleteFinalVideo(v.id) }}>
+                      <DeleteOutlined style={{ color: '#ff4d4f', fontSize: 11 }} />
+                    </span>
+                  ]}>
                     <a href={v.url} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>
                       <PlayCircleOutlined style={{ marginRight: 4 }} />视频 {v.id}
                     </a>
