@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Button, Card, Input, Select, Slider, Modal, Tag, Space, message, Spin, List, Descriptions } from 'antd'
+import { Button, Card, Input, Select, Slider, Modal, Tag, Space, message, List } from 'antd'
 import { PlusOutlined, RightOutlined, PlayCircleOutlined } from '@ant-design/icons'
 import request from '../utils/request'
 
 const { TextArea } = Input
 
 export default function StudioPage() {
-  const [sessionId, setSessionId] = useState<number>(0)
+  const [sessionId] = useState(Date.now())
   const [products, setProducts] = useState<any[]>([])
   const [selectedProduct, setSelectedProduct] = useState<any>(null)
   const [productModal, setProductModal] = useState(false)
@@ -20,67 +20,35 @@ export default function StudioPage() {
 
   const [templates, setTemplates] = useState<string[]>([])
   const [selectedTemplate, setSelectedTemplate] = useState('')
-  const [_sc, _ssc] = useState<any[]>([])
   const [selectedScript, setSelectedScript] = useState('')
-
-  const [_vc, _svc] = useState<any[]>([])
-  const [_sv, _ssv] = useState<number | null>(null)
-  const [_fv, _sfv] = useState<any[]>([])
 
   const [generating, setGenerating] = useState<string | null>(null)
 
-  // 初始化 session
   useEffect(() => {
-    const sid = Date.now()
-    setSessionId(sid)
-    loadTemplates()
-    loadMaterials()
+    request.get('/workflows/prompts').then((r: any) => setTemplates(Object.keys(r?.templates || {}))).catch(() => {})
+    request.post('/studio/materials/search', { threshold: 30, tags: [] }).then((r: any) => setMaterials(r?.materials || [])).catch(() => {})
   }, [])
-
-  const loadTemplates = async () => {
-    try {
-      const res: any = await request.get('/workflows/prompts')
-      setTemplates(Object.keys(res?.templates || {}))
-    } catch {}
-  }
-
-  const loadMaterials = async () => {
-    try {
-      const res: any = await request.post('/studio/materials/search', { threshold: 30, tags: [] })
-      setMaterials(res?.materials || [])
-    } catch {}
-  }
 
   const loadCollections = async () => {
     if (!sessionId) return
-    try {
-      const res: any = await request.get(`/studio/material-collections?session_id=${sessionId}`)
-      setCollections(res || [])
-    } catch {}
+    try { setCollections((await request.get(`/studio/material-collections?session_id=${sessionId}`)) || []) } catch {}
   }
 
-  // ── 产品 ──
   const addProduct = async () => {
     if (!productContent.trim()) return
-      await request.post('/studio/products', { session_id: sessionId, title: productTitle || '未命名', content: productContent })
+    await request.post('/studio/products', { session_id: sessionId, title: productTitle || '未命名', content: productContent })
     message.success('产品已添加')
     setProductModal(false)
     setProductTitle('')
     setProductContent('')
-    loadProducts()
+    searchProducts()
   }
 
-  const loadProducts = async () => {
+  const searchProducts = async () => {
     if (!sessionId) return
-    try {
-      const res: any = await request.get(`/studio/products?session_id=${sessionId}`)
-      setProducts(res || [])
-    } catch {}
+    try { setProducts((await request.get(`/studio/products?session_id=${sessionId}`)) || []) } catch {}
   }
 
-  // ── 素材搜索 ──
-
-  // ── 素材集合 ──
   const createCollection = async () => {
     if (selectedMaterials.length === 0) return message.warning('请先选择素材')
     setGenerating('collection')
@@ -92,55 +60,39 @@ export default function StudioPage() {
     setGenerating(null)
   }
 
-  // ── 剧本生成 ──
   const generateScript = async () => {
     if (!selectedProduct) return message.warning('请先选择产品介绍')
     if (!selectedTemplate) return message.warning('请选择剧本模板')
     setGenerating('script')
     try {
-      await request.post(`/agent/sessions/${sessionId}/chat`, {
-        message: `根据以下产品信息生成剧本：${selectedProduct.content}`,
-        auto_mode: false,
-      })
+      await request.post(`/agent/sessions/${sessionId}/chat`, { message: `根据以下产品信息生成剧本：${selectedProduct.content}`, auto_mode: false })
       message.success('剧本已生成')
-      // 重新加载脚本列表
       setSelectedScript(`script_${sessionId}`)
     } catch { message.error('生成失败') }
     setGenerating(null)
   }
 
-  // ── 视频生成 ──
   const generateVideo = async () => {
     if (!selectedScript) return message.warning('请选择剧本')
     setGenerating('video')
     try {
-      await request.post(`/agent/sessions/${sessionId}/chat`, {
-        message: `用剧本 ${selectedScript} 生成视频`,
-        auto_mode: false,
-      })
+      await request.post(`/agent/sessions/${sessionId}/chat`, { message: `用剧本 ${selectedScript} 生成视频`, auto_mode: false })
       message.success('视频生成中...')
     } catch { message.error('生成失败') }
     setGenerating(null)
   }
 
-  // ── 视频合成 ──
   const composeVideo = async () => {
     setGenerating('compose')
     try {
-      await request.post(`/agent/sessions/${sessionId}/chat`, {
-        message: '合成最终视频',
-        auto_mode: false,
-      })
+      await request.post(`/agent/sessions/${sessionId}/chat`, { message: '合成最终视频', auto_mode: false })
       message.success('合成完成')
     } catch { message.error('合成失败') }
     setGenerating(null)
   }
 
-  // ── Step 组件 ──
-  const StepBox = ({ title, extra, children, width = 280 }: any) => (
-    <Card title={title} size="small" extra={extra} style={{ width, flexShrink: 0, minHeight: 400 }}>
-      {children}
-    </Card>
+  const StepBox = ({ title, extra, children }: any) => (
+    <Card title={title} size="small" extra={extra} style={{ width: 280, flexShrink: 0, minHeight: 400 }}>{children}</Card>
   )
 
   const Arrow = () => (
@@ -151,17 +103,13 @@ export default function StudioPage() {
 
   const GenButton = ({ label, loading, onClick }: any) => (
     <div style={{ textAlign: 'center', margin: '8px 0' }}>
-      <Button type="primary" icon={<PlayCircleOutlined />} loading={loading} onClick={onClick} style={{ width: 180 }}>
-        {label}
-      </Button>
+      <Button type="primary" icon={<PlayCircleOutlined />} loading={loading} onClick={onClick} style={{ width: 180 }}>{label}</Button>
     </div>
   )
 
   return (
     <div style={{ padding: 16 }}>
-      {/* 横向步骤 */}
       <div style={{ display: 'flex', overflow: 'auto', gap: 0, paddingBottom: 16 }}>
-
         {/* 1. 产品介绍 */}
         <div>
           <StepBox title="产品介绍" extra={<Button size="small" icon={<PlusOutlined />} onClick={() => setProductModal(true)} />}>
@@ -171,7 +119,7 @@ export default function StudioPage() {
               </List.Item>
             )} />
           </StepBox>
-          <GenButton label="生成素材" loading={generating === 'collection'} onClick={createCollection} />
+          <GenButton label="生成素材集合" loading={generating === 'collection'} onClick={createCollection} />
         </div>
 
         <Arrow />
@@ -186,10 +134,8 @@ export default function StudioPage() {
             </Space>
           }>
             <List size="small" dataSource={materials} renderItem={(m: any) => (
-              <List.Item
-                style={{ cursor: 'pointer', background: selectedMaterials.includes(m.id) ? '#e6f4ff' : undefined }}
-                onClick={() => setSelectedMaterials(prev => prev.includes(m.id) ? prev.filter(x => x !== m.id) : [...prev, m.id])}
-              >
+              <List.Item style={{ cursor: 'pointer', background: selectedMaterials.includes(m.id) ? '#e6f4ff' : undefined }}
+                onClick={() => setSelectedMaterials(p => p.includes(m.id) ? p.filter(x => x !== m.id) : [...p, m.id])}>
                 <Space>
                   {m.image_url && <img src={m.image_url} style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 4 }} />}
                   <span style={{ fontSize: 12 }}>{(m.tags || []).join(', ') || `素材 #${m.id}`}</span>
@@ -211,7 +157,6 @@ export default function StudioPage() {
             <List size="small" dataSource={collections} renderItem={(c: any) => (
               <List.Item style={{ fontSize: 12 }}>{c.name} ({c.material_ids?.length || 0} 素材)</List.Item>
             )} />
-            {scripts.length > 0 && <div style={{ marginTop: 8 }}><Tag color="green">已有 {scripts.length} 个剧本</Tag></div>}
           </StepBox>
           <GenButton label="生成剧本" loading={generating === 'script'} onClick={generateScript} />
         </div>
@@ -220,9 +165,7 @@ export default function StudioPage() {
 
         {/* 4. 视频生成 */}
         <div>
-          <StepBox title="视频生成">
-            <div style={{ fontSize: 12, color: '#666' }}>选择剧本后点击生成</div>
-          </StepBox>
+          <StepBox title="视频生成" />
           <GenButton label="生成视频" loading={generating === 'video'} onClick={generateVideo} />
         </div>
 
@@ -230,15 +173,11 @@ export default function StudioPage() {
 
         {/* 5. 视频合成 */}
         <div>
-          <StepBox title="视频合成">
-            <div style={{ fontSize: 12, color: '#666' }}>视频片段就绪后可合成最终视频</div>
-          </StepBox>
+          <StepBox title="视频合成" />
           <GenButton label="合成视频" loading={generating === 'compose'} onClick={composeVideo} />
         </div>
-
       </div>
 
-      {/* 产品编辑弹窗 */}
       <Modal title="添加产品介绍" open={productModal} onOk={addProduct} onCancel={() => setProductModal(false)} width={600}>
         <Input placeholder="产品名称（选填）" value={productTitle} onChange={e => setProductTitle(e.target.value)} style={{ marginBottom: 8 }} />
         <TextArea rows={12} placeholder="粘贴完整的产品介绍文案..." value={productContent} onChange={e => setProductContent(e.target.value)} />
