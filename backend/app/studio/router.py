@@ -15,6 +15,7 @@ DEFAULT_STATE = {
     "threshold": 30,
     "selected_material_ids": [],
     "collections": [],
+    "selected_collection_id": None,
     "selected_template": "",
     "cached_materials": [],
 }

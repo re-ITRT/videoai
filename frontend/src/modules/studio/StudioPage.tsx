@@ -92,9 +92,17 @@ export default function StudioPage() {
     const prod = state.products.find((p: any) => p.id === state.selected_product_id)
     if (!prod) return message.warning('请选择产品介绍')
     if (!state.selected_template) return message.warning('请选择模板')
+    const coll = state.collections.find((c: any) => c.id === state.selected_collection_id)
+    if (!coll) return message.warning('请选择素材集合')
     setGenerating('生成剧本')
     try {
-      await request.post(`/agent/sessions/${sessionId}/chat`, { message: `用模板"${state.selected_template}"生成剧本：${prod.content}`, auto_mode: false })
+      const matInfo = coll.material_ids?.length
+        ? `可用素材ID: [${coll.material_ids.join(', ')}]`
+        : ''
+      await request.post(`/agent/sessions/${sessionId}/chat`, {
+        message: `用模板"${state.selected_template}"为以下产品生成剧本。\n\n产品信息：${prod.content}\n\n${matInfo}`,
+        auto_mode: false,
+      })
       message.success('剧本已生成')
     } catch { message.error('生成失败') }
     setGenerating(null)
@@ -201,7 +209,10 @@ export default function StudioPage() {
         <div>
           <StepBox title="素材集合">
             <List size="small" dataSource={state.collections} renderItem={(c: any) => (
-              <List.Item style={{ fontSize: 12 }}>{c.name} ({c.material_ids?.length || 0} 素材)</List.Item>
+              <List.Item onClick={() => saveState({ selected_collection_id: c.id })}
+                style={{ cursor: 'pointer', background: state.selected_collection_id === c.id ? '#e6f4ff' : undefined }}>
+                <span style={{ fontSize: 12 }}>{c.name} ({c.material_ids?.length || 0} 素材)</span>
+              </List.Item>
             )} />
             {state.collections.length === 0 && <div style={{ color: '#999', fontSize: 12, textAlign: 'center', padding: 20 }}>选素材后点击生成</div>}
           </StepBox>
