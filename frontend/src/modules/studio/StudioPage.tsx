@@ -131,7 +131,7 @@ export default function StudioPage() {
     try {
       const matDetails = materials
         .filter((m: any) => coll.material_ids.includes(m.id))
-        .map((m: any) => ({ id: m.id, description: m.tags?.join(', ') || '', tags: m.tags || [] }))
+        .map((m: any) => ({ material_id: m.id, description: m.tags?.join(', ') || '', tags: m.tags || [] }))
       const res: any = await request.post('/studio/generate-script', {
         product_content: prod.content,
         template: state.selected_template,

@@ -160,13 +160,23 @@ async def studio_generate_video(body: dict, db: AsyncSession = Depends(get_db), 
     if not scenes:
         raise HTTPException(400, "剧本没有场景")
 
-    # 2. 获取素材图片（signed URL）
+    # 2. 获取素材图片（signed URL）— 优先用 scenes 中的 materials，否则用素材集合
     from sqlalchemy import select as _s
     from app.material.models import Material
     scene_mids = set()
     for s in scenes:
         for mid in s.get("materials", []):
             scene_mids.add(mid)
+    # 如果 scenes 没指定素材，从工作流 state 的素材集合取
+    if not scene_mids:
+        state_path = os.path.join(ensure_session_dir(session_id)["root"], "workflow_state.json")
+        if os.path.exists(state_path):
+            with open(state_path, "r", encoding="utf-8") as f:
+                st = json.loads(f.read())
+            sel = st.get("selected_collection_id")
+            coll = next((c for c in st.get("collections", []) if c.get("id") == sel), None)
+            if coll:
+                scene_mids = set(coll.get("material_ids", []))
     material_urls = {}
     if scene_mids:
         r = await db.execute(_s(Material).where(Material.id.in_(scene_mids)))
