@@ -41,6 +41,7 @@ export default function StudioPage() {
   // 切换 Session 时加载状态
   useEffect(() => {
     if (!sessionId) return
+    setMaterials([])  // 先清空
     Promise.all([
       request.get(`/studio/state/${sessionId}`),
       request.get(`/studio/clips/${sessionId}`).catch(() => ({ clips: [], final_videos: [] })),
@@ -53,7 +54,6 @@ export default function StudioPage() {
       }
       setState(merged)
       if (merged.cached_materials?.length) setMaterials(merged.cached_materials)
-      else request.post('/studio/materials/search', { threshold: 30, tags: [] }).then((r2: any) => setMaterials(r2?.materials || [])).catch(() => {})
       // 持久化到 state 文件
       request.put(`/studio/state/${sessionId}`, merged).catch(() => {})
     }).catch(() => {})
