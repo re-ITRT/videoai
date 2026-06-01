@@ -232,7 +232,13 @@ export default function StudioPage() {
               onChange={v => saveState({ selected_template: v })}
               options={templates.map(t => ({ value: t, label: t }))} />
           }>
-            <div style={{ fontSize: 12, color: '#999' }}>选产品+模板后点击生成</div>
+            <div style={{ fontSize: 12, color: '#999' }}>选产品+素材集合+模板后点击生成</div>
+            {state.last_script?.script?.title && (
+              <div style={{ marginTop: 8, padding: 8, background: '#f6ffed', borderRadius: 4, fontSize: 13 }}>
+                ✅ 剧本: <strong>{state.last_script.script.title}</strong>
+                <br /><span style={{ color: '#666' }}>{state.last_script.script.scenes?.length || 0} 个场景</span>
+              </div>
+            )}
           </StepBox>
           <GenBtn label="生成剧本" onClick={genScript} />
         </div>
