@@ -205,13 +205,17 @@ async def studio_generate_video(body: dict, db: AsyncSession = Depends(get_db), 
             },
         })
     except Exception as e:
+        print(f"[generate-video] Coze ERROR: {e}")
         raise HTTPException(502, f"Coze workflow 返回错误: {str(e)}")
+    print(f"[generate-video] Coze OK, type={type(result)}")
     inner = result.get("result", result) if isinstance(result, dict) else result
     task_ids = inner.get("task_ids", []) if isinstance(inner, dict) else []
+    print(f"[generate-video] task_ids count={len(task_ids)}")
     if not task_ids:
         raise HTTPException(500, "提交视频生成任务失败")
 
     # 5. 保存 task_ids
+    print(f"[generate-video] saving task_ids... session_id={session_id}")
     sf = SessionFile(
         session_id=session_id, file_type="video_task",
         filename=f"tasks_{session_id}.json",
@@ -220,6 +224,7 @@ async def studio_generate_video(body: dict, db: AsyncSession = Depends(get_db), 
     )
     db.add(sf)
     await db.commit()
+    print(f"[generate-video] saved, returning")
     return {"submitted": True, "task_ids": task_ids, "session_id": session_id}
 
 
