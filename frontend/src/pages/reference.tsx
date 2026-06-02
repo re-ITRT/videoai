@@ -186,14 +186,14 @@ const ReferencePage: React.FC = () => {
       {/* 头部 */}
       <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Title level={3} style={{ margin: 0 }}>
-          优质视频库
+          上传视频
         </Title>
         <Button
           type="primary"
           icon={<PlusOutlined />}
           onClick={() => setAnalyzeModalVisible(true)}
         >
-          分析新视频
+          分析视频
         </Button>
       </div>
 
