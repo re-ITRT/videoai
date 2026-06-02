@@ -37,6 +37,8 @@ export default function StudioPage() {
   const [aiScriptEditorOpen, setAiScriptEditorOpen] = useState(false)
   const [asrResult, setAsrResult] = useState<any>(null)
   const [asrLoadingId, setAsrLoadingId] = useState<number | null>(null)
+  const [burning, setBurning] = useState(false)
+  const [subbedUrl, setSubbedUrl] = useState('')
 
   // 加载 Session 列表
   useEffect(() => {
@@ -282,6 +284,24 @@ export default function StudioPage() {
     setAsrLoadingId(null)
   }
 
+  const burnSubtitles = async () => {
+    if (!asrResult?.segments?.length) return
+    const vid = state.final_videos?.[0]
+    if (!vid) return message.warning('没有视频')
+    setBurning(true)
+    setSubbedUrl('')
+    try {
+      const res: any = await request.post('/studio/burn-subtitles', {
+        video_url: vid.url,
+        segments: asrResult.segments,
+      }, { timeout: 600000 })
+      if (res.error) { message.error(res.error); return }
+      setSubbedUrl(res.url)
+      message.success('字幕视频已生成')
+    } catch { message.error('烧录失败') }
+    setBurning(false)
+  }
+
   const StepBox = ({ title, extra, children }: any) => (
     <Card title={title} size="small" extra={extra} style={{ width: 280, flexShrink: 0, minHeight: 380 }}>{children}</Card>
   )
@@ -494,13 +514,23 @@ export default function StudioPage() {
             )}
             {asrResult && (
               <div style={{ marginTop: 8, maxHeight: 200, overflow: 'auto', fontSize: 12 }}>
-                <div style={{ fontWeight: 500, marginBottom: 4 }}>🎤 识别结果</div>
+                <div style={{ fontWeight: 500, marginBottom: 4 }}>🎤 识别结果
+                  <Button size="small" type="link" style={{ fontSize: 11, marginLeft: 8 }}
+                    loading={burning} onClick={burnSubtitles}>生成字幕视频</Button>
+                </div>
                 {asrResult.segments?.map((s: any, i: number) => (
                   <div key={i} style={{ padding: '2px 0', borderBottom: '1px solid #f0f0f0' }}>
                     <span style={{ color: '#999' }}>{s.start}-{s.end}s </span>
                     {s.text}
                   </div>
                 ))}
+                {subbedUrl && (
+                  <div style={{ marginTop: 4 }}>
+                    <a href={subbedUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#52c41a' }}>
+                      ✅ 查看带字幕视频
+                    </a>
+                  </div>
+                )}
               </div>
             )}
           </StepBox>

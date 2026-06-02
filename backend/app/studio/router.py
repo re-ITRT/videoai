@@ -522,6 +522,68 @@ async def studio_asr(body: dict, db: AsyncSession = Depends(get_db), user: User 
         shutil.rmtree(tmpdir, ignore_errors=True)
 
 
+@router.post("/burn-subtitles")
+async def studio_burn_subtitles(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """将 ASR 字幕烧录到视频中"""
+    import subprocess, tempfile, os, httpx, shutil, uuid
+    from app.core.signer import generate_signed_url
+
+    video_url = body.get("video_url", "")
+    segments = body.get("segments", [])
+    if not video_url or not segments:
+        raise HTTPException(400, "video_url and segments required")
+
+    tmpdir = tempfile.mkdtemp()
+    try:
+        # 下载视频
+        vid_path = os.path.join(tmpdir, "input.mp4")
+        async with httpx.AsyncClient(timeout=300) as client:
+            url = video_url if video_url.startswith("http") else f"http://114.117.242.17:3000{video_url}"
+            resp = await client.get(url)
+            resp.raise_for_status()
+            with open(vid_path, "wb") as f:
+                f.write(resp.content)
+
+        # 生成 SRT 字幕文件
+        srt_path = os.path.join(tmpdir, "subs.srt")
+        with open(srt_path, "w", encoding="utf-8") as f:
+            for i, seg in enumerate(segments, 1):
+                s = seg.get("start", 0)
+                e = seg.get("end", 0)
+                text = seg.get("text", "")
+                def fmt(t):
+                    h = int(t // 3600)
+                    m = int((t % 3600) // 60)
+                    sec = t % 60
+                    return f"{h:02d}:{m:02d}:{sec:06.3f}"
+                f.write(f"{i}\n{fmt(s)} --> {fmt(e)}\n{text}\n\n")
+
+        # FFmpeg 烧录字幕
+        out_name = f"subbed_{uuid.uuid4().hex[:8]}.mp4"
+        out_path = os.path.join(tmpdir, out_name)
+        result = subprocess.run(
+            ["ffmpeg", "-i", vid_path, "-vf", f"subtitles={srt_path}:force_style='FontName=SimHei,FontSize=16,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=1'",
+             "-c:a", "copy", "-y", out_path],
+            capture_output=True, text=True, timeout=120,
+        )
+        if result.returncode != 0:
+            return {"error": f"字幕烧录失败: {result.stderr[:200]}"}
+
+        # 保存到 uploads
+        uploads_dir = "/app/uploads/subbed"
+        os.makedirs(uploads_dir, exist_ok=True)
+        dest = os.path.join(uploads_dir, out_name)
+        shutil.copy2(out_path, dest)
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+        signed = generate_signed_url(dest.replace("/app/uploads", "/uploads"), expire_seconds=86400)
+        return {"url": f"http://114.117.242.17:3000{signed}"}
+
+    except Exception as e:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+        return {"error": str(e)}
+
+
 # ── AI 剧本编辑 ──────────────────────────
 
 AI_EDIT_TOOLS = [
