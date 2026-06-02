@@ -462,7 +462,7 @@ export default function StudioPage() {
       <AiScriptEditor sessionId={sessionId || 0} scriptName={`script_${sessionId}`}
         visible={aiScriptEditorOpen}
         onClose={() => setAiScriptEditorOpen(false)}
-        onScriptUpdated={(script) => saveState({ last_script: script })}
+        onScriptUpdated={(script) => saveState({ last_script: { script } })}
       />
     </div>
   )

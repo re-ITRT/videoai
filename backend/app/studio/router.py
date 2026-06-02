@@ -519,6 +519,7 @@ async def studio_ai_edit(body: dict, db: AsyncSession = Depends(get_db), user: U
             name = fn["name"]
             try:
                 args = json.loads(fn.get("arguments", "{}"))
+                print(f"[ai-edit] tool={name} args={json.dumps(args, ensure_ascii=False)[:200]}")
                 args.setdefault("script_name", script_name)
                 if name == "read_script":
                     args["session_id"] = session_id
