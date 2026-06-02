@@ -533,9 +533,7 @@ async def studio_ai_edit(body: dict, db: AsyncSession = Depends(get_db), user: U
                 args = json.loads(fn.get("arguments", "{}"))
                 print(f"[ai-edit] tool={name} args={json.dumps(args, ensure_ascii=False)[:200]}")
                 args.setdefault("script_name", script_name)
-                if name == "read_script":
-                    args["session_id"] = session_id
-                elif name in ("change_text", "change_duration", "change_visual_desc"):
+                if name in ("change_text", "change_duration", "change_visual_desc"):
                     # 直接修改文件，不走 execute_tool
                     from app.agent.models import ensure_session_dir
                     sp = os.path.join(ensure_session_dir(session_id)["scripts"], f"{script_name}.json")
