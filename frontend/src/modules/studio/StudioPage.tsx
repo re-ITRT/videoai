@@ -316,11 +316,9 @@ export default function StudioPage() {
         {/* 2. 素材选择 */}
         <div>
           <StepBox title="素材选择">
-            <div style={{ marginBottom: 16 }}>
+            <div style={{ marginBottom: 16 }} onPointerDown={e => e.preventDefault()}>
               <span>相似度阈值: {localThreshold}</span>
-              <div style={{ touchAction: 'none' }}>
-                <Slider min={0.3} max={0.95} step={0.05} value={localThreshold} onChange={setLocalThreshold} style={{ width: 240 }} />
-              </div>
+              <Slider min={0.3} max={0.95} step={0.05} value={localThreshold} onChange={setLocalThreshold} style={{ width: 240 }} />
             </div>
             <List size="small" dataSource={materials} renderItem={(m: any) => (
               <List.Item style={{ cursor: 'pointer', background: state.selected_material_ids.includes(m.id) ? '#e6f4ff' : undefined }}
