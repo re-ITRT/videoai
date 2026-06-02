@@ -18,6 +18,12 @@ class ReferenceVideo(Base):
     storyboard = Column(JSONB, default=[])  # 分镜拆解
     style = Column(String(64))  # 风格
     analysis_report = Column(JSONB, default={})  # 完整结构化拆解报告
+    # material-embed 数据
+    tags = Column(JSONB, default=[])  # 标签
+    text_content = Column(Text, default="")  # 商品描述文本
+    text_embedding = Column(JSONB, default=[])  # 文本向量
+    image_embedding = Column(JSONB, default=[])  # 图片向量
+    scenes = Column(JSONB, default=[])  # scenes 列表（从 material-embed 提取）
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 

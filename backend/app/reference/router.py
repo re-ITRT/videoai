@@ -68,21 +68,18 @@ async def upload_and_analyze(
     if isinstance(embed_data, dict):
         tags = embed_data.get("video_tags", []) or embed_data.get("tags", [])
 
-    # 2. 再分析：用 scenes 调 video-analyze
+    # 2. 用 scenes 调 video-analyze
     analyze_result = {}
     if scenes:
-        analyze_result = await call_workflow("video-analyze", {
-            "scenes": scenes,
-            "source_platform": source_platform,
-            "title": title or "",
-            "category": category or "",
-        })
-
-    hook_method = analyze_result.get("hook_method", "")
-    selling_points = analyze_result.get("selling_points", [])
-    storyboard = analyze_result.get("storyboard", [])
-    style = analyze_result.get("style", "")
-    analysis_report = analyze_result.get("analysis_report", {})
+        try:
+            analyze_result = await call_workflow("video-analyze", {
+                "scenes": scenes,
+                "source_platform": source_platform,
+                "title": title or "",
+                "category": category or "",
+            })
+        except Exception:
+            analyze_result = {}
 
     db_video = ReferenceVideo(
         user_id=str(current_user.id),
@@ -90,11 +87,18 @@ async def upload_and_analyze(
         source_url=video_url,
         title=title or (embed_data.get("text_content", "")[:30] if isinstance(embed_data, dict) else ""),
         category=category,
-        hook_method=hook_method,
-        selling_points=selling_points,
-        storyboard=storyboard,
-        style=style,
-        analysis_report={"embed": {"tags": tags, "text_content": embed_data.get("text_content", "") if isinstance(embed_data, dict) else ""}, "analyze": analysis_report},
+        # material-embed 数据
+        tags=tags,
+        text_content=embed_data.get("text_content", "") if isinstance(embed_data, dict) else "",
+        text_embedding=embed_data.get("text_embedding", []) if isinstance(embed_data, dict) else [],
+        image_embedding=embed_data.get("image_embedding", []) if isinstance(embed_data, dict) else [],
+        scenes=scenes,
+        # video-analyze 数据
+        hook_method=analyze_result.get("hook_method", ""),
+        selling_points=analyze_result.get("selling_points", []),
+        storyboard=analyze_result.get("storyboard", []),
+        style=analyze_result.get("style", ""),
+        analysis_report=analyze_result or {},
     )
     db.add(db_video)
     await db.commit()
