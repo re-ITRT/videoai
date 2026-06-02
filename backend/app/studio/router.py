@@ -53,7 +53,8 @@ async def semantic_search(body: dict, db: AsyncSession = Depends(get_db), user: 
     from app.material.search import search_materials_by_embeddings
     
     product_info = body.get("product_info", {})
-    threshold = body.get("threshold", 30) / 100.0
+    # 用低阈值搜索（0.1），让前端滑动实时筛选
+    threshold = 0.1
 
     # 1. 调用 query-generate 生成关键词
     qg = await call_workflow("query-generate", {
