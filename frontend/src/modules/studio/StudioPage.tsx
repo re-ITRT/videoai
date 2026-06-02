@@ -318,7 +318,7 @@ export default function StudioPage() {
         <div>
           <StepBox title="素材选择" extra={
             <Space><span style={{ fontSize: 12 }}>相似度</span>
-              <Slider style={{ width: 80 }} min={0} max={100} value={localThreshold}
+              <Slider style={{ width: 140 }} min={0} max={100} value={localThreshold}
                 onChange={v => setLocalThreshold(v)}
                 onAfterChange={v => saveState({ threshold: v })} />
               <span style={{ fontSize: 12 }}>{localThreshold}%</span></Space>
