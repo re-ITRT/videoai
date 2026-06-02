@@ -56,20 +56,38 @@ async def upload_and_analyze(
 
     video_url = saved_url or source_url or ""
 
-    # 1. 先嵌入：提取 scenes、tags、embedding
-    embed_result = await call_workflow("material-embed", {
-        "image_url": video_url,
-        "brief_description": title or "上传视频",
-        "material_type": "product",
-    })
-    embed_data = embed_result.get("data") if isinstance(embed_result, dict) and "data" in embed_result else embed_result
-    scenes = embed_data.get("scenes", []) if isinstance(embed_data, dict) else []
-    tags = []
-    if isinstance(embed_data, dict):
-        tags = embed_data.get("video_tags", []) or embed_data.get("tags", [])
+    # 判断是否视频文件
+    is_video = False
+    if file and file.filename:
+        ext = os.path.splitext(file.filename)[1].lower()
+        is_video = ext in (".mp4", ".mov", ".avi", ".webm", ".mkv")
+    elif source_url:
+        is_video = any(source_url.lower().endswith(e) for e in (".mp4", ".mov", ".avi", ".webm"))
 
-    # 2. 用 scenes 调 video-analyze
+    embed_data = {}
+    scenes = []
+    tags = []
+
+    if not is_video:
+        # 图片：走 material-embed 提取 scenes、tags、embedding
+        try:
+            embed_result = await call_workflow("material-embed", {
+                "image_url": video_url,
+                "brief_description": title or "上传视频",
+                "material_type": "product",
+            })
+            embed_data = embed_result.get("data") if isinstance(embed_result, dict) and "data" in embed_result else embed_result
+            scenes = embed_data.get("scenes", []) if isinstance(embed_data, dict) else []
+            if isinstance(embed_data, dict):
+                tags = embed_data.get("video_tags", []) or embed_data.get("tags", [])
+        except Exception:
+            pass
+
+    # 2. 调 video-analyze（视频直接用 URL 构造 scenes）
     analyze_result = {}
+    if not scenes and video_url:
+        scenes = [{"scene_id": 1, "time_range": "<00:00-00:05>", "description": title or "上传的视频素材", "script": ""}]
+
     if scenes:
         try:
             analyze_result = await call_workflow("video-analyze", {
