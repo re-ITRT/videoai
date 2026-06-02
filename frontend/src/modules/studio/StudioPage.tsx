@@ -319,9 +319,8 @@ export default function StudioPage() {
           <StepBox title="素材选择">
             <div style={{ marginBottom: 8 }}>
               <span style={{ fontSize: 12 }}>相似度: {localThreshold}%</span>
-              <Slider min={0} max={100} value={localThreshold} style={{ width: 140, margin: 0 }}
-                onChange={v => setLocalThreshold(v)}
-                onAfterChange={v => saveState({ threshold: v })} />
+              <Slider min={0} max={100} step={1} value={localThreshold} style={{ width: 140, margin: 0 }}
+                onChange={v => { setLocalThreshold(v); saveState({ threshold: v }) }} />
             </div>
             <List size="small" dataSource={materials} renderItem={(m: any) => (
               <List.Item style={{ cursor: 'pointer', background: state.selected_material_ids.includes(m.id) ? '#e6f4ff' : undefined }}
