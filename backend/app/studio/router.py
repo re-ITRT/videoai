@@ -446,24 +446,36 @@ async def search_studio_materials(body: dict, db: AsyncSession = Depends(get_db)
 AI_EDIT_TOOLS = [
     {"type": "function", "function": {
         "name": "read_script",
-        "description": "读取当前剧本内容（JSON格式），不需要传参数，系统自动使用当前剧本",
+        "description": "读取当前剧本内容",
         "parameters": {"type": "object", "properties": {}, "required": []},
     }},
     {"type": "function", "function": {
-        "name": "edit_script",
-        "description": "编辑剧本，支持修改 title/style/duration/scenes。scenes 传完整列表（保留+修改+新增）。不需要传 script_name，系统自动用当前剧本",
+        "name": "change_text",
+        "description": "修改剧本中的台词文本。传入旧文本和新文本，系统自动在剧本中查找替换。",
         "parameters": {"type": "object", "properties": {
-            "updates": {"type": "object", "properties": {
-                "title": {"type": "string"},
-                "style": {"type": "string"},
-                "duration": {"type": "integer"},
-                "scenes": {"type": "array", "items": {"type": "object"}},
-            }},
-        }, "required": ["updates"]},
+            "old_text": {"type": "string", "description": "当前台词文本（完整匹配）"},
+            "new_text": {"type": "string", "description": "替换后的新文本"},
+        }, "required": ["old_text", "new_text"]},
+    }},
+    {"type": "function", "function": {
+        "name": "change_duration",
+        "description": "修改指定场景的时长",
+        "parameters": {"type": "object", "properties": {
+            "scene_id": {"type": "integer", "description": "场景ID"},
+            "new_duration": {"type": "integer", "description": "新时长，限4/8/12秒"},
+        }, "required": ["scene_id", "new_duration"]},
+    }},
+    {"type": "function", "function": {
+        "name": "change_visual_desc",
+        "description": "修改指定场景的视觉描述",
+        "parameters": {"type": "object", "properties": {
+            "scene_id": {"type": "integer", "description": "场景ID"},
+            "new_desc": {"type": "string", "description": "新的视觉描述文本"},
+        }, "required": ["scene_id", "new_desc"]},
     }},
 ]
 
-AI_EDIT_SYSTEM = "你是短视频剧本编辑助手。你负责根据用户需求修改剧本。\n\n规则：\n1. 每次修改前先用 read_script 读取当前剧本\n2. 场景时长限 4/8/12 秒\n3. **修改台词/描述时，必须在调用 edit_script 之前就完成文本修改，不要在改动之后再调用**\n4. edit_script 的 scenes 里传完整的场景数据（修改+未修改的都要包含）\n5. 编辑完成后告知用户修改了哪些内容\n6. 说话简洁直接"
+AI_EDIT_SYSTEM = "你是短视频剧本编辑助手。根据用户需求修改剧本。\n\n规则：\n1. 先用 read_script 读取剧本\n2. 使用 change_text / change_duration / change_visual_desc 工具进行修改\n3. 每次修改后告知用户改了哪里"
 
 
 @router.post("/ai-edit")
@@ -523,11 +535,59 @@ async def studio_ai_edit(body: dict, db: AsyncSession = Depends(get_db), user: U
                 args.setdefault("script_name", script_name)
                 if name == "read_script":
                     args["session_id"] = session_id
-                elif name == "edit_script":
-                    args["session_id"] = session_id
-                from app.agent.router import execute_tool
-                result_str = await execute_tool(name, args, db, session_id, user)
-                result = json.loads(result_str)
+                elif name in ("change_text", "change_duration", "change_visual_desc"):
+                    # 直接修改文件，不走 execute_tool
+                    from app.agent.models import ensure_session_dir
+                    sp = os.path.join(ensure_session_dir(session_id)["scripts"], f"{script_name}.json")
+                    if not os.path.exists(sp):
+                        result = {"error": "剧本文件不存在"}
+                    else:
+                        with open(sp, "r", encoding="utf-8") as f:
+                            sd = json.loads(f.read())
+                        sb = sd.get("script", sd)
+                        if name == "change_text":
+                            old = args.get("old_text", "")
+                            new_t = args.get("new_text", "")
+                            changed = False
+                            for sc in sb.get("scenes", []):
+                                for ln in sc.get("lines", []):
+                                    if old and ln.get("text") == old:
+                                        ln["text"] = new_t
+                                        changed = True
+                            if changed:
+                                with open(sp, "w", encoding="utf-8") as f:
+                                    json.dump(sd, f, ensure_ascii=False, indent=2)
+                                result = {"ok": True, "msg": f"已将「{old}」改为「{new_t}」"}
+                            else:
+                                result = {"error": f"未找到文本「{old}」"}
+                        elif name == "change_duration":
+                            sid = args.get("scene_id")
+                            nd = args.get("new_duration")
+                            for sc in sb.get("scenes", []):
+                                if sc.get("scene_id") == sid:
+                                    sc["duration"] = nd
+                                    with open(sp, "w", encoding="utf-8") as f:
+                                        json.dump(sd, f, ensure_ascii=False, indent=2)
+                                    result = {"ok": True, "msg": f"场景{sid}时长改为{nd}秒"}
+                                    break
+                            else:
+                                result = {"error": f"未找到场景{sid}"}
+                        elif name == "change_visual_desc":
+                            sid = args.get("scene_id")
+                            nd = args.get("new_desc", "")
+                            for sc in sb.get("scenes", []):
+                                if sc.get("scene_id") == sid:
+                                    sc["visual_desc"] = nd
+                                    with open(sp, "w", encoding="utf-8") as f:
+                                        json.dump(sd, f, ensure_ascii=False, indent=2)
+                                    result = {"ok": True, "msg": f"场景{sid}视觉描述已更新"}
+                                    break
+                            else:
+                                result = {"error": f"未找到场景{sid}"}
+                else:
+                    from app.agent.router import execute_tool
+                    result_str = await execute_tool(name, args, db, session_id, user)
+                    result = json.loads(result_str)
             except Exception as e:
                 result = {"error": str(e)}
             msgs.append({"role": "tool", "tool_call_id": tc["id"], "content": json.dumps(result, ensure_ascii=False)})
@@ -540,13 +600,17 @@ async def studio_ai_edit(body: dict, db: AsyncSession = Depends(get_db), user: U
             last_assistant = m["content"]
             break
 
-    # 检查是否有 edit_script 被调用
+    # 检查是否有编辑工具被调用
     for m in msgs:
         if m["role"] == "tool":
             try:
                 content = json.loads(m["content"])
-                if content.get("ok") and content.get("script"):
-                    updated_script = content["script"]
+                if content.get("ok"):
+                    # 重新读取最新剧本
+                    spath = os.path.join(ensure_session_dir(session_id)["scripts"], f"{script_name}.json")
+                    if os.path.exists(spath):
+                        with open(spath, "r", encoding="utf-8") as f:
+                            updated_script = json.loads(f.read())
             except Exception:
                 pass
 
