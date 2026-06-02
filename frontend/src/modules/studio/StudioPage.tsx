@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Select, Button, Card, Input, Modal, Space, message, List, Collapse, Popconfirm } from 'antd'
+import { Select, Button, Card, Input, Modal, Space, message, List, Collapse, Popconfirm, Slider } from 'antd'
 import { PlusOutlined, RightOutlined, PlayCircleOutlined, EditOutlined, DeleteOutlined, VideoCameraOutlined, RobotOutlined } from '@ant-design/icons'
 import request from '../../utils/request'
 import ScriptEditor from '../agent/ScriptEditor'
@@ -27,7 +27,7 @@ export default function StudioPage() {
 
   const [materials, setMaterials] = useState<any[]>([])
   const [allMaterials, setAllMaterials] = useState<any[]>([])  // 完整搜索结果（含相似度）
-  const [localThreshold, setLocalThreshold] = useState(30)
+  const [localThreshold, setLocalThreshold] = useState(0.5)
   const [productModal, setProductModal] = useState(false)
   const [productTitle, setProductTitle] = useState('')
   const [productContent, setProductContent] = useState('')
@@ -57,7 +57,7 @@ export default function StudioPage() {
         final_videos: clipsRes?.final_videos || [],
       }
       setState(merged)
-      setLocalThreshold(merged.threshold || 30)
+      setLocalThreshold(merged.threshold != null ? merged.threshold / 100 : 0.5)
       if (merged.cached_materials?.length) {
         setAllMaterials(merged.cached_materials)
         setMaterials(merged.cached_materials)
@@ -70,8 +70,7 @@ export default function StudioPage() {
   // 根据阈值实时筛选素材
   useEffect(() => {
     if (allMaterials.length > 0) {
-      const t = localThreshold / 100
-      setMaterials(allMaterials.filter((m: any) => (m.similarity || 0) >= t))
+      setMaterials(allMaterials.filter((m: any) => (m.similarity || 0) >= localThreshold))
     }
   }, [allMaterials, localThreshold])
 
@@ -317,11 +316,9 @@ export default function StudioPage() {
         {/* 2. 素材选择 */}
         <div>
           <StepBox title="素材选择">
-              <div style={{ marginBottom: 8 }}>
-                <span style={{ fontSize: 12 }}>相似度: {localThreshold}%</span>
-                <input type="range" min={0} max={100} value={localThreshold} style={{ width: 140, margin: 0, verticalAlign: 'middle' }}
-                  onChange={e => { const v = Number(e.target.value); setLocalThreshold(v) }}
-                  onMouseUp={e => { const v = Number((e.target as HTMLInputElement).value); saveState({ threshold: v }) }} />
+            <div style={{ marginBottom: 16 }}>
+              <span>相似度阈值: {localThreshold}</span>
+              <Slider min={0.3} max={0.95} step={0.05} value={localThreshold} onChange={setLocalThreshold} style={{ width: 300 }} />
             </div>
             <List size="small" dataSource={materials} renderItem={(m: any) => (
               <List.Item style={{ cursor: 'pointer', background: state.selected_material_ids.includes(m.id) ? '#e6f4ff' : undefined }}
