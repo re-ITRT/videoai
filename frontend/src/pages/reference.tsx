@@ -119,7 +119,7 @@ const ReferencePage: React.FC = () => {
       formData.append('category', analyzeCategory);
       formData.append('source_platform', analyzePlatform);
 
-      const data: any = await request.post('/api/v1/reference/upload-analyze', formData);
+      const data: any = await request.post('/reference/upload-analyze', formData);
       if (data.success) {
         Modal.success({ title: '分析完成！' });
         setAnalyzeModalVisible(false);
