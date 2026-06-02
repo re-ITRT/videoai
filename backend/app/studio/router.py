@@ -522,7 +522,9 @@ async def studio_ai_edit(body: dict, db: AsyncSession = Depends(get_db), user: U
         data = await call_llm(msgs, AI_EDIT_TOOLS)
         choice = data["choices"][0]
         msg = choice["message"]
-        msgs.append({"role": "assistant", "content": msg.get("content", ""), "tool_calls": msg.get("tool_calls", [])})
+        msgs.append({"role": "assistant", "content": msg.get("content", "")})
+        if msg.get("tool_calls"):
+            msgs[-1]["tool_calls"] = msg["tool_calls"]
 
         if not msg.get("tool_calls"):
             break
