@@ -52,7 +52,8 @@ async def run_video_generate(api_key: str, params: dict) -> dict:
                         prompt += f"{s}-{e}秒: 旁白配音（不出现在画面中）「{text}」(语气: {tone})\n"
                     else:
                         prompt += f"{s}-{e}秒: 画面中的{speaker}说出「{text}」(语气: {tone})\n"
-                prompt += "\n【区分说明】旁白是画外音不出镜，其他角色须在画面中出现并说出台词。以上顺序不能颠倒。"
+                prompt += "\n【区分说明】旁白是画外音不出镜，其他角色须在画面中出现并说出台词。以上顺序不能颠倒。\n"
+                prompt += "【重要】不要在视频中添加任何文字、字幕、标签、标题或文字动画。只生成纯画面内容。"
             content_items.append({"type": "text", "text": prompt})
 
             body = {"model": MODEL_EP, "content": content_items, "return_last_frame": False}
