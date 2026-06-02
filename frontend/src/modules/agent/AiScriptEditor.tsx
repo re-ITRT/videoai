@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Modal, Input, Button, Space, Spin, message } from 'antd'
+import { Modal, Input, Button, Space, Spin, message, Select } from 'antd'
 import { SendOutlined } from '@ant-design/icons'
 import request from '../../utils/request'
 
@@ -12,16 +12,20 @@ interface Props {
   template?: string
 }
 
-export default function AiScriptEditor({ sessionId, scriptName, visible, onClose, onScriptUpdated, template }: Props) {
+export default function AiScriptEditor({ sessionId, scriptName, visible, onClose, onScriptUpdated, template: initialTemplate }: Props) {
   const [messages, setMessages] = useState<any[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [templates, setTemplates] = useState<string[]>([])
+  const [selectedTemplate, setSelectedTemplate] = useState(initialTemplate || 'default')
   const listRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (visible) {
       setMessages([])
       setInput('')
+      setSelectedTemplate(initialTemplate || 'default')
+      request.get('/workflows/prompts').then((r: any) => setTemplates(Object.keys(r?.templates || {}))).catch(() => {})
     }
   }, [visible])
 
@@ -43,7 +47,7 @@ export default function AiScriptEditor({ sessionId, scriptName, visible, onClose
         session_id: sessionId,
         script_name: scriptName,
         messages: newMsgs,
-        template: template || 'default',
+        template: selectedTemplate,
       })
       if (res.error) {
         message.error(res.error)
@@ -63,6 +67,11 @@ export default function AiScriptEditor({ sessionId, scriptName, visible, onClose
   return (
     <Modal title="AI 编辑剧本" open={visible} onCancel={onClose}
       width={600} footer={null} destroyOnClose>
+      <div style={{ marginBottom: 8 }}>
+        <Select size="small" style={{ width: 180 }} value={selectedTemplate}
+          onChange={setSelectedTemplate}
+          options={templates.map(t => ({ value: t, label: t }))} />
+      </div>
       <div ref={listRef} style={{ maxHeight: 400, overflow: 'auto', marginBottom: 12 }}>
         {messages.filter(m => m.role !== 'system').map((m, i) => (
           <div key={i} style={{
