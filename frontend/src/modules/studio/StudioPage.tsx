@@ -298,7 +298,7 @@ export default function StudioPage() {
 
       {/* 5步流程 */}
       <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
-      <div style={{ display: 'flex', overflow: 'auto', gap: 0, paddingBottom: 16 }}>
+      <div style={{ display: 'flex', gap: 0, paddingBottom: 16 }}>
         {/* 1. 产品介绍 */}
         <div>
           <StepBox title="产品介绍" extra={<Button size="small" icon={<PlusOutlined />} onClick={() => setProductModal(true)} />}>
@@ -316,7 +316,7 @@ export default function StudioPage() {
         {/* 2. 素材选择 */}
         <div>
           <StepBox title="素材选择">
-            <div style={{ marginBottom: 16 }} onPointerDown={e => e.preventDefault()}>
+            <div style={{ marginBottom: 16 }}>
               <span>相似度阈值: {localThreshold}</span>
               <Slider min={0.3} max={0.95} step={0.05} value={localThreshold} onChange={setLocalThreshold} style={{ width: 240 }} />
             </div>
