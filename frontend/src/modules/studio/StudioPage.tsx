@@ -463,6 +463,7 @@ export default function StudioPage() {
         visible={aiScriptEditorOpen}
         onClose={() => setAiScriptEditorOpen(false)}
         onScriptUpdated={(script) => saveState({ last_script: { script } })}
+        template={state.selected_template}
       />
     </div>
   )

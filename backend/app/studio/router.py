@@ -488,6 +488,21 @@ async def studio_ai_edit(body: dict, db: AsyncSession = Depends(get_db), user: U
     session_id = body.get("session_id", 0)
     script_name = body.get("script_name", f"script_{session_id}")
     messages = body.get("messages", [])
+    template = body.get("template", "default")
+
+    # 获取模板规则（附加到 system prompt）
+    from app.workflow.runners.script_generate import _read_prompt
+    extra_rules = ""
+    for fname in ["rules.md", "output_format.md"]:
+        p = os.path.join(os.path.dirname(__file__), "..", "workflow", "prompts", fname)
+        if os.path.exists(p):
+            with open(p, "r", encoding="utf-8") as f:
+                extra_rules += f"\n\n--- {fname} ---\n" + f.read()
+    template_system = _read_prompt(template, "system.md") if template else ""
+    full_system = AI_EDIT_SYSTEM
+    if template_system:
+        full_system += f"\n\n当前模板《{template}》的角色定义：\n{template_system}"
+    full_system += f"\n\n当前剧本需遵守的规则：{extra_rules}"
 
     # 获取用户 AI 配置
     cfg = await db.execute(_s(UserAIConfig).where(UserAIConfig.user_id == user.id))
@@ -500,7 +515,7 @@ async def studio_ai_edit(body: dict, db: AsyncSession = Depends(get_db), user: U
     model = cfg.model or "deepseek-v4-flash"
 
     # 构建消息列表
-    msgs = [{"role": "system", "content": AI_EDIT_SYSTEM}] + messages
+    msgs = [{"role": "system", "content": full_system}] + messages
 
     async def call_llm(_msgs, _tools=None):
         payload = {"model": model, "messages": _msgs, "temperature": 0.3}

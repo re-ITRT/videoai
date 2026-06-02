@@ -9,9 +9,10 @@ interface Props {
   visible: boolean
   onClose: () => void
   onScriptUpdated?: (script: any) => void
+  template?: string
 }
 
-export default function AiScriptEditor({ sessionId, scriptName, visible, onClose, onScriptUpdated }: Props) {
+export default function AiScriptEditor({ sessionId, scriptName, visible, onClose, onScriptUpdated, template }: Props) {
   const [messages, setMessages] = useState<any[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -42,6 +43,7 @@ export default function AiScriptEditor({ sessionId, scriptName, visible, onClose
         session_id: sessionId,
         script_name: scriptName,
         messages: newMsgs,
+        template: template || 'default',
       })
       if (res.error) {
         message.error(res.error)
