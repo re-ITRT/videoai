@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
-import { Modal, Input, Button, Space, Spin, message, List } from 'antd'
-import { SendOutlined, RobotOutlined, UserOutlined } from '@ant-design/icons'
+import { Modal, Input, Button, Space, Spin, message } from 'antd'
+import { SendOutlined } from '@ant-design/icons'
 import request from '../../utils/request'
 
 interface Props {
