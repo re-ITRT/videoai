@@ -685,6 +685,7 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
             return json.dumps(result, ensure_ascii=False, indent=2)
 
         elif tool_name == "edit_script":
+            from app.agent.models import ensure_session_dir
             script_name = args.get("script_name", f"script_{session_id}").replace(".json", "")
             sp = os.path.join(ensure_session_dir(session_id)["scripts"], f"{script_name}.json")
             updates = args.get("updates", {})
