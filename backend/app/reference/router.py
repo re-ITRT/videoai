@@ -1,11 +1,13 @@
 """
 优质视频库 - API路由
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 
 from app.core.database import get_db
+from app.core.deps import get_current_user
+from app.auth.models import User
 from .schemas import (
     VideoAnalyzeRequest,
     VideoAnalyzeResponse,
@@ -25,26 +27,65 @@ router = APIRouter(prefix="/api/v1/reference", tags=["reference"])
 DEFAULT_USER_ID = "dev_user"
 
 
-@router.post("/analyze", response_model=VideoAnalyzeResponse)
-async def analyze_video(
-    request: VideoAnalyzeRequest,
+@router.post("/upload-analyze")
+async def upload_and_analyze(
+    file: UploadFile = File(None),
+    source_url: str = Form(None),
+    title: str = Form(None),
+    category: str = Form(None),
+    source_platform: str = Form("custom"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """
-    分析视频并保存到优质视频库
-    
-    - 调用video-analyze工作流进行爆款拆解
-    - 保存Hook手法、卖点、分镜、风格等结构化数据
-    """
-    try:
-        video = await analyze_and_save_video(db, DEFAULT_USER_ID, request)
-        return VideoAnalyzeResponse(
-            success=True,
-            video_id=video.id,
-            message=f"视频分析完成，已保存到优质视频库",
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"视频分析失败: {str(e)}")
+    """上传视频并分析，保存结果到数据库"""
+    import os, uuid, shutil
+    from app.core.signer import generate_signed_url
+    from app.workers.workflow import call_workflow
+    from app.script.models import ReferenceVideo
+
+    saved_url = None
+    if file and file.filename:
+        ext = os.path.splitext(file.filename)[1] or ".mp4"
+        fname = f"{uuid.uuid4().hex}{ext}"
+        fpath = f"/app/uploads/analyze/{fname}"
+        os.makedirs(os.path.dirname(fpath), exist_ok=True)
+        with open(fpath, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+        saved_url = generate_signed_url(fpath.replace("/app/uploads", "/uploads"), expire_seconds=86400)
+        saved_url = f"http://114.117.242.17:3000{saved_url}"
+
+    # 调 Coze 工作流分析
+    payload = {
+        "source_platform": source_platform,
+        "title": title or "",
+        "category": category or "",
+        "video_url": saved_url or source_url or "",
+    }
+    analysis_result = await call_workflow("video-analyze", payload)
+
+    hook_method = analysis_result.get("hook_method", "")
+    selling_points = analysis_result.get("selling_points", [])
+    storyboard = analysis_result.get("storyboard", [])
+    style = analysis_result.get("style", "")
+    analysis_report = analysis_result.get("analysis_report", {})
+
+    db_video = ReferenceVideo(
+        user_id=str(current_user.id),
+        source_platform=source_platform,
+        source_url=saved_url or source_url or "",
+        title=title or analysis_result.get("title", ""),
+        category=category or analysis_result.get("category", ""),
+        hook_method=hook_method,
+        selling_points=selling_points,
+        storyboard=storyboard,
+        style=style,
+        analysis_report=analysis_report,
+    )
+    db.add(db_video)
+    await db.commit()
+    await db.refresh(db_video)
+
+    return {"success": True, "video_id": db_video.id, "message": "分析完成"}
 
 
 @router.get("/videos", response_model=ReferenceVideoListResponse)

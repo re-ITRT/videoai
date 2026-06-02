@@ -27,7 +27,6 @@ import {
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
-const { TextArea } = Input;
 
 // 类型定义
 interface ReferenceVideo {
@@ -67,7 +66,8 @@ const ReferencePage: React.FC = () => {
 
   // 分析弹窗
   const [analyzeModalVisible, setAnalyzeModalVisible] = useState(false);
-  const [analyzeScenes, setAnalyzeScenes] = useState('');  // JSON格式的scenes数组
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [sourceUrl, setSourceUrl] = useState('');
   const [analyzeTitle, setAnalyzeTitle] = useState('');
   const [analyzeCategory, setAnalyzeCategory] = useState('');
   const [analyzePlatform, setAnalyzePlatform] = useState('custom');
@@ -102,42 +102,32 @@ const ReferencePage: React.FC = () => {
     loadVideos();
   }, [currentPage, pageSize, category, style, sourcePlatform]);
 
-  // 分析视频
+  // 上传并分析视频
   const handleAnalyze = async () => {
-    if (!analyzeScenes) {
-      Modal.error({ title: '请输入scenes数据' });
-      return;
-    }
-
-    let scenes;
-    try {
-      scenes = JSON.parse(analyzeScenes);
-      if (!Array.isArray(scenes)) {
-        throw new Error('必须是数组格式');
-      }
-    } catch (e) {
-      Modal.error({ title: 'scenes格式错误', content: '请输入有效的JSON数组格式' });
+    if (!uploadFile && !sourceUrl) {
+      Modal.error({ title: '请上传视频或填写视频链接' });
       return;
     }
 
     setLoading(true);
     try {
-      const response = await fetch('/api/v1/reference/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          scenes: scenes,
-          source_platform: analyzePlatform,
-          title: analyzeTitle,
-          category: analyzeCategory,
-        }),
-      });
+      const formData = new FormData();
+      if (uploadFile) formData.append('file', uploadFile);
+      if (sourceUrl) formData.append('source_url', sourceUrl);
+      formData.append('title', analyzeTitle);
+      formData.append('category', analyzeCategory);
+      formData.append('source_platform', analyzePlatform);
 
+      const response = await fetch('/api/v1/reference/upload-analyze', {
+        method: 'POST',
+        body: formData,
+      });
       const data = await response.json();
       if (data.success) {
-        Modal.success({ title: '分析成功！', content: '视频已添加到优质视频库' });
+        Modal.success({ title: '分析完成！' });
         setAnalyzeModalVisible(false);
-        setAnalyzeScenes('');
+        setUploadFile(null);
+        setSourceUrl('');
         setAnalyzeTitle('');
         setAnalyzeCategory('');
         loadVideos();
@@ -321,24 +311,24 @@ const ReferencePage: React.FC = () => {
         )}
       </Spin>
 
-      {/* 分析弹窗 */}
+      {/* 上传分析弹窗 */}
       <Modal
-        title="爆款视频拆解"
+        title="上传视频分析"
         open={analyzeModalVisible}
         onOk={handleAnalyze}
         onCancel={() => setAnalyzeModalVisible(false)}
-        width={700}
+        width={500}
         confirmLoading={loading}
       >
-        <Space direction="vertical" style={{ width: '100%' }} size="large">
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
           <div>
-            <Text strong>Scenes 数据 *</Text>
-            <TextArea
-              placeholder={`粘贴 material-embed 工作流输出的 scenes JSON 数组，例如：\n[\n  {"scene_id": 1, "time_range": "<00:00-00:03>", "description": "产品特写", "script": "姐妹们..."},\n  ...\n]`}
-              value={analyzeScenes}
-              onChange={(e) => setAnalyzeScenes(e.target.value)}
-              rows={8}
-            />
+            <input type="file" accept="video/*" onChange={e => setUploadFile(e.target.files?.[0] || null)} />
+            {uploadFile && <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>已选择: {uploadFile.name}</div>}
+          </div>
+          <div>
+            <Text strong>或输入视频链接</Text>
+            <Input placeholder="https://example.com/video.mp4" value={sourceUrl}
+              onChange={e => setSourceUrl(e.target.value)} />
           </div>
           <div>
             <Text strong>视频标题</Text>
@@ -378,8 +368,7 @@ const ReferencePage: React.FC = () => {
             </Select>
           </div>
           <Paragraph type="secondary">
-            ✅ <Text strong>无需重新处理视频</Text>，直接复用 material-embed 已生成的 scenes 数据做爆款拆解分析。
-            系统将分析 Hook 手法、核心卖点、分镜结构、风格节奏等，并保存到优质视频库。
+            上传后系统将调用 video-analyze 工作流分析视频，提取 Hook 手法、卖点、风格等结构化数据并保存。
           </Paragraph>
         </Space>
       </Modal>
