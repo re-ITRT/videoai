@@ -11,8 +11,6 @@ import MaterialUpload from './modules/material/upload'
 import ScriptList from './modules/script/index'
 import ScriptGenerate from './modules/script/generate'
 import ScriptDetail from './modules/script/detail'
-import CreationList from './modules/creation/index'
-import CreationDetail from './modules/creation/detail'
 import Profile from './pages/profile'
 import AdminUsers from './pages/admin/users'
 
