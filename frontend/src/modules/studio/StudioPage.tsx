@@ -275,7 +275,7 @@ export default function StudioPage() {
     setAsrLoadingId(id)
     setAsrResult(null)
     try {
-      const res: any = await request.post('/studio/asr', { video_url: url })
+      const res: any = await request.post('/studio/asr', { video_url: url }, { timeout: 600000 })
       if (res.error) { message.error(res.error); return }
       setAsrResult(res)
     } catch { message.error('ASR 请求失败') }
