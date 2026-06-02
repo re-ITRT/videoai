@@ -499,7 +499,7 @@ async def studio_asr(body: dict, db: AsyncSession = Depends(get_db), user: User 
         )
 
         # 语音识别
-        model = WhisperModel("/app/models/whisper", device="cpu", compute_type="int8")
+        model = WhisperModel("tiny", device="cpu", compute_type="int8")
         segments, info = model.transcribe(audio_path, language="zh", vad_filter=True)
 
         subs = []
