@@ -29,8 +29,6 @@ function App() {
           <Route path="script" element={<ScriptList />} />
           <Route path="script/generate" element={<ScriptGenerate />} />
           <Route path="script/:id" element={<ScriptDetail />} />
-          <Route path="creation" element={<CreationList />} />
-          <Route path="creation/:id" element={<CreationDetail />} />
           <Route path="profile" element={<Profile />} />
           <Route path="admin/users" element={<AdminUsers />} />
         </Route>
