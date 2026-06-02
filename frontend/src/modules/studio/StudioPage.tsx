@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Select, Button, Card, Input, Slider, Modal, Space, message, List, Collapse, Popconfirm } from 'antd'
+import { Select, Button, Card, Input, Modal, Space, message, List, Collapse, Popconfirm } from 'antd'
 import { PlusOutlined, RightOutlined, PlayCircleOutlined, EditOutlined, DeleteOutlined, VideoCameraOutlined, RobotOutlined } from '@ant-design/icons'
 import request from '../../utils/request'
 import ScriptEditor from '../agent/ScriptEditor'
