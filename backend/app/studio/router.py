@@ -446,14 +446,13 @@ async def search_studio_materials(body: dict, db: AsyncSession = Depends(get_db)
 AI_EDIT_TOOLS = [
     {"type": "function", "function": {
         "name": "read_script",
-        "description": "读取剧本内容（JSON格式）",
-        "parameters": {"type": "object", "properties": {"script_name": {"type": "string"}}, "required": ["script_name"]},
+        "description": "读取当前剧本内容（JSON格式），不需要传参数，系统自动使用当前剧本",
+        "parameters": {"type": "object", "properties": {}, "required": []},
     }},
     {"type": "function", "function": {
         "name": "edit_script",
-        "description": "编辑剧本，支持修改 title/style/duration/scenes。scenes 传完整列表（保留+修改+新增）",
+        "description": "编辑剧本，支持修改 title/style/duration/scenes。scenes 传完整列表（保留+修改+新增）。不需要传 script_name，系统自动用当前剧本",
         "parameters": {"type": "object", "properties": {
-            "script_name": {"type": "string"},
             "updates": {"type": "object", "properties": {
                 "title": {"type": "string"},
                 "style": {"type": "string"},
@@ -464,7 +463,7 @@ AI_EDIT_TOOLS = [
     }},
 ]
 
-AI_EDIT_SYSTEM = "你是短视频剧本编辑助手。你负责根据用户需求修改剧本。\n\n规则：\n1. 每次修改前先用 read_script 读取当前剧本\n2. 场景时长限 4/8/12 秒\n3. 编辑完成后告知用户修改了哪些内容\n4. 保持 JSON 格式完整\n5. 说话简洁直接"
+AI_EDIT_SYSTEM = "你是短视频剧本编辑助手。你负责根据用户需求修改剧本。\n\n规则：\n1. 每次修改前先用 read_script 读取当前剧本，剧本文件名由系统自动传入，无需用户指定\n2. 场景时长限 4/8/12 秒\n3. 编辑完成后告知用户修改了哪些内容\n4. 保持 JSON 格式完整\n5. 说话简洁直接"
 
 
 @router.post("/ai-edit")
