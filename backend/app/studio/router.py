@@ -352,10 +352,10 @@ async def studio_poll_generate(session_id: int, db: AsyncSession = Depends(get_d
 
 @router.post("/compose-video")
 async def studio_compose_video(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    """合成视频：调 Coze 工作流拼接 clip（不传台词，不做TTS）"""
+    """合成视频：FFmpeg 本地拼接选中 clip，不做TTS"""
     from app.agent.models import SessionFile, get_session_files as _gsf
-    from app.workers.workflow import call_workflow
-    import json
+    from app.core.signer import generate_signed_url
+    import subprocess, tempfile, os, httpx, uuid, shutil
 
     session_id = body.get("session_id", 0)
     clip_ids = body.get("clip_ids")
@@ -367,36 +367,62 @@ async def studio_compose_video(body: dict, db: AsyncSession = Depends(get_db), u
     if not clips:
         raise HTTPException(400, "没有可合成的视频片段")
 
-    # 按场景排序
-    def _sid(vf):
-        s = (vf.description or "").replace("场景 ", "").replace(" 视频片段", "")
-        return int(s) if s.isdigit() else 0
-    clips.sort(key=_sid)
+    # 下载 clips
+    tmpdir = tempfile.mkdtemp()
+    inputs = []
+    async with httpx.AsyncClient(timeout=120) as client:
+        for vf in clips:
+            url = vf.file_url or ""
+            if not url.startswith("http"):
+                url = "http://114.117.242.17:3000" + url
+            try:
+                resp = await client.get(url)
+                resp.raise_for_status()
+                path = os.path.join(tmpdir, f"clip_{vf.id}.mp4")
+                with open(path, "wb") as f:
+                    f.write(resp.content)
+                inputs.append(path)
+            except Exception:
+                continue
 
-    scenes = [{"scene_id": _sid(vf), "video_url": vf.file_url, "duration": 5, "lines": []} for vf in clips]
-    payload = {"scenes": scenes}
+    if len(inputs) < 1:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+        return {"composed": False, "error": "无法下载视频片段"}
 
-    result = await call_workflow("video-compose", payload)
+    # FFmpeg concat
+    list_path = os.path.join(tmpdir, "files.txt")
+    with open(list_path, "w") as f:
+        for p in inputs:
+            f.write(f"file '{p}'\n")
 
-    output_url = ""
-    if isinstance(result, dict):
-        inner = result.get("result", result)
-        if isinstance(inner, dict):
-            output_url = inner.get("output_video_url", "") or inner.get("video_url", "")
-        output_url = output_url or result.get("output_video_url", "") or result.get("video_url", "")
+    out_name = f"final_{session_id}_{uuid.uuid4().hex[:8]}.mp4"
+    out_path = os.path.join(tmpdir, out_name)
+    result = subprocess.run(
+        ["ffmpeg", "-f", "concat", "-safe", "0", "-i", list_path, "-c", "copy", "-y", out_path],
+        capture_output=True, text=True, timeout=120,
+    )
+    if result.returncode != 0:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+        return {"composed": False, "error": f"FFmpeg 拼接失败: {result.stderr[:200]}"}
 
-    if output_url:
-        sf = SessionFile(
-            session_id=session_id, file_type="final_video",
-            filename=f"final_{session_id}.mp4",
-            file_url=output_url,
-            description="Coze 合成视频",
-        )
-        db.add(sf)
-        await db.commit()
-        return {"composed": True, "videos": [{"id": sf.id, "url": output_url}]}
+    # 复制到 uploads
+    uploads_dir = "/app/uploads/composed"
+    os.makedirs(uploads_dir, exist_ok=True)
+    dest = os.path.join(uploads_dir, out_name)
+    shutil.copy2(out_path, dest)
+    shutil.rmtree(tmpdir, ignore_errors=True)
 
-    return {"composed": False, "error": "合成失败", "detail": str(result)}
+    signed = generate_signed_url(dest.replace("/app/uploads", "/uploads"), expire_seconds=86400)
+    url = f"http://114.117.242.17:3000{signed}"
+
+    sf = SessionFile(
+        session_id=session_id, file_type="final_video",
+        filename=out_name, file_url=url, description="FFmpeg 合成视频",
+    )
+    db.add(sf)
+    await db.commit()
+
+    return {"composed": True, "videos": [{"id": sf.id, "url": url}]}
 
 
 @router.get("/clips/{session_id}")
@@ -440,6 +466,56 @@ async def search_studio_materials(body: dict, db: AsyncSession = Depends(get_db)
     r = await db.execute(query.order_by(Material.id.desc()))
     items = [{"id": m.id, "image_url": m.image_url, "tags": m.tags, "similarity": 1.0} for m in r.scalars().all()]
     return {"materials": items, "total": len(items)}
+
+
+# ── ASR 语音识别 ────────────────────────
+
+@router.post("/asr")
+async def studio_asr(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """对视频做语音识别，返回带时间戳的字幕"""
+    import subprocess, tempfile, os, httpx, shutil, uuid
+    from faster_whisper import WhisperModel
+
+    video_url = body.get("video_url", "")
+    if not video_url:
+        raise HTTPException(400, "video_url required")
+
+    tmpdir = tempfile.mkdtemp()
+    try:
+        # 下载视频
+        vid_path = os.path.join(tmpdir, "input.mp4")
+        async with httpx.AsyncClient(timeout=300) as client:
+            url = video_url if video_url.startswith("http") else f"http://114.117.242.17:3000{video_url}"
+            resp = await client.get(url)
+            resp.raise_for_status()
+            with open(vid_path, "wb") as f:
+                f.write(resp.content)
+
+        # 提取音频
+        audio_path = os.path.join(tmpdir, "audio.wav")
+        subprocess.run(
+            ["ffmpeg", "-i", vid_path, "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", "-y", audio_path],
+            capture_output=True, text=True, timeout=120,
+        )
+
+        # 语音识别
+        model = WhisperModel("tiny", device="cpu", compute_type="int8")
+        segments, info = model.transcribe(audio_path, language="zh", vad_filter=True)
+
+        subs = []
+        for seg in segments:
+            subs.append({
+                "start": round(seg.start, 1),
+                "end": round(seg.end, 1),
+                "text": seg.text.strip(),
+            })
+
+        return {"segments": subs, "duration": round(info.duration, 1) if info.duration else 0}
+
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 # ── AI 剧本编辑 ──────────────────────────

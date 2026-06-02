@@ -35,6 +35,8 @@ export default function StudioPage() {
   const [generating, setGenerating] = useState<string | null>(null)
   const [scriptEditorOpen, setScriptEditorOpen] = useState(false)
   const [aiScriptEditorOpen, setAiScriptEditorOpen] = useState(false)
+  const [asrResult, setAsrResult] = useState<any>(null)
+  const [asrLoadingId, setAsrLoadingId] = useState<number | null>(null)
 
   // 加载 Session 列表
   useEffect(() => {
@@ -269,6 +271,17 @@ export default function StudioPage() {
     saveState({ final_videos: [] })
   }
 
+  const runAsr = async (id: number, url: string) => {
+    setAsrLoadingId(id)
+    setAsrResult(null)
+    try {
+      const res: any = await request.post('/studio/asr', { video_url: url })
+      if (res.error) { message.error(res.error); return }
+      setAsrResult(res)
+    } catch { message.error('ASR 请求失败') }
+    setAsrLoadingId(null)
+  }
+
   const StepBox = ({ title, extra, children }: any) => (
     <Card title={title} size="small" extra={extra} style={{ width: 280, flexShrink: 0, minHeight: 380 }}>{children}</Card>
   )
@@ -459,6 +472,38 @@ export default function StudioPage() {
             )}
           </StepBox>
           <GenBtn label="合成视频" onClick={composeVid} />
+        </div>
+        <Arrow />
+
+        {/* 6. ASR 校准 */}
+        <div>
+          <StepBox title="ASR 校准">
+            <div style={{ fontSize: 12, color: '#999' }}>选择一个最终视频，识别音频生成字幕</div>
+            {state.final_videos?.length > 0 && (
+              <List size="small" dataSource={state.final_videos} renderItem={(v: any) => (
+                <List.Item actions={[
+                  <Button key="asr" size="small" type="link" style={{ fontSize: 11 }}
+                    loading={v.id === asrLoadingId}
+                    onClick={() => runAsr(v.id, v.url)}>ASR</Button>
+                ]}>
+                  <a href={v.url} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>
+                    <PlayCircleOutlined style={{ marginRight: 4 }} />视频 {v.id}
+                  </a>
+                </List.Item>
+              )} />
+            )}
+            {asrResult && (
+              <div style={{ marginTop: 8, maxHeight: 200, overflow: 'auto', fontSize: 12 }}>
+                <div style={{ fontWeight: 500, marginBottom: 4 }}>🎤 识别结果</div>
+                {asrResult.segments?.map((s: any, i: number) => (
+                  <div key={i} style={{ padding: '2px 0', borderBottom: '1px solid #f0f0f0' }}>
+                    <span style={{ color: '#999' }}>{s.start}-{s.end}s </span>
+                    {s.text}
+                  </div>
+                ))}
+              </div>
+            )}
+          </StepBox>
         </div>
       </div>
       </div>
