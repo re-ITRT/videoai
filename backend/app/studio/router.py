@@ -512,6 +512,8 @@ async def studio_ai_edit(body: dict, db: AsyncSession = Depends(get_db), user: U
                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
                 json=payload,
             )
+            if r.status_code != 200:
+                print(f"[ai-edit] LLM {r.status_code}: {r.text[:500]}")
             r.raise_for_status()
             return r.json()
 
