@@ -37,7 +37,7 @@ async def upload_and_analyze(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """上传视频并分析，保存结果到数据库"""
+    """上传视频 → material-embed提取scenes → video-analyze语义分析 → 存库"""
     import os, uuid, shutil
     from app.core.signer import generate_signed_url
     from app.workers.workflow import call_workflow
@@ -54,38 +54,53 @@ async def upload_and_analyze(
         saved_url = generate_signed_url(fpath.replace("/app/uploads", "/uploads"), expire_seconds=86400)
         saved_url = f"http://114.117.242.17:3000{saved_url}"
 
-    # 调 Coze 工作流分析
-    payload = {
-        "source_platform": source_platform,
-        "title": title or "",
-        "category": category or "",
-        "video_url": saved_url or source_url or "",
-    }
-    analysis_result = await call_workflow("video-analyze", payload)
+    video_url = saved_url or source_url or ""
 
-    hook_method = analysis_result.get("hook_method", "")
-    selling_points = analysis_result.get("selling_points", [])
-    storyboard = analysis_result.get("storyboard", [])
-    style = analysis_result.get("style", "")
-    analysis_report = analysis_result.get("analysis_report", {})
+    # 1. 先嵌入：提取 scenes、tags、embedding
+    embed_result = await call_workflow("material-embed", {
+        "image_url": video_url,
+        "brief_description": title or "上传视频",
+        "material_type": "product",
+    })
+    embed_data = embed_result.get("data") if isinstance(embed_result, dict) and "data" in embed_result else embed_result
+    scenes = embed_data.get("scenes", []) if isinstance(embed_data, dict) else []
+    tags = []
+    if isinstance(embed_data, dict):
+        tags = embed_data.get("video_tags", []) or embed_data.get("tags", [])
+
+    # 2. 再分析：用 scenes 调 video-analyze
+    analyze_result = {}
+    if scenes:
+        analyze_result = await call_workflow("video-analyze", {
+            "scenes": scenes,
+            "source_platform": source_platform,
+            "title": title or "",
+            "category": category or "",
+        })
+
+    hook_method = analyze_result.get("hook_method", "")
+    selling_points = analyze_result.get("selling_points", [])
+    storyboard = analyze_result.get("storyboard", [])
+    style = analyze_result.get("style", "")
+    analysis_report = analyze_result.get("analysis_report", {})
 
     db_video = ReferenceVideo(
         user_id=str(current_user.id),
         source_platform=source_platform,
-        source_url=saved_url or source_url or "",
-        title=title or analysis_result.get("title", ""),
-        category=category or analysis_result.get("category", ""),
+        source_url=video_url,
+        title=title or (embed_data.get("text_content", "")[:30] if isinstance(embed_data, dict) else ""),
+        category=category,
         hook_method=hook_method,
         selling_points=selling_points,
         storyboard=storyboard,
         style=style,
-        analysis_report=analysis_report,
+        analysis_report={"embed": {"tags": tags, "text_content": embed_data.get("text_content", "") if isinstance(embed_data, dict) else ""}, "analyze": analysis_report},
     )
     db.add(db_video)
     await db.commit()
     await db.refresh(db_video)
 
-    return {"success": True, "video_id": db_video.id, "message": "分析完成"}
+    return {"success": True, "video_id": db_video.id, "message": f"嵌入完成({len(scenes)} scenes) + 分析完成"}
 
 
 @router.get("/videos", response_model=ReferenceVideoListResponse)
