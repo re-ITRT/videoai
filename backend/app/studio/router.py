@@ -506,7 +506,6 @@ async def studio_ai_edit(body: dict, db: AsyncSession = Depends(get_db), user: U
         payload = {"model": model, "messages": _msgs, "temperature": 0.3}
         if _tools:
             payload["tools"] = _tools
-            payload["tool_choice"] = "auto"
         async with httpx.AsyncClient(timeout=60) as client:
             r = await client.post(
                 f"{base_url.rstrip('/')}/chat/completions",
