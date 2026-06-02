@@ -10,7 +10,6 @@ import {
   UserOutlined,
   TeamOutlined,
   LogoutOutlined,
-  AppstoreOutlined
 } from '@ant-design/icons'
 import { useAuth } from '../hooks/useAuth'
 
@@ -23,7 +22,6 @@ const menuItems = [
   { key: '/creation', icon: <ThunderboltOutlined />, label: '视频创作' },
   { key: '/reference', icon: <PlayCircleOutlined />, label: '参考视频' },
   { key: '/templates', icon: <BookOutlined />, label: '灵感模板' },
-  { key: '/studio', icon: <AppstoreOutlined />, label: '工作流工作室' },
   { key: '/profile', icon: <UserOutlined />, label: '个人中心' },
 ]
 

@@ -16,8 +16,6 @@ import CreationDetail from './modules/creation/detail'
 import Profile from './pages/profile'
 import AdminUsers from './pages/admin/users'
 
-import StudioPage from './modules/studio/StudioPage'
-
 function App() {
   return (
     <BrowserRouter>
@@ -37,7 +35,6 @@ function App() {
           <Route path="creation/:id" element={<CreationDetail />} />
           <Route path="profile" element={<Profile />} />
           <Route path="admin/users" element={<AdminUsers />} />
-          <Route path="studio" element={<StudioPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
