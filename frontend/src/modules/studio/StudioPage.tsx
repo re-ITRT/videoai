@@ -26,6 +26,8 @@ export default function StudioPage() {
   stateRef.current = state
 
   const [materials, setMaterials] = useState<any[]>([])
+  const [allMaterials, setAllMaterials] = useState<any[]>([])  // 完整搜索结果（含相似度）
+  const [localThreshold, setLocalThreshold] = useState(30)
   const [productModal, setProductModal] = useState(false)
   const [productTitle, setProductTitle] = useState('')
   const [productContent, setProductContent] = useState('')
@@ -55,11 +57,23 @@ export default function StudioPage() {
         final_videos: clipsRes?.final_videos || [],
       }
       setState(merged)
-      if (merged.cached_materials?.length) setMaterials(merged.cached_materials)
+      setLocalThreshold(merged.threshold || 30)
+      if (merged.cached_materials?.length) {
+        setAllMaterials(merged.cached_materials)
+        setMaterials(merged.cached_materials)
+      }
       // 持久化到 state 文件
       request.put(`/studio/state/${sessionId}`, merged).catch(() => {})
     }).catch(() => {})
   }, [sessionId])
+
+  // 根据阈值实时筛选素材
+  useEffect(() => {
+    if (allMaterials.length > 0) {
+      const t = localThreshold / 100
+      setMaterials(allMaterials.filter((m: any) => (m.similarity || 0) >= t))
+    }
+  }, [allMaterials, localThreshold])
 
   // 刷新最终视频（不覆盖 clip_collections）
   const loadClips = async () => {
@@ -154,7 +168,7 @@ export default function StudioPage() {
     setGenerating('嵌入搜索')
     try {
       const res: any = await request.post('/studio/semantic-search', { product_info: { title: prod.title, content: prod.content }, threshold: state.threshold })
-      setMaterials(res?.materials || [])
+      setAllMaterials(res?.materials || [])
       saveState({ cached_materials: res?.materials || [] })
       if (res?.total > 0) message.success(`找到 ${res.total} 个相关素材`)
       else message.info('未找到匹配素材')
@@ -304,8 +318,10 @@ export default function StudioPage() {
         <div>
           <StepBox title="素材选择" extra={
             <Space><span style={{ fontSize: 12 }}>相似度</span>
-              <Slider style={{ width: 80 }} min={0} max={100} value={state.threshold} onChange={v => saveState({ threshold: v })} />
-              <span style={{ fontSize: 12 }}>{state.threshold}%</span></Space>
+              <Slider style={{ width: 80 }} min={0} max={100} value={localThreshold}
+                onChange={v => setLocalThreshold(v)}
+                onAfterChange={v => saveState({ threshold: v })} />
+              <span style={{ fontSize: 12 }}>{localThreshold}%</span></Space>
           }>
             <List size="small" dataSource={materials} renderItem={(m: any) => (
               <List.Item style={{ cursor: 'pointer', background: state.selected_material_ids.includes(m.id) ? '#e6f4ff' : undefined }}
