@@ -176,7 +176,7 @@ const ReferencePage: React.FC = () => {
       {/* 头部 */}
       <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Title level={3} style={{ margin: 0 }}>
-          上传视频
+          优质视频库
         </Title>
         <Button
           type="primary"
