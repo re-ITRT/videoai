@@ -264,13 +264,64 @@ TOOLS_DEFINITIONS = [
         "type": "function",
         "function": {
             "name": "read_script",
-            "description": "【读取剧本】读取指定剧本的完整内容",
+            "description": "【读取剧本】读取指定剧本的完整内容（JSON格式），供编辑参考",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "script_name": {"type": "string", "description": "剧本名称（不带.json）"},
                 },
                 "required": ["script_name"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "edit_script",
+            "description": "【编辑剧本】修改已有的剧本内容，支持修改 title/style/duration，以及按 scene_id 替换或新增场景。每次调用传完整的 scenes 数组（修改+未修改的都要包含）。每个场景中 lines/duration/visual_desc/materials 都可以改。新增场景时 scene_id 用当前最大+1。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "script_name": {"type": "string", "description": "剧本名称（不带.json），默认当前剧本"},
+                    "updates": {
+                        "type": "object",
+                        "description": "更新内容，包含要修改的部分",
+                        "properties": {
+                            "title": {"type": "string", "description": "新的标题（可选）"},
+                            "style": {"type": "string", "description": "新的风格（可选）"},
+                            "duration": {"type": "integer", "description": "新的总时长（可选）"},
+                            "scenes": {
+                                "type": "array",
+                                "description": "场景列表（可选），包含全部要保留的场景。已有 scene_id 的会覆盖，新的 scene_id 会新增。不传则场景不变。",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "scene_id": {"type": "integer"},
+                                        "duration": {"type": "integer", "description": "限4/8/12秒"},
+                                        "type": {"type": "string", "enum": ["scene", "product", "closing"]},
+                                        "visual_desc": {"type": "string"},
+                                        "materials": {"type": "array", "items": {"type": "integer"}},
+                                        "lines": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "speaker": {"type": "string"},
+                                                    "text": {"type": "string"},
+                                                    "tone": {"type": "string"},
+                                                    "start_sec": {"type": "number"},
+                                                    "end_sec": {"type": "number"},
+                                                },
+                                            },
+                                        },
+                                    },
+                                    "required": ["scene_id", "duration", "type", "visual_desc"],
+                                },
+                            },
+                        },
+                    },
+                },
+                "required": ["updates"],
             },
         },
     },
@@ -632,6 +683,29 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
                 db.add(sf)
                 await db.commit()
             return json.dumps(result, ensure_ascii=False, indent=2)
+
+        elif tool_name == "edit_script":
+            script_name = args.get("script_name", f"script_{session_id}").replace(".json", "")
+            sp = os.path.join(ensure_session_dir(session_id)["scripts"], f"{script_name}.json")
+            updates = args.get("updates", {})
+            if not os.path.exists(sp):
+                return json.dumps({"error": f"剧本不存在: {script_name}"}, ensure_ascii=False)
+            with open(sp, "r", encoding="utf-8") as f:
+                sd = json.loads(f.read())
+            if "scenes" in updates:
+                new_map = {s.get("scene_id", i+1): s for i, s in enumerate(updates["scenes"])}
+                for i, es in enumerate(sd.get("scenes", [])):
+                    sid = es.get("scene_id", i+1)
+                    if sid in new_map:
+                        sd["scenes"][i] = new_map.pop(sid)
+                for sid, ns in new_map.items():
+                    sd.setdefault("scenes", []).append(ns)
+            for k in ["title", "style", "duration"]:
+                if k in updates:
+                    sd[k] = updates[k]
+            with open(sp, "w", encoding="utf-8") as f:
+                json.dump(sd, f, ensure_ascii=False, indent=2)
+            return json.dumps({"ok": True, "script": sd}, ensure_ascii=False)
 
         else:
             return json.dumps({"error": f"未知工具: {tool_name}"})

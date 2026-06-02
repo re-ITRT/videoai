@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { Select, Button, Card, Input, Slider, Modal, Space, message, List, Collapse, Popconfirm } from 'antd'
-import { PlusOutlined, RightOutlined, PlayCircleOutlined, EditOutlined, DeleteOutlined, VideoCameraOutlined } from '@ant-design/icons'
+import { PlusOutlined, RightOutlined, PlayCircleOutlined, EditOutlined, DeleteOutlined, VideoCameraOutlined, RobotOutlined } from '@ant-design/icons'
 import request from '../../utils/request'
 import ScriptEditor from '../agent/ScriptEditor'
+import AiScriptEditor from '../agent/AiScriptEditor'
 
 const { TextArea } = Input
 
@@ -31,6 +32,7 @@ export default function StudioPage() {
   const [templates, setTemplates] = useState<string[]>([])
   const [generating, setGenerating] = useState<string | null>(null)
   const [scriptEditorOpen, setScriptEditorOpen] = useState(false)
+  const [aiScriptEditorOpen, setAiScriptEditorOpen] = useState(false)
 
   // 加载 Session 列表
   useEffect(() => {
@@ -354,6 +356,7 @@ export default function StudioPage() {
                 ✅ 剧本: <strong>{state.last_script.script.title}</strong>
                 <br /><span style={{ color: '#666' }}>{state.last_script.script.scenes?.length || 0} 个场景</span>
                 <Button size="small" type="link" icon={<EditOutlined />} onClick={() => setScriptEditorOpen(true)} style={{ padding: 0, marginLeft: 8 }}>编辑</Button>
+                <Button size="small" type="link" icon={<RobotOutlined />} onClick={() => setAiScriptEditorOpen(true)} style={{ padding: 0, marginLeft: 4 }}>AI编辑</Button>
                 <Button size="small" type="link" danger icon={<DeleteOutlined />} onClick={e => { e.stopPropagation(); deleteScript() }} style={{ padding: 0, marginLeft: 4 }} />
               </div>
             )}
@@ -456,6 +459,11 @@ export default function StudioPage() {
       </Modal>
 
       <ScriptEditor sessionId={sessionId || 0} visible={scriptEditorOpen} onClose={() => setScriptEditorOpen(false)} />
+      <AiScriptEditor sessionId={sessionId || 0} scriptName={`script_${sessionId}`}
+        visible={aiScriptEditorOpen}
+        onClose={() => setAiScriptEditorOpen(false)}
+        onScriptUpdated={(script) => saveState({ last_script: script })}
+      />
     </div>
   )
 }

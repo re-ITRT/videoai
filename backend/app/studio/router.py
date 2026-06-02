@@ -439,3 +439,115 @@ async def search_studio_materials(body: dict, db: AsyncSession = Depends(get_db)
     r = await db.execute(query.order_by(Material.id.desc()))
     items = [{"id": m.id, "image_url": m.image_url, "tags": m.tags, "similarity": 1.0} for m in r.scalars().all()]
     return {"materials": items, "total": len(items)}
+
+
+# ── AI 剧本编辑 ──────────────────────────
+
+AI_EDIT_TOOLS = [
+    {"type": "function", "function": {
+        "name": "read_script",
+        "description": "读取剧本内容（JSON格式）",
+        "parameters": {"type": "object", "properties": {"script_name": {"type": "string"}}, "required": ["script_name"]},
+    }},
+    {"type": "function", "function": {
+        "name": "edit_script",
+        "description": "编辑剧本，支持修改 title/style/duration/scenes。scenes 传完整列表（保留+修改+新增）",
+        "parameters": {"type": "object", "properties": {
+            "script_name": {"type": "string"},
+            "updates": {"type": "object", "properties": {
+                "title": {"type": "string"},
+                "style": {"type": "string"},
+                "duration": {"type": "integer"},
+                "scenes": {"type": "array", "items": {"type": "object"}},
+            }},
+        }, "required": ["updates"]},
+    }},
+]
+
+AI_EDIT_SYSTEM = "你是短视频剧本编辑助手。你负责根据用户需求修改剧本。\n\n规则：\n1. 每次修改前先用 read_script 读取当前剧本\n2. 场景时长限 4/8/12 秒\n3. 编辑完成后告知用户修改了哪些内容\n4. 保持 JSON 格式完整\n5. 说话简洁直接"
+
+
+@router.post("/ai-edit")
+async def studio_ai_edit(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """AI 剧本编辑对话"""
+    from app.ai.models import UserAIConfig
+    from sqlalchemy import select as _s
+    import json, httpx
+
+    session_id = body.get("session_id", 0)
+    script_name = body.get("script_name", f"script_{session_id}")
+    messages = body.get("messages", [])
+
+    # 获取用户 AI 配置
+    cfg = await db.execute(_s(UserAIConfig).where(UserAIConfig.user_id == user.id))
+    cfg = cfg.scalar_one_or_none()
+    if not cfg or not cfg.api_key:
+        return {"error": "请先在个人中心配置 AI API Key"}
+
+    api_key = cfg.api_key
+    base_url = cfg.base_url or "https://api.deepseek.com/v1"
+    model = cfg.model or "deepseek-v4-flash"
+
+    # 构建消息列表
+    msgs = [{"role": "system", "content": AI_EDIT_SYSTEM}] + messages
+
+    async def call_llm(_msgs, _tools=None):
+        payload = {"model": model, "messages": _msgs, "temperature": 0.3}
+        if _tools:
+            payload["tools"] = _tools
+            payload["tool_choice"] = "auto"
+        async with httpx.AsyncClient(timeout=60) as client:
+            r = await client.post(
+                f"{base_url.rstrip('/')}/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                json=payload,
+            )
+            r.raise_for_status()
+            return r.json()
+
+    # 工具循环（最多 5 轮）
+    for _ in range(5):
+        data = await call_llm(msgs, AI_EDIT_TOOLS)
+        choice = data["choices"][0]
+        msg = choice["message"]
+        msgs.append({"role": "assistant", "content": msg.get("content", ""), "tool_calls": msg.get("tool_calls", [])})
+
+        if not msg.get("tool_calls"):
+            break
+
+        for tc in msg["tool_calls"]:
+            fn = tc["function"]
+            name = fn["name"]
+            try:
+                args = json.loads(fn.get("arguments", "{}"))
+                args.setdefault("script_name", script_name)
+                if name == "read_script":
+                    args["session_id"] = session_id
+                elif name == "edit_script":
+                    args["session_id"] = session_id
+                from app.agent.router import execute_tool
+                result_str = await execute_tool(name, args, db, session_id, user)
+                result = json.loads(result_str)
+            except Exception as e:
+                result = {"error": str(e)}
+            msgs.append({"role": "tool", "tool_call_id": tc["id"], "content": json.dumps(result, ensure_ascii=False)})
+
+    # 获取最后 assistant 回复
+    last_assistant = ""
+    updated_script = None
+    for m in reversed(msgs):
+        if m["role"] == "assistant" and m.get("content"):
+            last_assistant = m["content"]
+            break
+
+    # 检查是否有 edit_script 被调用
+    for m in msgs:
+        if m["role"] == "tool":
+            try:
+                content = json.loads(m["content"])
+                if content.get("ok") and content.get("script"):
+                    updated_script = content["script"]
+            except Exception:
+                pass
+
+    return {"reply": last_assistant, "script": updated_script, "messages": msgs[1:]}  # 不包括 system
