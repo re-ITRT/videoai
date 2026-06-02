@@ -43,6 +43,7 @@ services:
       - uploads_data:/app/uploads
       - logs_data:/app/logs
       - /home/ubuntu/video-ai/backend/models:/app/models
+      - /home/ubuntu/video-ai/backend/models/hf_cache:/root/.cache
     restart: always
     depends_on:
       postgres:
