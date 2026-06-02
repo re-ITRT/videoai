@@ -2,6 +2,7 @@
  * 优质视频库 - 带筛选的视频卡片列表页面
  */
 import React, { useState, useEffect } from 'react';
+import request from '../utils/request';
 import {
   Card,
   Button,
@@ -118,11 +119,7 @@ const ReferencePage: React.FC = () => {
       formData.append('category', analyzeCategory);
       formData.append('source_platform', analyzePlatform);
 
-      const response = await fetch('/api/v1/reference/upload-analyze', {
-        method: 'POST',
-        body: formData,
-      });
-      const data = await response.json();
+      const data: any = await request.post('/api/v1/reference/upload-analyze', formData);
       if (data.success) {
         Modal.success({ title: '分析完成！' });
         setAnalyzeModalVisible(false);
