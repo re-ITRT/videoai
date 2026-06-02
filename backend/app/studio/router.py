@@ -461,15 +461,15 @@ AI_EDIT_TOOLS = [
         "name": "change_duration",
         "description": "修改指定场景的时长",
         "parameters": {"type": "object", "properties": {
-            "scene_id": {"type": "integer", "description": "场景ID"},
-            "new_duration": {"type": "integer", "description": "新时长，限4/8/12秒"},
+            "scene_id": {"type": "string", "description": "场景ID（数字）"},
+            "new_duration": {"type": "string", "description": "新时长秒数，限4/8/12"},
         }, "required": ["scene_id", "new_duration"]},
     }},
     {"type": "function", "function": {
         "name": "change_visual_desc",
         "description": "修改指定场景的视觉描述",
         "parameters": {"type": "object", "properties": {
-            "scene_id": {"type": "integer", "description": "场景ID"},
+            "scene_id": {"type": "string", "description": "场景ID（数字）"},
             "new_desc": {"type": "string", "description": "新的视觉描述文本"},
         }, "required": ["scene_id", "new_desc"]},
     }},
@@ -559,8 +559,8 @@ async def studio_ai_edit(body: dict, db: AsyncSession = Depends(get_db), user: U
                             else:
                                 result = {"error": f"未找到文本「{old}」"}
                         elif name == "change_duration":
-                            sid = args.get("scene_id")
-                            nd = args.get("new_duration")
+                            sid = int(args.get("scene_id", 0))
+                            nd = int(args.get("new_duration", 0))
                             for sc in sb.get("scenes", []):
                                 if sc.get("scene_id") == sid:
                                     sc["duration"] = nd
@@ -571,7 +571,7 @@ async def studio_ai_edit(body: dict, db: AsyncSession = Depends(get_db), user: U
                             else:
                                 result = {"error": f"未找到场景{sid}"}
                         elif name == "change_visual_desc":
-                            sid = args.get("scene_id")
+                            sid = int(args.get("scene_id", 0))
                             nd = args.get("new_desc", "")
                             for sc in sb.get("scenes", []):
                                 if sc.get("scene_id") == sid:
