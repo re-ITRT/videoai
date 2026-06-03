@@ -24,6 +24,7 @@ class ReferenceVideo(Base):
     text_embedding = Column(JSONB, default=[])  # 文本向量
     image_embedding = Column(JSONB, default=[])  # 图片向量
     scenes = Column(JSONB, default=[])  # scenes 列表（从 material-embed 提取）
+    cover_url = Column(Text, default="")  # 视频封面截帧
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 

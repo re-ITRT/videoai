@@ -53,6 +53,20 @@ async def upload_and_analyze(
 
     video_url = saved_url or source_url or ""
 
+    # 视频截取第一帧作为封面
+    cover_url = ""
+    if saved_url and is_video:
+        import subprocess
+        cover_name = f"cover_{uuid.uuid4().hex}.jpg"
+        cover_path = f"/app/uploads/analyze/{cover_name}"
+        subprocess.run(
+            ["ffmpeg", "-i", fpath, "-vframes", "1", "-q:v", "2", "-y", cover_path],
+            capture_output=True, text=True, timeout=30,
+        )
+        if os.path.exists(cover_path):
+            signed = generate_signed_url(f"/uploads/analyze/{cover_name}", expire_seconds=86400)
+            cover_url = f"http://114.117.242.17:3000{signed}"
+
     # 判断是否视频文件
     is_video = False
     if file and file.filename:
@@ -116,6 +130,7 @@ async def upload_and_analyze(
         text_embedding=embed_data.get("text_embedding", []) if isinstance(embed_data, dict) else [],
         image_embedding=embed_data.get("image_embedding", []) if isinstance(embed_data, dict) else [],
         scenes=scenes,
+        cover_url=cover_url,
         # video-analyze 数据
         hook_method=analyze_result.get("hook_method", ""),
         selling_points=analyze_result.get("selling_points", []),

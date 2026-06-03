@@ -36,6 +36,7 @@ class ReferenceVideoResponse(BaseModel):
     storyboard: Optional[List[Dict[str, Any]]]
     style: Optional[str]
     analysis_report: Optional[Dict[str, Any]]
+    cover_url: Optional[str] = ""
     created_at: datetime
 
     class Config:

@@ -42,6 +42,7 @@ interface ReferenceVideo {
   storyboard?: any[];
   style?: string;
   analysis_report?: any;
+  cover_url?: string;
   created_at: string;
 }
 
@@ -244,19 +245,27 @@ const ReferencePage: React.FC = () => {
                   <Card
                     hoverable
                     cover={
-                      <div
-                        style={{
-                          height: '160px',
-                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'white',
-                          fontSize: '48px',
-                        }}
-                      >
-                        <PlayCircleOutlined />
-                      </div>
+                      video.cover_url ? (
+                        <img src={video.cover_url} alt={video.title}
+                          style={{ height: '160px', width: '100%', objectFit: 'cover', cursor: 'pointer' }}
+                          onClick={() => window.open(video.source_url, '_blank')} />
+                      ) : (
+                        <div
+                          style={{
+                            height: '160px',
+                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'white',
+                            fontSize: '48px',
+                            cursor: 'pointer',
+                          }}
+                          onClick={() => window.open(video.source_url, '_blank')}
+                        >
+                          <PlayCircleOutlined />
+                        </div>
+                      )
                     }
                     actions={[
                       <EyeOutlined key="view" onClick={() => handleViewDetail(video)} />,
