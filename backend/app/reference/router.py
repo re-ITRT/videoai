@@ -53,6 +53,14 @@ async def upload_and_analyze(
 
     video_url = saved_url or source_url or ""
 
+    # 判断是否视频文件
+    is_video = False
+    if file and file.filename:
+        ext = os.path.splitext(file.filename)[1].lower()
+        is_video = ext in (".mp4", ".mov", ".avi", ".webm", ".mkv")
+    elif source_url:
+        is_video = any(source_url.lower().endswith(e) for e in (".mp4", ".mov", ".avi", ".webm"))
+
     # 视频太大？压缩一份给 Coze（本地保留原片）
     embed_video_url = video_url
     if saved_url and is_video:
@@ -83,14 +91,6 @@ async def upload_and_analyze(
         if os.path.exists(cover_path):
             signed = generate_signed_url(f"/uploads/analyze/{cover_name}", expire_seconds=86400)
             cover_url = f"http://114.117.242.17:3000{signed}"
-
-    # 判断是否视频文件
-    is_video = False
-    if file and file.filename:
-        ext = os.path.splitext(file.filename)[1].lower()
-        is_video = ext in (".mp4", ".mov", ".avi", ".webm", ".mkv")
-    elif source_url:
-        is_video = any(source_url.lower().endswith(e) for e in (".mp4", ".mov", ".avi", ".webm"))
 
     embed_data = {}
     scenes = []
