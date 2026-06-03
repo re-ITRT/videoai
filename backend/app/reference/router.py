@@ -61,7 +61,7 @@ async def upload_and_analyze(
         if size_mb > 2.8:
             compressed = fpath.replace(".mp4", "_coze.mp4").replace(".mov", "_coze.mp4")
             subprocess.run(
-                ["ffmpeg", "-i", fpath, "-vf", "scale=min(720,iw):min(1280,ih)", "-b:v", "1M", "-c:a", "copy", "-y", compressed],
+                ["ffmpeg", "-i", fpath, "-vf", "scale=min(720,iw):min(1280,ih)", "-b:v", "700K", "-c:a", "aac", "-b:a", "64K", "-y", compressed],
                 capture_output=True, text=True, timeout=60,
             )
             if os.path.exists(compressed):
