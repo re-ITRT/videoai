@@ -413,19 +413,43 @@ const ReferencePage: React.FC = () => {
 
             <Divider />
 
+            {selectedVideo.scenes && selectedVideo.scenes.length > 0 && (
+              <div>
+                <Text strong>🎬 分镜分析（{selectedVideo.scenes.length} 个场景）</Text>
+                {selectedVideo.scenes.map((scene: any, i: number) => (
+                  <div key={i} style={{ background: '#f5f5f5', padding: 8, borderRadius: 4, marginTop: 4 }}>
+                    <Text strong>场景 {scene.scene_id}</Text>
+                    <div style={{ fontSize: 12, color: '#666' }}>时间: {scene.time_range}</div>
+                    <div style={{ fontSize: 12, marginTop: 2 }}>{scene.description}</div>
+                    {scene.script && <div style={{ fontSize: 12, color: '#1677ff', marginTop: 2 }}>🎙 {scene.script}</div>}
+                    {scene.embedding && <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>embedding: {scene.embedding.length}维</div>}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {selectedVideo.tags && selectedVideo.tags.length > 0 && (
+              <div>
+                <Text strong>标签：</Text>
+                <Space wrap style={{ marginTop: 4 }}>
+                  {selectedVideo.tags.map((t: string, i: number) => <Tag key={i}>{t}</Tag>)}
+                </Space>
+              </div>
+            )}
+
             {selectedVideo.hook_method && (
               <div>
                 <Text strong>Hook手法：</Text>
-                <Paragraph>{selectedVideo.hook_method}</Paragraph>
+                <Paragraph style={{ margin: 0 }}>{selectedVideo.hook_method}</Paragraph>
               </div>
             )}
 
             {selectedVideo.selling_points && selectedVideo.selling_points.length > 0 && (
               <div>
                 <Text strong>核心卖点：</Text>
-                <ul>
-                  {selectedVideo.selling_points.map((point, index) => (
-                    <li key={index}>{point}</li>
+                <ul style={{ margin: 0 }}>
+                  {selectedVideo.selling_points.map((p: string, i: number) => (
+                    <li key={i}>{p}</li>
                   ))}
                 </ul>
               </div>
@@ -433,13 +457,10 @@ const ReferencePage: React.FC = () => {
 
             {selectedVideo.storyboard && selectedVideo.storyboard.length > 0 && (
               <div>
-                <Text strong>分镜拆解：</Text>
-                <ol>
-                  {selectedVideo.storyboard.map((scene, index) => (
-                    <li key={index}>
-                      <Text strong>{scene.type || '场景'}：</Text>
-                      {scene.description || JSON.stringify(scene)}
-                    </li>
+                <Text strong>分镜拆解（video-analyze）：</Text>
+                <ol style={{ margin: 0 }}>
+                  {selectedVideo.storyboard.map((s: any, i: number) => (
+                    <li key={i}><Text strong>{s.type || '场景'}：</Text>{s.visual || s.description || JSON.stringify(s)}</li>
                   ))}
                 </ol>
               </div>
@@ -448,7 +469,7 @@ const ReferencePage: React.FC = () => {
             {selectedVideo.analysis_report && Object.keys(selectedVideo.analysis_report).length > 0 && (
               <div>
                 <Text strong>完整分析报告：</Text>
-                <pre style={{ background: '#f5f5f5', padding: '12px', borderRadius: '4px', overflow: 'auto' }}>
+                <pre style={{ background: '#f5f5f5', padding: '12px', borderRadius: '4px', overflow: 'auto', fontSize: 12, maxHeight: 300 }}>
                   {JSON.stringify(selectedVideo.analysis_report, null, 2)}
                 </pre>
               </div>
