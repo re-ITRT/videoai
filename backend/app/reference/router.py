@@ -53,20 +53,22 @@ async def upload_and_analyze(
 
     video_url = saved_url or source_url or ""
 
-    # 视频太大？压缩到 3MB 以下（Coze 多模态限制）
+    # 视频太大？压缩一份给 Coze（本地保留原片）
+    embed_video_url = video_url
     if saved_url and is_video:
         import subprocess, os
         size_mb = os.path.getsize(fpath) / (1024 * 1024)
         if size_mb > 2.8:
-            compressed = fpath.replace(".mp4", "_compressed.mp4").replace(".mov", "_compressed.mp4").replace(".avi", "_compressed.mp4")
-            # 先降分辨率到 720p，再降 bitrate 到 1M
+            compressed = fpath.replace(".mp4", "_coze.mp4").replace(".mov", "_coze.mp4")
             subprocess.run(
                 ["ffmpeg", "-i", fpath, "-vf", "scale=min(720,iw):min(1280,ih)", "-b:v", "1M", "-c:a", "copy", "-y", compressed],
                 capture_output=True, text=True, timeout=60,
             )
-            if os.path.exists(compressed) and os.path.getsize(compressed) < size_mb * 1024 * 1024:
-                os.replace(compressed, fpath)
-                print(f"[upload-analyze] compressed video: {size_mb:.1f}MB -> {os.path.getsize(fpath)/(1024*1024):.1f}MB")
+            if os.path.exists(compressed):
+                # 用压缩版 URL 给 Coze
+                signed2 = generate_signed_url(compressed.replace("/app/uploads", "/uploads"), expire_seconds=86400)
+                embed_video_url = f"http://114.117.242.17:3000{signed2}"
+                print(f"[upload-analyze] compressed for Coze: {size_mb:.1f}MB -> {os.path.getsize(compressed)/(1024*1024):.1f}MB")
 
     # 视频截取第一帧作为封面
     cover_url = ""
@@ -98,15 +100,8 @@ async def upload_and_analyze(
     try:
         embed_payload = {"material_type": "product"}
         if is_video:
-            # 视频用直接 URL（去掉 signed token，Coze 可能不认）
-            direct_url = video_url
-            if "/signed/" in (saved_url or ""):
-                parts = saved_url.split("/signed/", 1)[1]
-                token_and_path = parts.split("/", 1)
-                if len(token_and_path) == 2:
-                    direct_url = f"http://114.117.242.17:3000/uploads/{token_and_path[1]}"
-            embed_payload["video_url"] = direct_url
-            print(f"[upload-analyze] video_url sent to material-embed: {direct_url[:100]}")
+            embed_payload["video_url"] = embed_video_url
+            print(f"[upload-analyze] video_url sent to material-embed: {embed_video_url[:80]}")
         else:
             embed_payload["image_url"] = video_url
             embed_payload["brief_description"] = title or "上传素材"
