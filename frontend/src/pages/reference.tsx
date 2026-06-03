@@ -406,7 +406,13 @@ const ReferencePage: React.FC = () => {
               {selectedVideo.tags && selectedVideo.tags.length > 0 && (
                 <div style={{ marginTop: 8 }}>
                   <Tag icon={<TagOutlined />} color="purple" style={{ marginRight: 4, opacity: 0.7 }}>标签</Tag>
-                  {selectedVideo.tags.map((t: string, i: number) => <Tag key={i}>{t}</Tag>)}
+                  {selectedVideo.tags.map((t: string, i: number) => <Tag key={'t'+i}>{t}</Tag>)}
+                </div>
+              )}
+              {selectedVideo.analysis_report?.tags && selectedVideo.analysis_report.tags.length > 0 && (
+                <div style={{ marginTop: 4 }}>
+                  <Tag icon={<TagOutlined />} color="purple" style={{ marginRight: 4, opacity: 0.7 }}>🏷 分析标签</Tag>
+                  {selectedVideo.analysis_report.tags.map((t: string, i: number) => <Tag key={'a'+i}>{t}</Tag>)}
                 </div>
               )}
             </div>
