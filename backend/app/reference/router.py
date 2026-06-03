@@ -53,6 +53,21 @@ async def upload_and_analyze(
 
     video_url = saved_url or source_url or ""
 
+    # 视频太大？压缩到 3MB 以下（Coze 多模态限制）
+    if saved_url and is_video:
+        import subprocess, os
+        size_mb = os.path.getsize(fpath) / (1024 * 1024)
+        if size_mb > 2.8:
+            compressed = fpath.replace(".mp4", "_compressed.mp4").replace(".mov", "_compressed.mp4").replace(".avi", "_compressed.mp4")
+            # 先降分辨率到 720p，再降 bitrate 到 1M
+            subprocess.run(
+                ["ffmpeg", "-i", fpath, "-vf", "scale=min(720,iw):min(1280,ih)", "-b:v", "1M", "-c:a", "copy", "-y", compressed],
+                capture_output=True, text=True, timeout=60,
+            )
+            if os.path.exists(compressed) and os.path.getsize(compressed) < size_mb * 1024 * 1024:
+                os.replace(compressed, fpath)
+                print(f"[upload-analyze] compressed video: {size_mb:.1f}MB -> {os.path.getsize(fpath)/(1024*1024):.1f}MB")
+
     # 视频截取第一帧作为封面
     cover_url = ""
     if saved_url and is_video:
@@ -91,6 +106,7 @@ async def upload_and_analyze(
                 if len(token_and_path) == 2:
                     direct_url = f"http://114.117.242.17:3000/uploads/{token_and_path[1]}"
             embed_payload["video_url"] = direct_url
+            print(f"[upload-analyze] video_url sent to material-embed: {direct_url[:100]}")
         else:
             embed_payload["image_url"] = video_url
             embed_payload["brief_description"] = title or "上传素材"
@@ -99,8 +115,11 @@ async def upload_and_analyze(
         scenes = embed_data.get("scenes", []) if isinstance(embed_data, dict) else []
         if isinstance(embed_data, dict):
             tags = embed_data.get("video_tags", []) or embed_data.get("tags", [])
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[upload-analyze] material-embed failed: {e}")
+        embed_data = {}
+        scenes = []
+        tags = []
 
     # 2. 调 video-analyze（视频用 scenes 分析）
     analyze_result = {}
