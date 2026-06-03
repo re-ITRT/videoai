@@ -43,6 +43,8 @@ interface ReferenceVideo {
   style?: string;
   analysis_report?: any;
   cover_url?: string;
+  scenes?: any[];
+  tags?: string[];
   created_at: string;
 }
 
