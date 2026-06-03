@@ -439,6 +439,13 @@ const ReferencePage: React.FC = () => {
               </div>
             )}
 
+            {selectedVideo.style && (
+              <div>
+                <Text strong>风格：</Text>
+                <Tag color="green">{selectedVideo.style}</Tag>
+              </div>
+            )}
+
             {selectedVideo.hook_method && (
               <div>
                 <Text strong>Hook手法：</Text>
@@ -468,12 +475,40 @@ const ReferencePage: React.FC = () => {
               </div>
             )}
 
+            {/* analysis_report 逐字段渲染 */}
             {selectedVideo.analysis_report && Object.keys(selectedVideo.analysis_report).length > 0 && (
               <div>
-                <Text strong>完整分析报告：</Text>
-                <pre style={{ background: '#f5f5f5', padding: '12px', borderRadius: '4px', overflow: 'auto', fontSize: 12, maxHeight: 300 }}>
-                  {JSON.stringify(selectedVideo.analysis_report, null, 2)}
-                </pre>
+                <Text strong>分析报告</Text>
+                {Object.entries(selectedVideo.analysis_report).filter(([k]) => k !== 'run_id').map(([key, val]: [string, any]) => (
+                  <div key={key} style={{ marginTop: 8 }}>
+                    <Text strong style={{ fontSize: 13 }}>{{
+                      hook_quality: '📊 Hook质量',
+                      pacing_score: '⏱ 节奏评分',
+                      engagement_strength: '🔥 互动强度',
+                      cta_clarity: '🎯 CTA清晰度',
+                      improvement_suggestions: '💡 优化建议',
+                      overall_score: '⭐ 综合评分',
+                      tags: '🏷 分析标签',
+                      style: '🎨 风格',
+                      rhythm: '🎵 节奏',
+                      formula: '📐 公式',
+                    }[key] || key}：</Text>
+                    {Array.isArray(val) ? (
+                      <ul style={{ margin: 0, paddingLeft: 20 }}>
+                        {val.map((v: string, i: number) => <li key={i} style={{ fontSize: 12 }}>{v}</li>)}
+                      </ul>
+                    ) : typeof val === 'number' ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
+                        <div style={{ flex: 1, height: 8, background: '#f0f0f0', borderRadius: 4 }}>
+                          <div style={{ width: `${Math.min(val, 100)}%`, height: 8, background: val >= 70 ? '#52c41a' : val >= 40 ? '#faad14' : '#ff4d4f', borderRadius: 4 }} />
+                        </div>
+                        <span style={{ fontSize: 12, fontWeight: 600 }}>{val}</span>
+                      </div>
+                    ) : (
+                      <Paragraph style={{ margin: 0, fontSize: 12 }}>{String(val)}</Paragraph>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </Space>
