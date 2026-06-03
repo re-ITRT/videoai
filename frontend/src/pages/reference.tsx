@@ -464,18 +464,7 @@ const ReferencePage: React.FC = () => {
               </div>
             )}
 
-            {selectedVideo.storyboard && selectedVideo.storyboard.length > 0 && (
-              <div>
-                <Text strong>分镜拆解（video-analyze）：</Text>
-                <ol style={{ margin: 0 }}>
-                  {selectedVideo.storyboard.map((s: any, i: number) => (
-                    <li key={i}><Text strong>{s.type || '场景'}：</Text>{s.visual || s.description || JSON.stringify(s)}</li>
-                  ))}
-                </ol>
-              </div>
-            )}
-
-            {/* analysis_report 逐字段渲染 */}
+            {/* analysis_report 逐字段渲染（不含和顶层重复的 storyboard） */}
             {selectedVideo.analysis_report && Object.keys(selectedVideo.analysis_report).length > 0 && (
               <div>
                 <Text strong>分析报告</Text>
