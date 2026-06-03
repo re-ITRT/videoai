@@ -494,9 +494,24 @@ const ReferencePage: React.FC = () => {
                       formula: '📐 公式',
                     }[key] || key}：</Text>
                     {Array.isArray(val) ? (
-                      <ul style={{ margin: 0, paddingLeft: 20 }}>
-                        {val.map((v: any, i: number) => <li key={i} style={{ fontSize: 12 }}>{typeof v === 'object' ? JSON.stringify(v) : String(v)}</li>)}
-                      </ul>
+                      val.length > 0 && typeof val[0] === 'object' && val[0].visual ? (
+                        <div style={{ maxHeight: 300, overflow: 'auto' }}>
+                          {val.map((s: any, i: number) => (
+                            <div key={i} style={{ background: '#f8f8f8', padding: 6, borderRadius: 4, marginTop: 4, fontSize: 12 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                                <Tag color="blue" style={{ fontSize: 10, margin: 0 }}>{s.type || '场景'}</Tag>
+                                <span style={{ color: '#999' }}>{s.time_range}</span>
+                              </div>
+                              <div style={{ color: '#333' }}>{s.visual}</div>
+                              {s.narration && <div style={{ color: '#1677ff', marginTop: 2 }}>🎙 {s.narration}</div>}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <ul style={{ margin: 0, paddingLeft: 20 }}>
+                          {val.map((v: any, i: number) => <li key={i} style={{ fontSize: 12 }}>{typeof v === 'object' ? JSON.stringify(v) : String(v)}</li>)}
+                        </ul>
+                      )
                     ) : typeof val === 'number' ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
                         <div style={{ flex: 1, height: 8, background: '#f0f0f0', borderRadius: 4 }}>
