@@ -23,9 +23,6 @@ from .service import (
 
 router = APIRouter(prefix="/api/v1/reference", tags=["reference"])
 
-# TODO: 替换为真实的用户认证
-DEFAULT_USER_ID = "dev_user"
-
 
 @router.post("/upload-analyze")
 async def upload_and_analyze(
@@ -133,16 +130,13 @@ async def list_reference_videos(
     skip: int = Query(0, ge=0, description="跳过数量"),
     limit: int = Query(20, ge=1, le=100, description="每页数量"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     获取优质视频库列表，支持多维度筛选
-    
-    - 按分类筛选（美妆、数码、食品等）
-    - 按风格筛选（口播、测评、剧情等）
-    - 按来源平台筛选（FB、INS、TikTok等）
     """
     total, videos = await get_reference_videos(
-        db, DEFAULT_USER_ID, category, style, source_platform, skip, limit
+        db, str(current_user.id), category, style, source_platform, skip, limit
     )
     
     return ReferenceVideoListResponse(
@@ -155,9 +149,10 @@ async def list_reference_videos(
 async def get_video_detail(
     video_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """获取单个参考视频详情"""
-    video = await get_reference_video_by_id(db, video_id, DEFAULT_USER_ID)
+    video = await get_reference_video_by_id(db, video_id, str(current_user.id))
     if not video:
         raise HTTPException(status_code=404, detail="视频不存在")
     
@@ -168,9 +163,10 @@ async def get_video_detail(
 async def delete_video(
     video_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """删除参考视频"""
-    success = await delete_reference_video(db, video_id, DEFAULT_USER_ID)
+    success = await delete_reference_video(db, video_id, str(current_user.id))
     if not success:
         raise HTTPException(status_code=404, detail="视频不存在")
     
