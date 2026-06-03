@@ -81,15 +81,15 @@ const ReferencePage: React.FC = () => {
   const loadVideos = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (category) params.append('category', category);
-      if (style) params.append('style', style);
-      if (sourcePlatform) params.append('source_platform', sourcePlatform);
-      params.append('skip', String((currentPage - 1) * pageSize));
-      params.append('limit', String(pageSize));
-
-      const response = await fetch(`/api/v1/reference/videos?${params}`);
-      const data = await response.json();
+      const data: any = await request.get('/reference/videos', {
+        params: {
+          category: category || undefined,
+          style: style || undefined,
+          source_platform: sourcePlatform || undefined,
+          skip: (currentPage - 1) * pageSize,
+          limit: pageSize,
+        }
+      });
       setVideos(data.items || []);
       setTotal(data.total || 0);
     } catch (error) {
@@ -145,7 +145,7 @@ const ReferencePage: React.FC = () => {
       content: '确定要删除这个参考视频吗？',
       onOk: async () => {
         try {
-          await fetch(`/api/v1/reference/videos/${id}`, { method: 'DELETE' });
+          await request.delete(`/reference/videos/${id}`);
           loadVideos();
         } catch (error) {
           console.error('删除失败:', error);
