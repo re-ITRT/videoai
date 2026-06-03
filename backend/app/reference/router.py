@@ -69,7 +69,14 @@ async def upload_and_analyze(
     try:
         embed_payload = {"material_type": "product"}
         if is_video:
-            embed_payload["video_url"] = video_url
+            # 视频用直接 URL（去掉 signed token，Coze 可能不认）
+            direct_url = video_url
+            if "/signed/" in (saved_url or ""):
+                parts = saved_url.split("/signed/", 1)[1]
+                token_and_path = parts.split("/", 1)
+                if len(token_and_path) == 2:
+                    direct_url = f"http://114.117.242.17:3000/uploads/{token_and_path[1]}"
+            embed_payload["video_url"] = direct_url
         else:
             embed_payload["image_url"] = video_url
             embed_payload["brief_description"] = title or "上传素材"
