@@ -24,6 +24,7 @@ import {
   DeleteOutlined,
   EyeOutlined,
   PlusOutlined,
+  TagOutlined,
 } from '@ant-design/icons';
 
 const { Title, Text, Paragraph } = Typography;
@@ -402,6 +403,12 @@ const ReferencePage: React.FC = () => {
                 {selectedVideo.category && <Tag color="blue">{selectedVideo.category}</Tag>}
                 {selectedVideo.style && <Tag color="green">{selectedVideo.style}</Tag>}
               </Space>
+              {selectedVideo.tags && selectedVideo.tags.length > 0 && (
+                <div style={{ marginTop: 8 }}>
+                  <Tag icon={<TagOutlined />} color="purple" style={{ marginRight: 4, opacity: 0.7 }}>标签</Tag>
+                  {selectedVideo.tags.map((t: string, i: number) => <Tag key={i}>{t}</Tag>)}
+                </div>
+              )}
             </div>
 
             {selectedVideo.source_url && (
@@ -430,12 +437,18 @@ const ReferencePage: React.FC = () => {
               </div>
             )}
 
-            {selectedVideo.tags && selectedVideo.tags.length > 0 && (
+            {selectedVideo.scenes && selectedVideo.scenes.length > 0 && (
               <div>
-                <Text strong>标签：</Text>
-                <Space wrap style={{ marginTop: 4 }}>
-                  {selectedVideo.tags.map((t: string, i: number) => <Tag key={i}>{t}</Tag>)}
-                </Space>
+                <Text strong>🎬 分镜分析（{selectedVideo.scenes.length} 个场景）</Text>
+                {selectedVideo.scenes.map((scene: any, i: number) => (
+                  <div key={i} style={{ background: '#f5f5f5', padding: 8, borderRadius: 4, marginTop: 4 }}>
+                    <Text strong>场景 {scene.scene_id}</Text>
+                    <div style={{ fontSize: 12, color: '#666' }}>时间: {scene.time_range}</div>
+                    <div style={{ fontSize: 12, marginTop: 2 }}>{scene.description}</div>
+                    {scene.script && <div style={{ fontSize: 12, color: '#1677ff', marginTop: 2 }}>🎙 {scene.script}</div>}
+                    {scene.embedding && <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>embedding: {scene.embedding.length}维</div>}
+                  </div>
+                ))}
               </div>
             )}
 

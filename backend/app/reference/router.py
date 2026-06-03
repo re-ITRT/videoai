@@ -129,6 +129,11 @@ async def upload_and_analyze(
                 "title": title or "",
                 "category": category or "",
             })
+            # 合并 tags（material-embed + video-analyze）
+            analyze_tags = analyze_result.get("tags", []) if isinstance(analyze_result, dict) else []
+            if analyze_tags:
+                merged = list(dict.fromkeys(tags + analyze_tags))
+                tags = merged
         except Exception:
             analyze_result = {}
 
