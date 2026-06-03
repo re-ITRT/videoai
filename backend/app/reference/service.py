@@ -63,6 +63,7 @@ async def get_reference_videos(
     category: Optional[str] = None,
     style: Optional[str] = None,
     source_platform: Optional[str] = None,
+    tag: Optional[str] = None,
     skip: int = 0,
     limit: int = 20,
 ) -> Tuple[int, List[ReferenceVideo]]:
@@ -77,6 +78,8 @@ async def get_reference_videos(
         query = query.where(ReferenceVideo.style == style)
     if source_platform:
         query = query.where(ReferenceVideo.source_platform == source_platform)
+    if tag:
+        query = query.where(ReferenceVideo.tags.contains([tag]))
     
     # 总数
     count_query = select(ReferenceVideo.id).where(ReferenceVideo.user_id == user_id)
@@ -86,6 +89,8 @@ async def get_reference_videos(
         count_query = count_query.where(ReferenceVideo.style == style)
     if source_platform:
         count_query = count_query.where(ReferenceVideo.source_platform == source_platform)
+    if tag:
+        count_query = count_query.where(ReferenceVideo.tags.contains([tag]))
     
     count_result = await db.execute(count_query)
     total = len(count_result.all())

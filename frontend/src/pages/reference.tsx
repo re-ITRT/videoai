@@ -68,6 +68,8 @@ const ReferencePage: React.FC = () => {
   const [category, setCategory] = useState<string | undefined>();
   const [style, setStyle] = useState<string | undefined>();
   const [sourcePlatform, setSourcePlatform] = useState<string | undefined>();
+  const [filterTag, setFilterTag] = useState<string | undefined>();
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
 
   // 分析弹窗
   const [analyzeModalVisible, setAnalyzeModalVisible] = useState(false);
@@ -90,6 +92,7 @@ const ReferencePage: React.FC = () => {
           category: category || undefined,
           style: style || undefined,
           source_platform: sourcePlatform || undefined,
+          tag: filterTag || undefined,
           skip: (currentPage - 1) * pageSize,
           limit: pageSize,
         }
@@ -105,7 +108,12 @@ const ReferencePage: React.FC = () => {
 
   useEffect(() => {
     loadVideos();
-  }, [currentPage, pageSize, category, style, sourcePlatform]);
+  }, [currentPage, pageSize, category, style, sourcePlatform, filterTag]);
+
+  // 加载标签列表
+  useEffect(() => {
+    request.get('/reference/tags').then((data: any) => setAvailableTags(data.tags || [])).catch(() => {});
+  }, []);
 
   // 上传并分析视频
   const handleAnalyze = async () => {
@@ -169,6 +177,7 @@ const ReferencePage: React.FC = () => {
     setCategory(undefined);
     setStyle(undefined);
     setSourcePlatform(undefined);
+    setFilterTag(undefined);
     setCurrentPage(1);
   };
 
@@ -230,6 +239,17 @@ const ReferencePage: React.FC = () => {
             <Option value="INS">Instagram</Option>
             <Option value="TikTok">TikTok</Option>
             <Option value="custom">其他</Option>
+          </Select>
+
+          <Select
+            placeholder="按标签筛选"
+            style={{ width: 150 }}
+            allowClear
+            value={filterTag}
+            onChange={(v) => { setFilterTag(v); setCurrentPage(1); }}
+            showSearch
+          >
+            {availableTags.map(t => <Option key={t} value={t}>{t}</Option>)}
           </Select>
 
           <Button onClick={handleResetFilter}>重置筛选</Button>

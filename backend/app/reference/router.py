@@ -166,25 +166,40 @@ async def upload_and_analyze(
 
 @router.get("/videos", response_model=ReferenceVideoListResponse)
 async def list_reference_videos(
-    category: Optional[str] = Query(None, description="按分类筛选"),
-    style: Optional[str] = Query(None, description="按风格筛选"),
-    source_platform: Optional[str] = Query(None, description="按来源平台筛选"),
-    skip: int = Query(0, ge=0, description="跳过数量"),
-    limit: int = Query(20, ge=1, le=100, description="每页数量"),
+    category: Optional[str] = Query(None),
+    style: Optional[str] = Query(None),
+    source_platform: Optional[str] = Query(None),
+    tag: Optional[str] = Query(None, description="按标签筛选"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    获取优质视频库列表，支持多维度筛选
-    """
     total, videos = await get_reference_videos(
-        db, str(current_user.id), category, style, source_platform, skip, limit
+        db, str(current_user.id), category, style, source_platform, tag, skip, limit
     )
     
     return ReferenceVideoListResponse(
         total=total,
         items=[ReferenceVideoResponse.model_validate(v) for v in videos],
     )
+
+
+@router.get("/tags")
+async def list_tags(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """获取所有标签（去重）"""
+    from sqlalchemy import text
+    r = await db.execute(text("""
+        SELECT DISTINCT jsonb_array_elements_text(tags) as t
+        FROM reference_videos
+        WHERE user_id = :uid AND tags IS NOT NULL
+        ORDER BY t
+    """), {"uid": str(current_user.id)})
+    tags = [row[0] for row in r if row[0]]
+    return {"tags": tags}
 
 
 @router.get("/videos/{video_id}", response_model=ReferenceVideoResponse)
