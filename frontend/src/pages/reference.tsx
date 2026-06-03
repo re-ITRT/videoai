@@ -479,7 +479,7 @@ const ReferencePage: React.FC = () => {
             {selectedVideo.analysis_report && Object.keys(selectedVideo.analysis_report).length > 0 && (
               <div>
                 <Text strong>分析报告</Text>
-                {Object.entries(selectedVideo.analysis_report).filter(([k]) => k !== 'run_id').map(([key, val]: [string, any]) => (
+                {Object.entries(selectedVideo.analysis_report).filter(([k]) => !['run_id', 'analysis_report'].includes(k)).map(([key, val]: [string, any]) => (
                   <div key={key} style={{ marginTop: 8 }}>
                     <Text strong style={{ fontSize: 13 }}>{{
                       hook_quality: '📊 Hook质量',
@@ -504,6 +504,8 @@ const ReferencePage: React.FC = () => {
                         </div>
                         <span style={{ fontSize: 12, fontWeight: 600 }}>{val}</span>
                       </div>
+                    ) : typeof val === 'object' && !Array.isArray(val) ? (
+                      <Paragraph style={{ margin: 0, fontSize: 12 }}>{JSON.stringify(val)}</Paragraph>
                     ) : (
                       <Paragraph style={{ margin: 0, fontSize: 12 }}>{String(val)}</Paragraph>
                     )}
