@@ -65,22 +65,23 @@ async def upload_and_analyze(
     scenes = []
     tags = []
 
-    if not is_video:
-        # 图片：走 material-embed 提取 scenes、tags、embedding
-        try:
-            embed_result = await call_workflow("material-embed", {
-                "image_url": video_url,
-                "brief_description": title or "上传视频",
-                "material_type": "product",
-            })
-            embed_data = embed_result.get("data") if isinstance(embed_result, dict) and "data" in embed_result else embed_result
-            scenes = embed_data.get("scenes", []) if isinstance(embed_data, dict) else []
-            if isinstance(embed_data, dict):
-                tags = embed_data.get("video_tags", []) or embed_data.get("tags", [])
-        except Exception:
-            pass
+    # 调 material-embed（图片用 image_url，视频用 video_url）
+    try:
+        embed_payload = {"material_type": "product"}
+        if is_video:
+            embed_payload["video_url"] = video_url
+        else:
+            embed_payload["image_url"] = video_url
+            embed_payload["brief_description"] = title or "上传素材"
+        embed_result = await call_workflow("material-embed", embed_payload)
+        embed_data = embed_result.get("data") if isinstance(embed_result, dict) and "data" in embed_result else embed_result
+        scenes = embed_data.get("scenes", []) if isinstance(embed_data, dict) else []
+        if isinstance(embed_data, dict):
+            tags = embed_data.get("video_tags", []) or embed_data.get("tags", [])
+    except Exception:
+        pass
 
-    # 2. 调 video-analyze（视频直接用 URL 构造 scenes）
+    # 2. 调 video-analyze（视频用 scenes 分析）
     analyze_result = {}
     if not scenes and video_url:
         scenes = [{"scene_id": 1, "time_range": "<00:00-00:05>", "description": title or "上传的视频素材", "script": ""}]
