@@ -493,7 +493,7 @@ const ReferencePage: React.FC = () => {
                       rhythm: '🎵 节奏',
                       formula: '📐 公式',
                     }[key] || key}：</Text>
-                    ) : Array.isArray(val) ? (
+                    {Array.isArray(val) ? (
                       <ul style={{ margin: 0, paddingLeft: 20 }}>
                         {val.map((v: any, i: number) => <li key={i} style={{ fontSize: 12 }}>{typeof v === 'object' ? JSON.stringify(v) : String(v)}</li>)}
                       </ul>
