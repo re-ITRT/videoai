@@ -111,19 +111,20 @@ async def upload_material_file(
             audio_features = {}
             try:
                 import librosa
+                import numpy as np
                 filepath = UPLOAD_DIR / filename
                 y, sr = librosa.load(str(filepath), sr=None, mono=True)
                 duration = float(librosa.get_duration(y=y, sr=sr))
-                tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
-                bpm = float(tempo) if tempo else 120.0
+                tempo_val, _ = librosa.beat.beat_track(y=y, sr=sr)
+                bpm = float(np.atleast_1d(tempo_val)[0]) if tempo_val else 120.0
                 cent = librosa.feature.spectral_centroid(y=y, sr=sr)
-                centroid_mean = float(cent.mean())
+                centroid_mean = float(np.atleast_1d(cent.mean())[0])
                 zcr = librosa.feature.zero_crossing_rate(y)
-                zcr_mean = float(zcr.mean())
+                zcr_mean = float(np.atleast_1d(zcr.mean())[0])
                 rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr)
-                rolloff_mean = float(rolloff.mean())
+                rolloff_mean = float(np.atleast_1d(rolloff.mean())[0])
                 mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
-                mfcc_mean = [round(float(mfcc[i].mean()), 4) for i in range(13)]
+                mfcc_mean = [round(float(np.atleast_1d(mfcc[i].mean())[0]), 4) for i in range(13)]
                 bpm_score = min(bpm / 2.0, 50.0)
                 cent_score = min(centroid_mean / 50.0, 25.0)
                 zcr_score = min(zcr_mean * 500, 25.0)
