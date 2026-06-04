@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Card, Row, Col, Statistic, Skeleton, Tabs, Tag, Empty, Spin, Button, message, Modal, Space, Typography, Divider, InputNumber, Descriptions } from 'antd'
+import { Card, Row, Col, Statistic, Skeleton, Tabs, Tag, Empty, Spin, Button, message, Modal, Space, Typography, Divider, Descriptions } from 'antd'
 import { VideoCameraOutlined, FileTextOutlined, ThunderboltOutlined, AppstoreOutlined, PlayCircleOutlined, EyeOutlined, DeleteOutlined, RiseOutlined } from '@ant-design/icons'
 import request from '../utils/request'
 import { getMaterials, getTasks } from '../utils/api'
