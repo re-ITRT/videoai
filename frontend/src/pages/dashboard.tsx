@@ -142,6 +142,7 @@ export default function Dashboard() {
                       <Title level={4} style={{ margin: 0 }}>{detailVideo.title || '未命名视频'}</Title>
                       <Space wrap style={{ marginTop: 4 }}>
                         {detailVideo.style && <Tag color="green">{detailVideo.style}</Tag>}
+                        {detailVideo.rhythm ? <Tag color="orange">{detailVideo.rhythm <= 2 ? '⚡快' : detailVideo.rhythm <= 5 ? '~中' : '🐢慢'}</Tag> : null}
                       </Space>
                       {detailVideo.tags && detailVideo.tags.length > 0 && (
                         <div style={{ marginTop: 4 }}>
@@ -150,6 +151,7 @@ export default function Dashboard() {
                           </Space>
                         </div>
                       )}
+                      {/* 播放量编辑 */}
                       <div style={{ marginTop: 6, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
                         <EyeOutlined /> 播放量：
                         {editingPlay ? (
@@ -220,16 +222,20 @@ export default function Dashboard() {
                       </div>
                     )}
 
+                    {/* analysis_report */}
                     {detailVideo.analysis_report && Object.keys(detailVideo.analysis_report).length > 0 && (
-                      <>
-                        <Divider style={{ margin: '8px 0' }} />
+                      <div>
                         <Text strong style={{ fontSize: 13 }}>分析报告</Text>
-                        {Object.entries(detailVideo.analysis_report).filter(([k]) => !['run_id', 'tags', 'hook_method', 'selling_points', 'storyboard'].includes(k)).map(([key, val]: [string, any]) => {
+                        {Object.entries(detailVideo.analysis_report).filter(([k]) => !['run_id', 'analysis_report', 'rhythm', 'tags', 'hook_method', 'selling_points', 'storyboard'].includes(k)).map(([key, val]: [string, any]) => {
                           const label = ({
-                            hook_quality: '📊 Hook质量', pacing_score: '⏱ 节奏评分',
-                            engagement_strength: '🔥 互动强度', cta_clarity: '🎯 CTA清晰度',
-                            improvement_suggestions: '💡 优化建议', overall_score: '⭐ 综合评分',
-                            formula: '📐 公式', style: '🎨 风格',
+                            hook_quality: '📊 Hook质量',
+                            pacing_score: '⏱ 节奏评分',
+                            engagement_strength: '🔥 互动强度',
+                            cta_clarity: '🎯 CTA清晰度',
+                            improvement_suggestions: '💡 优化建议',
+                            overall_score: '⭐ 综合评分',
+                            formula: '📐 公式',
+                            style: '🎨 风格',
                           } as any)[key];
                           if (!label) return null;
                           return (
@@ -250,7 +256,7 @@ export default function Dashboard() {
                             </div>
                           );
                         })}
-                      </>
+                      </div>
                     )}
                   </Space>
                 )}
