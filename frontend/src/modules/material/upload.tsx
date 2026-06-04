@@ -49,6 +49,7 @@ export default function MaterialUpload() {
           <Select onChange={(v) => setMtype(v)} options={[
             { value: 'image', label: '图片' },
             { value: 'video', label: '视频' },
+            { value: 'audio', label: 'BGM/音频' },
           ]} />
         </Form.Item>
 
@@ -74,7 +75,7 @@ export default function MaterialUpload() {
             beforeUpload={(f) => { setFileList([f]); return false }}
             onRemove={() => setFileList([])}
             maxCount={1}
-            accept={mtype === 'image' ? 'image/*' : 'video/*'}
+            accept={mtype === 'image' ? 'image/*' : mtype === 'video' ? 'video/*' : 'audio/*'}
           >
             <p className="ant-upload-drag-icon"><InboxOutlined /></p>
             <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>

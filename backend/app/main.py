@@ -19,6 +19,7 @@ from app.ai.router import router as ai_router
 from app.agent.router import router as agent_router
 from app.studio.router import router as studio_router
 from app.published.router import router as published_router
+from app.audio.router import router as audio_router
 
 # ── 初始化日志 ──────────────────────────
 from app.core.logging import setup_logging
@@ -93,6 +94,7 @@ app.include_router(ai_router)
 app.include_router(agent_router)
 app.include_router(studio_router)
 app.include_router(published_router)
+app.include_router(audio_router)
 
 # ── 静态文件 ──────────────────────────
 import os
