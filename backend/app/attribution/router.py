@@ -133,7 +133,7 @@ async def run_attribution_analysis(
     for f in features:
         bgm_level = "轻快" if f["lightness_score"] >= 55 else ("中性" if f["lightness_score"] >= 30 else "稳重") if f["lightness_score"] else "无BGM"
         rhythm_tag = "快" if f["rhythm"] <= 2 else ("中" if f["rhythm"] <= 5 else "慢") if f["rhythm"] else "未知"
-        combo_key = f"{f['style']}|{f['hook_method'][:8]}|{bgm_level}|{rhythm_tag}"
+        combo_key = f"{f['style']}|{f['hook_method'][:12]}|{bgm_level}|{rhythm_tag}"
         best_combos.append({
             "combo": combo_key,
             "style": f["style"],
@@ -147,9 +147,18 @@ async def run_attribution_analysis(
     from collections import defaultdict
     groups = defaultdict(list)
     for c in best_combos:
-        groups[c["combo"]].append(c["play_count"])
-    combo_rank = [{"combo": k, "avg_play_count": round(sum(v)/len(v)), "count": len(v)}
-                  for k, v in groups.items()]
+        groups[c["combo"]].append(c)
+    combo_rank = []
+    for k, v in groups.items():
+        avg_pc = round(sum(c["play_count"] for c in v) / len(v))
+        first = v[0]
+        combo_rank.append({
+            "combo": k, "avg_play_count": avg_pc, "count": len(v),
+            "style": first.get("style", ""),
+            "hook_method": first.get("hook_method", ""),
+            "bgm": first.get("bgm", ""),
+            "rhythm_tag": first.get("rhythm_tag", ""),
+        })
     combo_rank.sort(key=lambda x: x["avg_play_count"], reverse=True)
 
     return {
