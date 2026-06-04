@@ -68,7 +68,7 @@ export default function AttributionPage() {
             基于 {data.length} 个参考视频的 {numericCols.length} 个数值特征 × 播放量 分析
           </Text>
         </div>
-        <Button type="primary" icon={<ThunderboltOutlined />} loading={analyzing} onClick={loadData}>
+        <Button type="primary" icon={<ThunderboltOutlined />} loading={loading} onClick={loadData}>
           重新分析
         </Button>
       </div>
