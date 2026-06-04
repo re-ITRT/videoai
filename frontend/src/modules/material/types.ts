@@ -2,7 +2,7 @@ export interface Material {
   id: number
   user_id: number
   product_id: number | null
-  material_type: 'image' | 'video' | 'text'
+  material_type: 'image' | 'video' | 'text' | 'audio'
   input_type: string
   image_url: string | null
   video_url: string | null

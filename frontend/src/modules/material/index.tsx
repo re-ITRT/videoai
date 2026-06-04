@@ -36,6 +36,21 @@ export default function MaterialList() {
     }
   }
 
+  const analyzeAudio = async (id: number) => {
+    try {
+      const res = await (await fetch(`/api/v1/audio/analyze/${id}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      })).json()
+      if (res.bpm) {
+        message.success(`分析完成：${res.mood}，BPM=${res.bpm}`)
+        loadMaterials()
+      } else {
+        message.error(res.detail || '分析失败')
+      }
+    } catch { message.error('分析请求失败') }
+  }
+
   const renderEmbedStatus = (_: any, r: Material) => {
     const hasTags = r.tags && r.tags.length > 0
     return (
@@ -48,14 +63,21 @@ export default function MaterialList() {
 
   const columns = [
     { title: 'ID', dataIndex: 'id', width: 60 },
-    { title: '类型', dataIndex: 'material_type', render: (v: string) => <Tag color={v === 'video' ? 'blue' : 'green'}>{v}</Tag> },
+    { title: '类型', dataIndex: 'material_type', render: (v: string) => <Tag color={v === 'audio' ? 'purple' : v === 'video' ? 'blue' : 'green'}>{v === 'audio' ? '🎵 BGM' : v}</Tag> },
     { title: '分类', render: (_: any, r: Material) => r.category ? <Tag>{r.category}</Tag> : null },
     { title: '标签', dataIndex: 'tags', render: (tags: string[]) => tags?.map(t => <Tag key={t}>{t}</Tag>) },
     { title: '来源', dataIndex: 'source', render: (v: string) => v ? <Tag>{v}</Tag> : null },
     { title: '嵌入状态', render: renderEmbedStatus },
     { title: '预览', dataIndex: 'image_url', render: (url: string) => url ? <img src={url} loading="lazy" alt="" style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 4 }} /> : null },
     { title: '创建时间', dataIndex: 'created_at', render: (v: string) => v ? new Date(v).toLocaleString() : '' },
-    { title: '操作', render: (_: any, r: Material) => <Button danger icon={<DeleteOutlined />} size="small" onClick={() => handleDelete(r.id)} /> },
+    { title: '操作', render: (_: any, r: Material) => (
+      <span>
+        {r.material_type === 'audio' && (
+          <Button size="small" type="link" style={{ fontSize: 11 }} onClick={() => analyzeAudio(r.id)}>分析</Button>
+        )}
+        <Button danger icon={<DeleteOutlined />} size="small" onClick={() => handleDelete(r.id)} />
+      </span>
+    ) },
   ]
 
   return (

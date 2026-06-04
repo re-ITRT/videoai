@@ -1,10 +1,65 @@
 """音频分析 — Librosa 特征提取"""
 import os, json, tempfile, shutil
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.auth.models import User
 
 router = APIRouter(prefix="/api/v1/audio", tags=["audio"])
+
+
+@router.post("/analyze/{material_id}")
+async def analyze_existing_audio(
+    material_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """对已有音频素材重新跑 Librosa 分析"""
+    from app.material import service as svc
+    material = await svc.get_material(db, material_id)
+    if not material:
+        raise HTTPException(404, "素材不存在")
+    if material.material_type != "audio":
+        raise HTTPException(400, "非音频素材")
+
+    import os, librosa
+    filepath = None
+    if material.image_url and material.image_url.startswith("/uploads/"):
+        filepath = os.path.join("/app", material.image_url)
+    if not filepath or not os.path.exists(filepath):
+        raise HTTPException(400, "音频文件不存在")
+
+    y, sr = librosa.load(filepath, sr=None, mono=True)
+    duration = float(librosa.get_duration(y=y, sr=sr))
+    tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
+    bpm = float(tempo) if tempo else 120.0
+    cent = librosa.feature.spectral_centroid(y=y, sr=sr)
+    centroid_mean = float(cent.mean())
+    zcr = librosa.feature.zero_crossing_rate(y)
+    zcr_mean = float(zcr.mean())
+    rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr)
+    rolloff_mean = float(rolloff.mean())
+    mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
+    mfcc_mean = [round(float(mfcc[i].mean()), 4) for i in range(13)]
+    bpm_score = min(bpm / 2.0, 50.0)
+    cent_score = min(centroid_mean / 50.0, 25.0)
+    zcr_score = min(zcr_mean * 500, 25.0)
+    lightness = round(min(bpm_score + cent_score + zcr_score, 100), 1)
+    mood = "稳重" if lightness < 30 else "中性" if lightness < 55 else "轻快"
+    audio_features = {
+        "duration": round(duration, 2), "bpm": round(bpm, 1),
+        "spectral_centroid": round(centroid_mean, 2),
+        "zero_crossing_rate": round(zcr_mean, 6),
+        "spectral_rolloff": round(rolloff_mean, 2),
+        "mfcc_mean": mfcc_mean,
+        "lightness_score": lightness, "mood": mood,
+        "features": {"bpm_score": round(bpm_score, 1), "centroid_score": round(cent_score, 1), "zcr_score": round(zcr_score, 1)},
+    }
+
+    material.audio_features = audio_features
+    await db.commit()
+    return audio_features
 
 
 @router.post("/analyze")
