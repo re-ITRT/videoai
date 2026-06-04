@@ -121,6 +121,22 @@ async def increment_view(
     return {"play_count": r.play_count}
 
 
+@router.put("/{video_id}/play-count")
+async def update_published_play_count(
+    video_id: int,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """设置已生成视频播放量"""
+    r = await db.get(PublishedVideo, video_id)
+    if not r or r.user_id != user.id:
+        raise HTTPException(404, "视频不存在")
+    r.play_count = body.get("play_count", 2000)
+    await db.commit()
+    return {"play_count": r.play_count}
+
+
 @router.delete("/{video_id}")
 async def delete_published(
     video_id: int,
