@@ -90,51 +90,81 @@ async def upload_material_file(
         source="upload",
     )
     # 异步触发 material-embed 工作流（不阻塞返回）
-    if signed_url:
-        import logging
-        embed_logger = logging.getLogger("material-embed")
-        
-        async def run_embed():
-            try:
-                public_url = f"http://114.117.242.17:3000{signed_url}"
-                embed_logger.info(f"Starting material-embed for material {material.id}, url={public_url[:60]}...")
-                brief = text_content or category or f"上传的{material_type}素材"
-                result = await call_workflow("material-embed", {
-                    "image_url": public_url,
-                    "brief_description": brief,
-                    "material_type": "product",
-                })
-                # Coze webhook 响应可能是 {code, data} 格式
-                data = result.get("data") if isinstance(result, dict) and "data" in result else result
-                if isinstance(data, dict):
-                    scenes = data.get("scenes", [])
-                    tags = data.get("video_tags", []) or data.get("tags", [])
-                    image_emb = data.get("image_embedding", [])
-                else:
-                    scenes = result.get("scenes", [])
-                    tags = result.get("video_tags", [])
-                    image_emb = result.get("image_embedding", [])
-                # 保存嵌入结果到 material 记录
-                async with async_session() as session:
-                    m = await session.get(type(material), material.id)
-                    if m:
-                        if tags:
-                            m.tags = tags
-                        if image_emb:
-                            from sqlalchemy import text as sa_text
-                            vec_str = "[" + ",".join(str(v) for v in image_emb) + "]"
-                            await session.execute(
-                                sa_text("UPDATE materials SET embedding = CAST(:vec AS vector) WHERE id = :id"),
-                                {"vec": vec_str, "id": m.id},
-                            )
-                        if scenes:
-                            from app.material import service as mat_svc
-                            await mat_svc.parse_and_create_slices(session, m.id, scenes)
-                        await session.commit()
-            except Exception as e:
-                embed_logger.error(f"material-embed failed for material {material.id}: {e}")
-        
-        asyncio.create_task(run_embed())
+    if not signed_url:
+        return {
+            "id": material.id,
+            "material_type": material.material_type,
+            "input_type": material.input_type,
+            "image_url": image_url,
+            "source": "upload",
+            "created_at": material.created_at,
+        }
+    
+    import logging
+    embed_logger = logging.getLogger("material-embed")
+
+    # 音频素材：直接标记完成，不调 Coze
+    if material_type == "audio" or input_type == "audio":
+        try:
+            tags = ["BGM", category or "音频"] if category else ["BGM"]
+            async with async_session() as session:
+                m = await session.get(type(material), material.id)
+                if m:
+                    m.tags = tags
+                    await session.commit()
+            embed_logger.info(f"audio material {material.id}: tagged as BGM, no Coze embed needed")
+        except Exception as e:
+            embed_logger.error(f"audio material {material.id} tag failed: {e}")
+        return {
+            "id": material.id,
+            "material_type": material.material_type,
+            "input_type": material.input_type,
+            "image_url": image_url,
+            "source": "upload",
+            "created_at": material.created_at,
+        }
+
+    async def run_embed():
+        try:
+            public_url = f"http://114.117.242.17:3000{signed_url}"
+            embed_logger.info(f"Starting material-embed for material {material.id}, url={public_url[:60]}...")
+            brief = text_content or category or f"上传的{material_type}素材"
+            result = await call_workflow("material-embed", {
+                "image_url": public_url,
+                "brief_description": brief,
+                "material_type": "product",
+            })
+            # Coze webhook 响应可能是 {code, data} 格式
+            data = result.get("data") if isinstance(result, dict) and "data" in result else result
+            if isinstance(data, dict):
+                scenes = data.get("scenes", [])
+                tags = data.get("video_tags", []) or data.get("tags", [])
+                image_emb = data.get("image_embedding", [])
+            else:
+                scenes = result.get("scenes", [])
+                tags = result.get("video_tags", [])
+                image_emb = result.get("image_embedding", [])
+            # 保存嵌入结果到 material 记录
+            async with async_session() as session:
+                m = await session.get(type(material), material.id)
+                if m:
+                    if tags:
+                        m.tags = tags
+                    if image_emb:
+                        from sqlalchemy import text as sa_text
+                        vec_str = "[" + ",".join(str(v) for v in image_emb) + "]"
+                        await session.execute(
+                            sa_text("UPDATE materials SET embedding = CAST(:vec AS vector) WHERE id = :id"),
+                            {"vec": vec_str, "id": m.id},
+                        )
+                    if scenes:
+                        from app.material import service as mat_svc
+                        await mat_svc.parse_and_create_slices(session, m.id, scenes)
+                    await session.commit()
+        except Exception as e:
+            embed_logger.error(f"material-embed failed for material {material.id}: {e}")
+
+    asyncio.create_task(run_embed())
 
     return {
         "id": material.id,
