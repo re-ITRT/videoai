@@ -37,7 +37,7 @@ export default function AttributionPage() {
         request.get('/attribution/data'),
         request.post('/attribution/analyze', {}),
       ])
-      setData(dataRes.items || [])
+      setData((dataRes as any)?.items || (dataRes as any)?.data?.items || [])
       setResult(analyzeRes)
     } catch { /* ignore */ }
     setLoading(false)
@@ -121,7 +121,7 @@ export default function AttributionPage() {
                             <th style={thStyle}>标题</th>
                             <th style={thStyle}>风格</th>
                             <th style={thStyle}>Hook</th>
-                            {numericCols.map(c => (
+                            {numericCols.map((c: string) => (
                               <th key={c} style={{ ...thStyle, cursor: 'pointer', color: c === selectedFeature ? '#1677ff' : undefined }}
                                 onClick={() => setSelectedFeature(c)}>
                                 {FEATURE_LABELS[c] || c}
@@ -142,8 +142,8 @@ export default function AttributionPage() {
                               </td>
                               <td style={tdStyle}><Tag style={{ fontSize: 10 }}>{f.style || '-'}</Tag></td>
                               <td style={tdStyle}><Text ellipsis style={{ maxWidth: 100, fontSize: 11 }}>{f.hook_method?.slice(0, 12) || '-'}</Text></td>
-                              {numericCols.map(c => {
-                                const val = f[c]
+                              {numericCols.map((c: string) => {
+                                const val = (f as any)[c]
                                 const isNum = typeof val === 'number'
                                 return (
                                   <td key={c} style={{
