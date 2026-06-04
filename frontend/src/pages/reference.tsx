@@ -24,7 +24,6 @@ import {
   DeleteOutlined,
   EyeOutlined,
   PlusOutlined,
-  TagOutlined,
 } from '@ant-design/icons';
 
 const { Title, Text, Paragraph } = Typography;
@@ -413,10 +412,10 @@ const ReferencePage: React.FC = () => {
         width={800}
       >
         {selectedVideo && (
-          <Space direction="vertical" style={{ width: '100%' }} size="middle">
+          <Space direction="vertical" style={{ width: '100%' }} size="small">
             <div>
-              <Title level={4}>{selectedVideo.title || '未命名视频'}</Title>
-              <Space wrap>
+              <Title level={4} style={{ margin: 0 }}>{selectedVideo.title || '未命名视频'}</Title>
+              <Space wrap style={{ marginTop: 4 }}>
                 {selectedVideo.source_platform && (
                   <Tag color={platformColors[selectedVideo.source_platform] || 'default'}>
                     {selectedVideo.source_platform}
@@ -427,132 +426,85 @@ const ReferencePage: React.FC = () => {
                 {selectedVideo.rhythm ? <Tag color="orange">{selectedVideo.rhythm <= 2 ? '⚡快' : selectedVideo.rhythm <= 5 ? '~中' : '🐢慢'}</Tag> : null}
               </Space>
               {selectedVideo.tags && selectedVideo.tags.length > 0 && (
-                <div style={{ marginTop: 8 }}>
-                  <Tag icon={<TagOutlined />} color="purple" style={{ marginRight: 4, opacity: 0.7 }}>标签</Tag>
-                  {selectedVideo.tags.map((t: string, i: number) => <Tag key={'t'+i}>{t}</Tag>)}
+                <div style={{ marginTop: 4 }}>
+                  <Space wrap size={[4, 4]}>
+                    {selectedVideo.tags.map((t: string, i: number) => <Tag key={i}>{t}</Tag>)}
+                  </Space>
                 </div>
               )}
             </div>
 
-            {selectedVideo.source_url && (
-              <div>
-                <Text strong>来源链接：</Text>
-                <a href={selectedVideo.source_url} target="_blank" rel="noopener noreferrer">
-                  {selectedVideo.source_url}
-                </a>
-              </div>
-            )}
-
-            <Divider />
-
-            {selectedVideo.scenes && selectedVideo.scenes.length > 0 && (
-              <div>
-                <Text strong>🎬 分镜分析（{selectedVideo.scenes.length} 个场景）</Text>
-                {selectedVideo.scenes.map((scene: any, i: number) => (
-                  <div key={i} style={{ background: '#f5f5f5', padding: 8, borderRadius: 4, marginTop: 4 }}>
-                    <Text strong>场景 {scene.scene_id}</Text>
-                    <div style={{ fontSize: 12, color: '#666' }}>时间: {scene.time_range}</div>
-                    <div style={{ fontSize: 12, marginTop: 2 }}>{scene.description}</div>
-                    {scene.script && <div style={{ fontSize: 12, color: '#1677ff', marginTop: 2 }}>🎙 {scene.script}</div>}
-                    {scene.embedding && <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>embedding: {scene.embedding.length}维</div>}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {selectedVideo.scenes && selectedVideo.scenes.length > 0 && (
-              <div>
-                <Text strong>🎬 分镜分析（{selectedVideo.scenes.length} 个场景）</Text>
-                {selectedVideo.scenes.map((scene: any, i: number) => (
-                  <div key={i} style={{ background: '#f5f5f5', padding: 8, borderRadius: 4, marginTop: 4 }}>
-                    <Text strong>场景 {scene.scene_id}</Text>
-                    <div style={{ fontSize: 12, color: '#666' }}>时间: {scene.time_range}</div>
-                    <div style={{ fontSize: 12, marginTop: 2 }}>{scene.description}</div>
-                    {scene.script && <div style={{ fontSize: 12, color: '#1677ff', marginTop: 2 }}>🎙 {scene.script}</div>}
-                    {scene.embedding && <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>embedding: {scene.embedding.length}维</div>}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {selectedVideo.style && (
-              <div>
-                <Text strong>风格：</Text>
-                <Tag color="green">{selectedVideo.style}</Tag>
-              </div>
-            )}
-
             {selectedVideo.hook_method && (
-              <div>
-                <Text strong>Hook手法：</Text>
-                <Paragraph style={{ margin: 0 }}>{selectedVideo.hook_method}</Paragraph>
-              </div>
+              <Tag color="geekblue" style={{ fontSize: 12 }}>🎣 {selectedVideo.hook_method}</Tag>
             )}
 
             {selectedVideo.selling_points && selectedVideo.selling_points.length > 0 && (
+              <Space wrap size={[4, 4]}>
+                {selectedVideo.selling_points.map((p: string, i: number) => (
+                  <Tag key={i} color="volcano">{p}</Tag>
+                ))}
+              </Space>
+            )}
+
+            {selectedVideo.source_url && (
               <div>
-                <Text strong>核心卖点：</Text>
-                <div style={{ marginTop: 4 }}>
-                  <Space wrap>
-                    {selectedVideo.selling_points.map((p: string, i: number) => (
-                      <Tag key={i} color="volcano">{p}</Tag>
-                    ))}
-                  </Space>
-                </div>
+                <Text type="secondary" style={{ fontSize: 12 }}>来源：</Text>
+                <a href={selectedVideo.source_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12 }}>{selectedVideo.source_url}</a>
               </div>
             )}
 
-            {/* analysis_report 逐字段渲染（不含和顶层重复的 storyboard） */}
-            {selectedVideo.analysis_report && Object.keys(selectedVideo.analysis_report).length > 0 && (
+            <Divider style={{ margin: '8px 0' }} />
+
+            {selectedVideo.scenes && selectedVideo.scenes.length > 0 && (
               <div>
-                <Text strong>分析报告</Text>
-                {Object.entries(selectedVideo.analysis_report).filter(([k]) => !['run_id', 'analysis_report', 'rhythm', 'tags'].includes(k)).map(([key, val]: [string, any]) => (
-                  <div key={key} style={{ marginTop: 8 }}>
-                    <Text strong style={{ fontSize: 13 }}>{{
-                      hook_quality: '📊 Hook质量',
-                      pacing_score: '⏱ 节奏评分',
-                      engagement_strength: '🔥 互动强度',
-                      cta_clarity: '🎯 CTA清晰度',
-                      improvement_suggestions: '💡 优化建议',
-                      overall_score: '⭐ 综合评分',
-                      tags: '🏷 分析标签',
-                      style: '🎨 风格',
-                      rhythm: '🎵 节奏',
-                      formula: '📐 公式',
-                    }[key] || key}：</Text>
-                    {Array.isArray(val) ? (
-                      val.length > 0 && typeof val[0] === 'object' && val[0].visual ? (
-                        <div style={{ maxHeight: 300, overflow: 'auto' }}>
-                          {val.map((s: any, i: number) => (
-                            <div key={i} style={{ background: '#f8f8f8', padding: 6, borderRadius: 4, marginTop: 4, fontSize: 12 }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
-                                <Tag color="blue" style={{ fontSize: 10, margin: 0 }}>{s.type || '场景'}</Tag>
-                                <span style={{ color: '#999' }}>{s.time_range}</span>
-                              </div>
-                              <div style={{ color: '#333' }}>{s.visual}</div>
-                              {s.narration && <div style={{ color: '#1677ff', marginTop: 2 }}>🎙 {s.narration}</div>}
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <ul style={{ margin: 0, paddingLeft: 20 }}>
-                          {val.map((v: any, i: number) => <li key={i} style={{ fontSize: 12 }}>{typeof v === 'object' ? JSON.stringify(v) : String(v)}</li>)}
-                        </ul>
-                      )
-                    ) : typeof val === 'number' ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
-                        <div style={{ flex: 1, height: 8, background: '#f0f0f0', borderRadius: 4 }}>
-                          <div style={{ width: `${Math.min(val, 100)}%`, height: 8, background: val >= 70 ? '#52c41a' : val >= 40 ? '#faad14' : '#ff4d4f', borderRadius: 4 }} />
-                        </div>
-                        <span style={{ fontSize: 12, fontWeight: 600 }}>{val}</span>
-                      </div>
-                    ) : typeof val === 'object' && !Array.isArray(val) ? (
-                      <Paragraph style={{ margin: 0, fontSize: 12 }}>{JSON.stringify(val)}</Paragraph>
-                    ) : (
-                      <Paragraph style={{ margin: 0, fontSize: 12 }}>{String(val)}</Paragraph>
-                    )}
+                <Text strong style={{ fontSize: 13 }}>🎬 分镜（{selectedVideo.scenes.length} 景）</Text>
+                {selectedVideo.scenes.map((scene: any, i: number) => (
+                  <div key={i} style={{ background: '#f5f5f5', padding: 8, borderRadius: 4, marginTop: 4, fontSize: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                      <Tag color="default" style={{ fontSize: 10, margin: 0 }}>#{(i+1).toString().padStart(2,'0')}</Tag>
+                      <span style={{ color: '#666' }}>{scene.time_range}</span>
+                      {scene.script && <span style={{ color: '#1677ff' }}>🎙 {scene.script}</span>}
+                    </div>
+                    <div style={{ color: '#333' }}>{scene.description}</div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* analysis_report */}
+            {selectedVideo.analysis_report && Object.keys(selectedVideo.analysis_report).length > 0 && (
+              <div>
+                <Text strong style={{ fontSize: 13 }}>分析报告</Text>
+                {Object.entries(selectedVideo.analysis_report).filter(([k]) => !['run_id', 'analysis_report', 'rhythm', 'tags', 'hook_method', 'selling_points', 'storyboard'].includes(k)).map(([key, val]: [string, any]) => {
+                  const label = ({
+                    hook_quality: '📊 Hook质量',
+                    pacing_score: '⏱ 节奏评分',
+                    engagement_strength: '🔥 互动强度',
+                    cta_clarity: '🎯 CTA清晰度',
+                    improvement_suggestions: '💡 优化建议',
+                    overall_score: '⭐ 综合评分',
+                    formula: '📐 公式',
+                    style: '🎨 风格',
+                  } as any)[key];
+                  if (!label) return null;
+                  return (
+                    <div key={key} style={{ marginTop: 6 }}>
+                      {typeof val === 'number' ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                          <span style={{ width: 80, flexShrink: 0 }}>{label}</span>
+                          <div style={{ flex: 1, height: 8, background: '#f0f0f0', borderRadius: 4 }}>
+                            <div style={{ width: `${Math.min(val, 100)}%`, height: 8, background: val >= 70 ? '#52c41a' : val >= 40 ? '#faad14' : '#ff4d4f', borderRadius: 4 }} />
+                          </div>
+                          <span style={{ fontWeight: 600 }}>{val}</span>
+                        </div>
+                      ) : typeof val === 'string' && key === 'formula' ? (
+                        <Tag color="purple">{label.replace(/^[^\s]+\s/,'')}: {val}</Tag>
+                      ) : typeof val === 'string' && key === 'improvement_suggestions' ? (
+                        <div style={{ fontSize: 12, marginTop: 2 }}>{val}</div>
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </Space>
