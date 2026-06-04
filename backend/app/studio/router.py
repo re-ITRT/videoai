@@ -432,7 +432,15 @@ async def get_session_clips(session_id: int, db: AsyncSession = Depends(get_db),
     files = await _gsf(db, session_id)
     clips = [{"id": f.id, "scene_id": (f.description or "").replace("场景 ", "").replace(" 视频片段", ""), "url": f.file_url} for f in files if f.file_type == "video_clip"]
     final = [{"id": f.id, "url": f.file_url} for f in files if f.file_type == "final_video"]
-    return {"clips": clips, "final_videos": final}
+    subbed = [{"id": f.id, "url": f.file_url} for f in files if f.file_type == "subbed_video"]
+    asr_list = [json.loads(f.description or "[]") for f in files if f.file_type == "asr_subtitles"]
+    asr_durs = [float(f.description or "0") for f in files if f.file_type == "asr_duration"]
+    return {
+        "clips": clips, "final_videos": final,
+        "subbed_videos": subbed,
+        "asr_segments": asr_list[0] if asr_list else [],
+        "asr_duration": asr_durs[0] if asr_durs else 0,
+    }
 
 
 @router.post("/delete-clip")
@@ -592,6 +600,32 @@ async def studio_asr(body: dict, db: AsyncSession = Depends(get_db), user: User 
             except Exception:
                 pass
 
+        # 保存 ASR 结果到 SessionFile
+        session_id = body.get("session_id")
+        if session_id:
+            from app.agent.models import SessionFile
+            # 删除旧的 ASR 记录
+            from sqlalchemy import delete
+            await db.execute(delete(SessionFile).where(
+                SessionFile.session_id == session_id,
+                SessionFile.file_type == "asr_subtitles",
+            ))
+            sf = SessionFile(
+                session_id=session_id, file_type="asr_subtitles",
+                filename="asr_segments.json",
+                description=json.dumps(subs, ensure_ascii=False),
+            )
+            db.add(sf)
+
+            # 如果 session_id 还在 body 里，一并保存持续时长
+            sfd = SessionFile(
+                session_id=session_id, file_type="asr_duration",
+                filename="asr_duration.txt",
+                description=str(round(info.duration, 1) if info.duration else 0),
+            )
+            db.add(sfd)
+            await db.commit()
+
         return {"segments": subs, "duration": round(info.duration, 1) if info.duration else 0}
 
     except Exception as e:
@@ -674,7 +708,26 @@ async def studio_burn_subtitles(body: dict, db: AsyncSession = Depends(get_db), 
         shutil.rmtree(tmpdir, ignore_errors=True)
 
         signed = generate_signed_url(dest.replace("/app/uploads", "/uploads"), expire_seconds=86400)
-        return {"url": f"http://114.117.242.17:3000{signed}"}
+        url = f"http://114.117.242.17:3000{signed}"
+
+        # 保存到 SessionFile
+        session_id = body.get("session_id")
+        if session_id:
+            from app.agent.models import SessionFile
+            from sqlalchemy import delete
+            await db.execute(delete(SessionFile).where(
+                SessionFile.session_id == session_id,
+                SessionFile.file_type == "subbed_video",
+            ))
+            sf = SessionFile(
+                session_id=session_id, file_type="subbed_video",
+                filename=out_name, file_url=url,
+                description="字幕烧录视频",
+            )
+            db.add(sf)
+            await db.commit()
+
+        return {"url": url}
 
     except Exception as e:
         shutil.rmtree(tmpdir, ignore_errors=True)

@@ -59,12 +59,20 @@ export default function StudioPage() {
         clip_collections: stateRes?.clip_collections || [],
         selected_clip_collection_id: stateRes?.selected_clip_collection_id || null,
         final_videos: clipsRes?.final_videos || [],
+        subbed_videos: clipsRes?.subbed_videos || [],
       }
       setState(merged)
       setLocalThreshold(merged.threshold != null ? merged.threshold / 100 : 0.5)
       if (merged.cached_materials?.length) {
         setAllMaterials(merged.cached_materials)
         setMaterials(merged.cached_materials)
+      }
+      // 加载 ASR 结果
+      if (clipsRes?.asr_segments?.length) {
+        setAsrResult({ segments: clipsRes.asr_segments })
+      }
+      if (clipsRes?.subbed_videos?.length) {
+        setSubbedUrl(clipsRes.subbed_videos[0].url)
       }
       // 持久化到 state 文件
       request.put(`/studio/state/${sessionId}`, merged).catch(() => {})
@@ -277,7 +285,7 @@ export default function StudioPage() {
     setAsrLoadingId(id)
     setAsrResult(null)
     try {
-      const res: any = await request.post('/studio/asr', { video_url: url }, { timeout: 600000 })
+      const res: any = await request.post('/studio/asr', { video_url: url, session_id: sessionId }, { timeout: 600000 })
       if (res.error) { message.error(res.error); return }
       setAsrResult(res)
     } catch { message.error('ASR 请求失败') }
@@ -294,6 +302,7 @@ export default function StudioPage() {
       const res: any = await request.post('/studio/burn-subtitles', {
         video_url: vid.url,
         segments: asrResult.segments,
+        session_id: sessionId,
       }, { timeout: 600000 })
       if (res.error) { message.error(res.error); return }
       setSubbedUrl(res.url)
