@@ -22,7 +22,7 @@ class PublishedVideo(Base):
     tags = Column(JSONB, default=[])
     scenes = Column(JSONB, default=[])
     # 播放量
-    play_count = Column(Integer, default=0)
+    play_count = Column(Integer, default=2000)
     # 来源
     source_session_id = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

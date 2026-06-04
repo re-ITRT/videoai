@@ -52,6 +52,7 @@ async def publish_video(
         style=analyze_result.get("style", ""),
         tags=analyze_result.get("tags", []),
         scenes=[],
+        play_count=2000,
         source_session_id=source_session_id,
     )
     db.add(pv)

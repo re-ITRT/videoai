@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Card, Row, Col, Statistic, Skeleton, Tabs, List, Tag, Empty, Spin, Button, message } from 'antd'
+import { Card, Row, Col, Statistic, Skeleton, Tabs, Tag, Empty, Spin, Button, message } from 'antd'
 import { VideoCameraOutlined, FileTextOutlined, ThunderboltOutlined, AppstoreOutlined, PlayCircleOutlined, EyeOutlined, DeleteOutlined } from '@ant-design/icons'
 import request from '../utils/request'
 import { getMaterials, getTasks } from '../utils/api'
@@ -35,16 +35,6 @@ export default function Dashboard() {
 
   useEffect(() => { loadVideos() }, [])
 
-  // 播放量 +1
-  const handlePlay = async (v: any) => {
-    window.open(v.video_url, '_blank')
-    try {
-      await request.post(`/published/${v.id}/view`)
-      loadVideos()
-    } catch { /* */ }
-  }
-
-  // 删除
   const handleDelete = async (id: number) => {
     try {
       await request.delete(`/published/${id}`)
@@ -78,42 +68,46 @@ export default function Dashboard() {
                 ))}
               </Row>
 
-              {/* 已生成视频 */}
-              <Card title={<span><PlayCircleOutlined /> 已生成视频</span>} size="small" extra={
+              <Card title={<span><PlayCircleOutlined /> 已生成视频 ({videos.length})</span>} size="small" extra={
                 <Button size="small" onClick={loadVideos}>刷新</Button>
               }>
                 <Spin spinning={videosLoading}>
                   {videos.length === 0 ? (
                     <Empty description="暂无已生成视频，在工作流中完成字幕生成后点击「导出」" />
                   ) : (
-                    <List
-                      size="small"
-                      dataSource={videos}
-                      renderItem={(v: any) => (
-                        <List.Item actions={[
-                          <Button key="play" type="link" size="small" icon={<EyeOutlined />}
-                            onClick={() => handlePlay(v)}>
-                            {v.play_count || 0}
-                          </Button>,
-                          <Button key="del" type="link" size="small" danger icon={<DeleteOutlined />}
-                            onClick={() => handleDelete(v.id)} />
-                        ]}>
-                          <List.Item.Meta
-                            title={<span style={{ fontSize: 13 }}>{v.title}</span>}
-                            description={
-                              <div style={{ fontSize: 11, color: '#999' }}>
-                                {v.style && <Tag color="green" style={{ fontSize: 10 }}>{v.style}</Tag>}
-                                {v.hook_method && <Tag color="geekblue" style={{ fontSize: 10 }}>🎣 {v.hook_method}</Tag>}
-                                {v.tags?.slice(0, 3).map((t: string, i: number) =>
-                                  <Tag key={i} style={{ fontSize: 10 }}>{t}</Tag>
-                                )}
-                                <div style={{ marginTop: 2 }}>{new Date(v.created_at).toLocaleString('zh-CN')}</div>
+                    <Row gutter={[12, 12]}>
+                      {videos.map((v: any) => (
+                        <Col xs={24} sm={12} md={8} lg={6} key={v.id}>
+                          <Card
+                            size="small"
+                            style={{ height: '100%' }}
+                            cover={
+                              <div style={{ position: 'relative', background: '#000', height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                                onClick={() => window.open(v.video_url, '_blank')}>
+                                <video src={v.video_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                <PlayCircleOutlined style={{ position: 'absolute', fontSize: 40, color: 'rgba(255,255,255,0.8)' }} />
                               </div>
                             }
-                          />
-                        </List.Item>
-                      )}
-                    />
+                            actions={[
+                              <span key="play" onClick={() => { window.open(v.video_url, '_blank'); request.post(`/published/${v.id}/view`).catch(() => {}); }}>
+                                <EyeOutlined /> {v.play_count || 2000}
+                              </span>,
+                              <DeleteOutlined key="del" onClick={() => handleDelete(v.id)} />,
+                            ]}
+                          >
+                            <Card.Meta
+                              title={<span style={{ fontSize: 13 }}>{v.title}</span>}
+                              description={
+                                <div style={{ fontSize: 11, color: '#999' }}>
+                                  {v.style && <Tag color="green" style={{ fontSize: 10 }}>{v.style}</Tag>}
+                                  {v.hook_method && <Tag color="geekblue" style={{ fontSize: 10 }}>🎣 {v.hook_method}</Tag>}
+                                </div>
+                              }
+                            />
+                          </Card>
+                        </Col>
+                      ))}
+                    </Row>
                   )}
                 </Spin>
               </Card>
