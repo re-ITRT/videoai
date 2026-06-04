@@ -27,37 +27,26 @@ async def publish_video(
     if not video_url:
         raise HTTPException(400, "video_url required")
 
-    # 调 video-analyze 分析
-    analyze_result = {}
-    scenes = [{"scene_id": 1, "time_range": "<00:00-00:05>", "description": title, "script": ""}]
+    # 1. 调 material-embed 提取 scenes + tags
+    scenes = []
+    tags = []
+    embed_data = {}
     try:
-        # 优先从 session 剧本中提取 scenes
-        scenes = []
-        if source_session_id:
-            try:
-                from app.agent.models import ensure_session_dir
-                sp = os.path.join(ensure_session_dir(source_session_id)["scripts"], f"script_{source_session_id}.json")
-                if os.path.exists(sp):
-                    with open(sp, "r", encoding="utf-8") as sf:
-                        sd = json.loads(sf.read())
-                    script_scenes = sd.get("script", sd).get("scenes", sd.get("scenes", []))
-                    for sc in script_scenes:
-                        start = sc.get("start_sec", 0)
-                        end = sc.get("end_sec", sc.get("duration", 5))
-                        desc_parts = [sc.get("visual_desc", "")]
-                        lines = sc.get("lines", [])
-                        if lines:
-                            desc_parts.append("台词: " + " | ".join([l.get("text","") for l in lines]))
-                        scenes.append({
-                            "scene_id": sc.get("scene_id", len(scenes)+1),
-                            "time_range": f"<{start}s-{end}s>",
-                            "description": " ".join(desc_parts),
-                            "script": lines[0].get("text", "") if lines else "",
-                        })
-            except Exception:
-                pass
-        if not scenes:
-            scenes = [{"scene_id": 1, "time_range": "<00:00-00:05>", "description": title, "script": ""}]
+        embed_payload = {"material_type": "product", "video_url": video_url}
+        embed_result = await call_workflow("material-embed", embed_payload)
+        embed_data = embed_result.get("data") if isinstance(embed_result, dict) and "data" in embed_result else embed_result
+        scenes = embed_data.get("scenes", []) if isinstance(embed_data, dict) else []
+        if isinstance(embed_data, dict):
+            tags = embed_data.get("video_tags", []) or embed_data.get("tags", [])
+        print(f"[publish] material-embed got {len(scenes)} scenes, {len(tags)} tags")
+    except Exception as e:
+        print(f"[publish] material-embed failed: {e}")
+
+    # 2. 调 video-analyze 分析
+    analyze_result = {}
+    if not scenes:
+        scenes = [{"scene_id": 1, "time_range": "<00:00-00:05>", "description": title, "script": ""}]
+    try:
         analyze_result = await call_workflow("video-analyze", {
             "scenes": scenes,
             "source_platform": "custom",
@@ -66,6 +55,12 @@ async def publish_video(
         })
     except Exception as e:
         print(f"[publish] video-analyze failed: {e}")
+
+    # 合并 tags
+    if isinstance(analyze_result, dict):
+        analyze_tags = analyze_result.get("tags", [])
+        if analyze_tags:
+            tags = list(dict.fromkeys(tags + analyze_tags))
 
     pv = PublishedVideo(
         user_id=user.id,
@@ -76,7 +71,7 @@ async def publish_video(
         hook_method=analyze_result.get("hook_method", ""),
         selling_points=analyze_result.get("selling_points", []),
         style=analyze_result.get("style", ""),
-        tags=analyze_result.get("tags", []),
+        tags=tags,
         scenes=scenes,
         play_count=2000,
         source_session_id=source_session_id,

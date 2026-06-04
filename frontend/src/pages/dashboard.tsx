@@ -143,6 +143,13 @@ export default function Dashboard() {
                       <Space wrap style={{ marginTop: 4 }}>
                         {detailVideo.style && <Tag color="green">{detailVideo.style}</Tag>}
                       </Space>
+                      {detailVideo.tags && detailVideo.tags.length > 0 && (
+                        <div style={{ marginTop: 4 }}>
+                          <Space wrap size={[4, 4]}>
+                            {detailVideo.tags.map((t: string, i: number) => <Tag key={i}>{t}</Tag>)}
+                          </Space>
+                        </div>
+                      )}
                       <div style={{ marginTop: 6, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
                         <EyeOutlined /> 播放量：
                         {editingPlay ? (
