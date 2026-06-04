@@ -432,12 +432,6 @@ const ReferencePage: React.FC = () => {
                   {selectedVideo.tags.map((t: string, i: number) => <Tag key={'t'+i}>{t}</Tag>)}
                 </div>
               )}
-              {selectedVideo.analysis_report?.tags && selectedVideo.analysis_report.tags.length > 0 && (
-                <div style={{ marginTop: 4 }}>
-                  <Tag icon={<TagOutlined />} color="purple" style={{ marginRight: 4, opacity: 0.7 }}>🏷 分析标签</Tag>
-                  {selectedVideo.analysis_report.tags.map((t: string, i: number) => <Tag key={'a'+i}>{t}</Tag>)}
-                </div>
-              )}
             </div>
 
             {selectedVideo.source_url && (
@@ -510,7 +504,7 @@ const ReferencePage: React.FC = () => {
             {selectedVideo.analysis_report && Object.keys(selectedVideo.analysis_report).length > 0 && (
               <div>
                 <Text strong>分析报告</Text>
-                {Object.entries(selectedVideo.analysis_report).filter(([k]) => !['run_id', 'analysis_report', 'rhythm'].includes(k)).map(([key, val]: [string, any]) => (
+                {Object.entries(selectedVideo.analysis_report).filter(([k]) => !['run_id', 'analysis_report', 'rhythm', 'tags'].includes(k)).map(([key, val]: [string, any]) => (
                   <div key={key} style={{ marginTop: 8 }}>
                     <Text strong style={{ fontSize: 13 }}>{{
                       hook_quality: '📊 Hook质量',
