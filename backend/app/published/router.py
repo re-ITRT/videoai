@@ -165,6 +165,69 @@ async def list_published(
     ).order_by(order_fn).offset(skip).limit(limit)
     rows = (await db.execute(q)).scalars().all()
 
+    # 预测播放量：基于参考视频回归模型
+    predicted_play_counts = {}
+    try:
+        from app.script.models import ReferenceVideo
+        ref_q = select(ReferenceVideo).where(ReferenceVideo.user_id == str(user.id))
+        refs = (await db.execute(ref_q)).scalars().all()
+        if len(refs) >= 3:
+            # 提取参考视频特征
+            import math
+            ref_features = []
+            for ref in refs:
+                af = ref.audio_features or {}
+                ar = ref.analysis_report or {}
+                ref_features.append({
+                    "rhythm": ref.rhythm or 0.0,
+                    "hook_quality": ar.get("hook_quality", 0) if isinstance(ar, dict) else 0,
+                    "pacing_score": ar.get("pacing_score", 0) if isinstance(ar, dict) else 0,
+                    "engagement_strength": ar.get("engagement_strength", 0) if isinstance(ar, dict) else 0,
+                    "cta_clarity": ar.get("cta_clarity", 0) if isinstance(ar, dict) else 0,
+                    "overall_score": ar.get("overall_score", 0) if isinstance(ar, dict) else 0,
+                    "bpm": af.get("bpm", 0) or 0,
+                    "lightness_score": af.get("lightness_score", 0) or 0,
+                    "spectral_centroid": af.get("spectral_centroid", 0) or 0,
+                    "zero_crossing_rate": af.get("zero_crossing_rate", 0) or 0,
+                    "play_count": ref.play_count or 2000,
+                })
+            numeric_cols = ["rhythm", "hook_quality", "pacing_score", "engagement_strength",
+                            "cta_clarity", "overall_score", "bpm", "lightness_score",
+                            "spectral_centroid", "zero_crossing_rate"]
+            for r in rows:
+                ar = r.analysis_report or {}
+                af = r.audio_features or {}
+                features = {
+                    "rhythm": r.rhythm or 0.0,
+                    "hook_quality": ar.get("hook_quality", 0) if isinstance(ar, dict) else 0,
+                    "pacing_score": ar.get("pacing_score", 0) if isinstance(ar, dict) else 0,
+                    "engagement_strength": ar.get("engagement_strength", 0) if isinstance(ar, dict) else 0,
+                    "cta_clarity": ar.get("cta_clarity", 0) if isinstance(ar, dict) else 0,
+                    "overall_score": ar.get("overall_score", 0) if isinstance(ar, dict) else 0,
+                    "bpm": af.get("bpm", 0) or 0,
+                    "lightness_score": af.get("lightness_score", 0) or 0,
+                    "spectral_centroid": af.get("spectral_centroid", 0) or 0,
+                    "zero_crossing_rate": af.get("zero_crossing_rate", 0) or 0,
+                }
+                from statistics import median
+                preds = []
+                for col in numeric_cols:
+                    vals = [(f[col], f["play_count"]) for f in ref_features]
+                    xs = [v[0] for v in vals]
+                    ys = [v[1] for v in vals]
+                    n = len(xs)
+                    mx, my = sum(xs)/n, sum(ys)/n
+                    num = sum((xs[i]-mx)*(ys[i]-my) for i in range(n))
+                    den = sum((xs[i]-mx)**2 for i in range(n))
+                    slope = num / den if den > 0 else 0
+                    intercept = my - slope * mx
+                    input_val = features.get(col)
+                    if input_val is not None and isinstance(input_val, (int, float)):
+                        preds.append(slope * input_val + intercept)
+                predicted_play_counts[r.id] = max(round(median(preds)) if preds else 2000, 2000)
+    except Exception as e:
+        print(f"[publish] predict failed: {e}")
+
     items = []
     for r in rows:
         items.append({
@@ -173,6 +236,7 @@ async def list_published(
             "video_url": r.video_url,
             "cover_url": r.cover_url,
             "play_count": r.play_count,
+            "predicted_play_count": predicted_play_counts.get(r.id, r.play_count),
             "hook_method": r.hook_method,
             "style": r.style,
             "tags": r.tags or [],

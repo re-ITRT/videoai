@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Card, Row, Col, Statistic, Skeleton, Tabs, Tag, Empty, Spin, Button, message, Modal, Space, Typography, Divider, InputNumber, Descriptions } from 'antd'
-import { VideoCameraOutlined, FileTextOutlined, ThunderboltOutlined, AppstoreOutlined, PlayCircleOutlined, EyeOutlined, DeleteOutlined } from '@ant-design/icons'
+import { VideoCameraOutlined, FileTextOutlined, ThunderboltOutlined, AppstoreOutlined, PlayCircleOutlined, EyeOutlined, DeleteOutlined, RiseOutlined } from '@ant-design/icons'
 import request from '../utils/request'
 import { getMaterials, getTasks } from '../utils/api'
 import StudioPage from '../modules/studio/StudioPage'
@@ -15,8 +15,6 @@ export default function Dashboard() {
 
   const [detailVisible, setDetailVisible] = useState(false)
   const [detailVideo, setDetailVideo] = useState<any>(null)
-  const [editingPlay, setEditingPlay] = useState(false)
-  const [editPlayVal, setEditPlayVal] = useState(2000)
   const [audioModalVisible, setAudioModalVisible] = useState(false)
   const [audioData, setAudioData] = useState<any>(null)
 
@@ -54,20 +52,9 @@ export default function Dashboard() {
 
   const openDetail = (v: any) => {
     setDetailVideo(v)
-    setEditPlayVal(v.play_count ?? 2000)
-    setEditingPlay(false)
     setDetailVisible(true)
   }
 
-  const savePlayCount = async (val: number) => {
-    if (!detailVideo) return
-    try {
-      await request.put(`/published/${detailVideo.id}/play-count`, { play_count: val })
-      setDetailVideo({ ...detailVideo, play_count: val })
-      setEditingPlay(false)
-      loadVideos()
-    } catch { message.error('保存失败') }
-  }
 
   const cards = [
     { title: '素材总数', value: stats.materials, icon: <VideoCameraOutlined /> },
@@ -115,10 +102,10 @@ export default function Dashboard() {
                                 <PlayCircleOutlined style={{ position: 'absolute', fontSize: 40, color: 'rgba(255,255,255,0.8)' }} />
                               </div>
                             }
-                            actions={[
-                              <EyeOutlined key="play" onClick={() => { openDetail(v); request.post(`/published/${v.id}/view`).catch(() => {}) }} />,
-                              <DeleteOutlined key="del" onClick={() => handleDelete(v.id)} />,
-                            ]}
+            actions={[
+              <EyeOutlined key="play" onClick={() => openDetail(v)} />,
+              <DeleteOutlined key="del" onClick={() => handleDelete(v.id)} />,
+            ]}
                           >
                             <Card.Meta
                               title={<span style={{ fontSize: 13 }}>{v.title}</span>}
@@ -153,21 +140,13 @@ export default function Dashboard() {
                           </Space>
                         </div>
                       )}
-                      {/* 播放量编辑 */}
+                      {/* 播放量（回归预测） */}
                       <div style={{ marginTop: 6, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <EyeOutlined /> 播放量：
-                        {editingPlay ? (
-                          <InputNumber size="small" min={0} value={editPlayVal}
-                            onChange={(v) => setEditPlayVal(v || 0)}
-                            onPressEnter={() => savePlayCount(editPlayVal)}
-                            onBlur={() => savePlayCount(editPlayVal)}
-                            autoFocus style={{ width: 80 }} />
-                        ) : (
-                          <span style={{ cursor: 'pointer', fontWeight: 600, color: '#1677ff' }}
-                            onClick={() => { setEditPlayVal(detailVideo.play_count ?? 2000); setEditingPlay(true) }}>
-                            {detailVideo.play_count ?? 2000}
-                          </span>
-                        )}
+                        <RiseOutlined /> 预测播放量：
+                        <span style={{ fontWeight: 700, fontSize: 16, color: '#1677ff' }}>
+                          {detailVideo.predicted_play_count?.toLocaleString() ?? '计算中...'}
+                        </span>
+                        <Tag color="blue" style={{ fontSize: 10 }}>AI预测</Tag>
                       </div>
                     </div>
 

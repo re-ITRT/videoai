@@ -169,3 +169,55 @@ async def run_attribution_analysis(
         "sample_count": len(features),
         "numeric_features": numeric_cols,
     }
+
+
+@router.post("/predict")
+async def predict_play_count(
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """根据已有参考视频的回归模型，预测输入视频的播放量"""
+    from app.script.models import ReferenceVideo
+    q = select(ReferenceVideo).where(ReferenceVideo.user_id == str(user.id))
+    rows = (await db.execute(q)).scalars().all()
+    if len(rows) < 3:
+        return {"predicted_play_count": 2000, "confidence": "low", "message": "样本不足3个，返回默认值"}
+
+    # 提取训练特征
+    train = [_extract_features(r) for r in rows]
+    numeric_cols = ["rhythm", "hook_quality", "pacing_score", "engagement_strength",
+                    "cta_clarity", "overall_score", "bpm", "lightness_score",
+                    "spectral_centroid", "zero_crossing_rate"]
+
+    # 计算每个特征的回归系数
+    predictions = []
+    for col in numeric_cols:
+        vals = [(f[col], f["play_count"]) for f in train if isinstance(f.get(col), (int, float))]
+        if len(vals) < 3:
+            continue
+        xs = [v[0] for v in vals]
+        ys = [v[1] for v in vals]
+        n = len(xs)
+        mx, my = sum(xs)/n, sum(ys)/n
+        num = sum((xs[i]-mx)*(ys[i]-my) for i in range(n))
+        den = sum((xs[i]-mx)**2 for i in range(n))
+        slope = num / den if den > 0 else 0
+        intercept = my - slope * mx
+        # 用该特征预测
+        input_val = body.get(col)
+        if input_val is not None and isinstance(input_val, (int, float)):
+            pred = slope * input_val + intercept
+            predictions.append(pred)
+
+    if not predictions:
+        return {"predicted_play_count": 2000, "confidence": "none"}
+
+    from statistics import median
+    predicted = round(median(predictions))
+    # 置信度：基于预测值的标准差评估
+    return {
+        "predicted_play_count": max(predicted, 0),
+        "confidence": "medium" if len(predictions) >= 5 else "low",
+        "features_used": len(predictions),
+    }
