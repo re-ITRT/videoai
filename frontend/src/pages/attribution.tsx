@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Card, Row, Col, Statistic, Tabs, Tag, Empty, Spin, Button, Typography, Progress } from 'antd'
-import { PlayCircleOutlined, BarChartOutlined, RiseOutlined, NodeIndexOutlined, ExperimentOutlined, LinkOutlined, AppstoreOutlined } from '@ant-design/icons'
+import { ThunderboltOutlined, BarChartOutlined, RiseOutlined, NodeIndexOutlined, LinkOutlined, AppstoreOutlined, PlayCircleOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import request from '../utils/request'
 
@@ -69,7 +69,7 @@ export default function AttributionPage() {
             基于 {data.length} 个参考视频的 {numericCols.length} 个数值特征 × 播放量 分析
           </Text>
         </div>
-        <Button type="primary" icon={<ExperimentOutlined />} loading={analyzing} onClick={loadData}>
+        <Button type="primary" icon={<ThunderboltOutlined />} loading={analyzing} onClick={loadData}>
           重新分析
         </Button>
       </div>
@@ -169,7 +169,7 @@ export default function AttributionPage() {
             // ════ Tab 2: 相关性矩阵 ════
             {
               key: 'correlation',
-              label: <span><ExperimentOutlined /> 相关性矩阵</span>,
+              label: <span><ThunderboltOutlined /> 相关性矩阵</span>,
               children: result ? (
                 <div style={{ overflowX: 'auto' }}>
                   <div style={{ fontSize: 12, marginBottom: 8, color: '#666' }}>
@@ -285,7 +285,7 @@ export default function AttributionPage() {
             // ════ Tab 5: 最佳组合 ════
             {
               key: 'combos',
-              label: <span><ExperimentOutlined /> 最佳组合</span>,
+              label: <span><ThunderboltOutlined /> 最佳组合</span>,
               children: result ? (
                 <div>
                   <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 16 }}>
