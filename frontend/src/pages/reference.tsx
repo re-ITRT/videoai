@@ -20,7 +20,6 @@ import {
   Divider,
   InputNumber,
   Descriptions,
-  message,
 } from 'antd';
 import {
   PlayCircleOutlined,
@@ -90,7 +89,6 @@ const ReferencePage: React.FC = () => {
   const [editingPlayCount, setEditingPlayCount] = useState(false);
   const [editPlayValue, setEditPlayValue] = useState(2000);
   const [audioModalVisible, setAudioModalVisible] = useState(false);
-  const [audioAnalyzing, setAudioAnalyzing] = useState(false);
   const [audioData, setAudioData] = useState<any>(null);
 
   // 加载视频列表
