@@ -547,21 +547,12 @@ const ReferencePage: React.FC = () => {
             )}
 
             {/* 🎵 BGM 分析 */}
-            {selectedVideo.id && (
+            {selectedVideo.id && selectedVideo.audio_features?.bpm && (
               <div>
-                <Button size="small" type="default" loading={audioAnalyzing}
-                  onClick={async () => {
-                    setAudioAnalyzing(true)
-                    try {
-                      const res: any = await request.post(`/reference/videos/${selectedVideo.id}/analyze-audio`, {}, { timeout: 180000 })
-                      if (res.bpm) {
-                        setAudioData(res)
-                        setAudioModalVisible(true)
-                      } else {
-                        message.error(res.detail || '分析失败')
-                      }
-                    } catch { message.error('音频分析请求失败') }
-                    setAudioAnalyzing(false)
+                <Button size="small" type="default"
+                  onClick={() => {
+                    setAudioData(selectedVideo.audio_features)
+                    setAudioModalVisible(true)
                   }}>
                   🎵 BGM 分析
                 </Button>
