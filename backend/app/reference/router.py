@@ -124,7 +124,7 @@ async def upload_and_analyze(
   "scenes": [
     {{"scene_id": 1, "time_range": "<0s-3s>", "description": "场景描述", "script": "旁白/台词"}}
   ],
-  "analysis": {{"style": "风格描述", "audience": "目标人群", "mood": "氛围情绪"}}
+  "analysis": {{"style": "风格描述", "audience": "目标人群", "mood": "氛围情绪", "hook_quality": 85, "pacing_score": 70, "engagement_strength": 90, "cta_clarity": 60, "overall_score": 78, "formula": "痛点Hook+场景对比+产品特写+CTA", "improvement_suggestions": "建议在前3秒强化视觉冲击力"}}
 }}
 视频URL：{video_url[:80]}...
 标题：{title or "无"}
