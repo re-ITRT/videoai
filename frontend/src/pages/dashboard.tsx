@@ -166,8 +166,6 @@ export default function Dashboard() {
 
                     <Divider style={{ margin: '8px 0' }} />
 
-                    <video src={detailVideo.video_url} controls style={{ width: '100%', maxHeight: 400, background: '#000', borderRadius: 4 }} />
-
                     {detailVideo.analysis_report && Object.keys(detailVideo.analysis_report).length > 0 && (
                       <>
                         <Divider style={{ margin: '8px 0' }} />
