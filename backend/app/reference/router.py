@@ -35,7 +35,7 @@ async def upload_and_analyze(
     current_user: User = Depends(get_current_user),
 ):
     """上传视频 → material-embed提取scenes → video-analyze语义分析 → 存库"""
-    import os, uuid, shutil
+    import os, uuid, shutil, json, httpx
     from app.core.signer import generate_signed_url
     from app.workers.workflow import call_workflow
     from app.script.models import ReferenceVideo
@@ -96,7 +96,69 @@ async def upload_and_analyze(
     scenes = []
     tags = []
 
-    # 调 material-embed（图片用 image_url，视频用 video_url）
+    # ── 本地 LLM 素材分析（替代 Coze 工作流）──┐
+    local_tags = []
+    local_text_content = ""
+    local_scenes = []
+    local_analyze = {}
+    try:
+        from app.workflow.models import WorkflowConfig
+        from sqlalchemy import select as _s
+        wf = await db.execute(_s(WorkflowConfig).where(
+            WorkflowConfig.user_id == user.id,
+            WorkflowConfig.workflow_name == "material-analyze",
+            WorkflowConfig.enabled == 1,
+        ))
+        wf_cfg = wf.scalar_one_or_none()
+        if wf_cfg:
+            cfg_dict = json.loads(wf_cfg.config or "{}")
+            api_key = cfg_dict.get("api_key")
+            base_url = (cfg_dict.get("base_url") or "https://api.deepseek.com/v1").rstrip("/")
+            model = cfg_dict.get("model", "deepseek-v4-flash")
+            if api_key and video_url:
+                llm_prompt = f"""分析以下视频/图片内容，以JSON格式输出（不要其他文本）：
+{{
+  "title": "简短标题",
+  "description": "详细的多模态内容描述（包含画面、主体、动作、氛围等）",
+  "tags": ["标签1", "标签2", ...],
+  "scenes": [
+    {{"scene_id": 1, "time_range": "<0s-3s>", "description": "场景描述", "script": "旁白/台词"}}
+  ],
+  "analysis": {{"style": "风格描述", "audience": "目标人群", "mood": "氛围情绪"}}
+}}
+视频URL：{video_url[:80]}...
+标题：{title or "无"}
+分类：{category or "无"}"""
+                payload = {
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": "你是素材内容分析专家，仔细分析视频/图片内容，输出结构化JSON数据，只输出JSON不要其他内容。"},
+                        {"role": "user", "content": llm_prompt}
+                    ],
+                    "temperature": 0.3,
+                    "response_format": {"type": "json_object"},
+                }
+                async with httpx.AsyncClient(timeout=60) as client:
+                    resp = await client.post(
+                        f"{base_url}/chat/completions",
+                        json=payload,
+                        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                    )
+                    if resp.status_code == 200:
+                        result = resp.json()
+                        content = result["choices"][0]["message"]["content"]
+                        import json as _j
+                        parsed = _j.loads(content)
+                        local_tags = parsed.get("tags", [])
+                        local_text_content = parsed.get("description", "")
+                        local_scenes = parsed.get("scenes", [])
+                        local_analyze = parsed.get("analysis", {})
+                        if parsed.get("title"):
+                            title = parsed["title"]
+    except Exception as e:
+        print(f"[upload-analyze] local LLM analyze failed: {e}")
+
+    # 调 material-embed（Coze 兜底）
     try:
         embed_payload = {"material_type": "product"}
         if is_video:
@@ -137,6 +199,10 @@ async def upload_and_analyze(
         except Exception:
             analyze_result = {}
 
+    scenes = local_scenes or scenes or []
+    tags = local_tags or tags or []
+    text_content = local_text_content or (embed_data.get("text_content", "") if isinstance(embed_data, dict) else "")
+
     db_video = ReferenceVideo(
         user_id=str(current_user.id),
         source_platform=source_platform,
@@ -145,7 +211,7 @@ async def upload_and_analyze(
         category=category,
         # material-embed 数据
         tags=tags,
-        text_content=embed_data.get("text_content", "") if isinstance(embed_data, dict) else "",
+        text_content=text_content,
         text_embedding=embed_data.get("text_embedding", []) if isinstance(embed_data, dict) else [],
         image_embedding=embed_data.get("image_embedding", []) if isinstance(embed_data, dict) else [],
         scenes=scenes,
@@ -155,7 +221,7 @@ async def upload_and_analyze(
         selling_points=analyze_result.get("selling_points", []),
         storyboard=analyze_result.get("storyboard", []),
         style=analyze_result.get("style", ""),
-        analysis_report=analyze_result or {},
+        analysis_report=local_analyze if local_analyze else (analyze_result or {}),
     )
     db.add(db_video)
     await db.commit()

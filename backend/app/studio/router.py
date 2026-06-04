@@ -659,7 +659,7 @@ async def studio_burn_subtitles(body: dict, db: AsyncSession = Depends(get_db), 
         out_name = f"subbed_{uuid.uuid4().hex[:8]}.mp4"
         out_path = os.path.join(tmpdir, out_name)
         result = subprocess.run(
-            ["ffmpeg", "-i", vid_path, "-vf", f"subtitles={srt_path}:fontsdir=/app/models/fonts:force_style=FontName=WenQuanYi Micro Hei,FontSize=16,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=1",
+            ["ffmpeg", "-i", vid_path, "-vf", f"subtitles={srt_path}:force_style='FontName=Serif,FontSize=16,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=1'",
              "-c:a", "copy", "-y", out_path],
             capture_output=True, text=True, timeout=120,
         )

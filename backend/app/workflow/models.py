@@ -67,4 +67,13 @@ AVAILABLE_WORKFLOWS = {
             {"key": "model", "label": "模型名称", "type": "text", "placeholder": "deepseek-v4-flash"},
         ],
     },
+    "material-analyze": {
+        "name": "素材分析",
+        "description": "上传视频/图片后，用 LLM 自动分析素材内容、生成标签和描述、预览生成 Prompt",
+        "fields": [
+            {"key": "api_key", "label": "API Key", "type": "password", "placeholder": "sk-..."},
+            {"key": "base_url", "label": "API 地址", "type": "text", "placeholder": "https://api.deepseek.com/v1"},
+            {"key": "model", "label": "模型名称", "type": "text", "placeholder": "deepseek-v4-flash"},
+        ],
+    },
 }
