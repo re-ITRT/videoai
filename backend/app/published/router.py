@@ -1,4 +1,5 @@
 """已生成视频 API — 导出/列表/播放量"""
+import os, json
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func as sa_func, delete
@@ -18,7 +19,6 @@ async def publish_video(
 ):
     """导出视频：调 video-analyze 分析 → 存 published_videos"""
     from app.workers.workflow import call_workflow
-    import json
 
     video_url = body.get("video_url", "")
     title = body.get("title", "未命名视频")
@@ -29,9 +29,35 @@ async def publish_video(
 
     # 调 video-analyze 分析
     analyze_result = {}
+    scenes = [{"scene_id": 1, "time_range": "<00:00-00:05>", "description": title, "script": ""}]
     try:
-        # 构造 scenes（可能有，用简单的占位）
-        scenes = [{"scene_id": 1, "time_range": "<00:00-00:05>", "description": title, "script": ""}]
+        # 优先从 session 剧本中提取 scenes
+        scenes = []
+        if source_session_id:
+            try:
+                from app.agent.models import ensure_session_dir
+                sp = os.path.join(ensure_session_dir(source_session_id)["scripts"], f"script_{source_session_id}.json")
+                if os.path.exists(sp):
+                    with open(sp, "r", encoding="utf-8") as sf:
+                        sd = json.loads(sf.read())
+                    script_scenes = sd.get("script", sd).get("scenes", sd.get("scenes", []))
+                    for sc in script_scenes:
+                        start = sc.get("start_sec", 0)
+                        end = sc.get("end_sec", sc.get("duration", 5))
+                        desc_parts = [sc.get("visual_desc", "")]
+                        lines = sc.get("lines", [])
+                        if lines:
+                            desc_parts.append("台词: " + " | ".join([l.get("text","") for l in lines]))
+                        scenes.append({
+                            "scene_id": sc.get("scene_id", len(scenes)+1),
+                            "time_range": f"<{start}s-{end}s>",
+                            "description": " ".join(desc_parts),
+                            "script": lines[0].get("text", "") if lines else "",
+                        })
+            except Exception:
+                pass
+        if not scenes:
+            scenes = [{"scene_id": 1, "time_range": "<00:00-00:05>", "description": title, "script": ""}]
         analyze_result = await call_workflow("video-analyze", {
             "scenes": scenes,
             "source_platform": "custom",
@@ -51,7 +77,7 @@ async def publish_video(
         selling_points=analyze_result.get("selling_points", []),
         style=analyze_result.get("style", ""),
         tags=analyze_result.get("tags", []),
-        scenes=[],
+        scenes=scenes,
         play_count=2000,
         source_session_id=source_session_id,
     )
