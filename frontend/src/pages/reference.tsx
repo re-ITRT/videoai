@@ -46,6 +46,7 @@ interface ReferenceVideo {
   rhythm?: number;
   scenes?: any[];
   tags?: string[];
+  play_count?: number;
   created_at: string;
 }
 
@@ -291,7 +292,9 @@ const ReferencePage: React.FC = () => {
                       )
                     }
                     actions={[
-                      <EyeOutlined key="view" onClick={() => handleViewDetail(video)} />,
+                      <span key="view" style={{ cursor: 'pointer' }} onClick={() => { handleViewDetail(video); request.post(`/reference/videos/${video.id}/view`).catch(() => {}); }}>
+                        <EyeOutlined /> {video.play_count ?? 2000}
+                      </span>,
                       <DeleteOutlined key="delete" onClick={() => handleDelete(video.id)} />,
                     ]}
                   >

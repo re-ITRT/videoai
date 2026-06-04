@@ -297,6 +297,22 @@ async def get_video_detail(
     return ReferenceVideoResponse.model_validate(video)
 
 
+@router.post("/videos/{video_id}/view")
+async def increment_reference_view(
+    video_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """增加参考视频播放量"""
+    from app.script.models import ReferenceVideo
+    r = await db.get(ReferenceVideo, video_id)
+    if not r or str(r.user_id) != str(current_user.id):
+        raise HTTPException(404, "视频不存在")
+    r.play_count = (r.play_count or 2000) + 1
+    await db.commit()
+    return {"play_count": r.play_count}
+
+
 @router.delete("/videos/{video_id}")
 async def delete_video(
     video_id: int,

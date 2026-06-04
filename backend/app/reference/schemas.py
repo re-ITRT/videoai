@@ -40,6 +40,7 @@ class ReferenceVideoResponse(BaseModel):
     rhythm: float = 0.0
     scenes: Optional[List[Dict[str, Any]]] = []
     tags: Optional[List[str]] = []
+    play_count: int = 2000
     created_at: datetime
 
     class Config:

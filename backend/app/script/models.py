@@ -26,6 +26,7 @@ class ReferenceVideo(Base):
     scenes = Column(JSONB, default=[])  # scenes 列表（从 material-embed 提取）
     cover_url = Column(Text, default="")  # 视频封面截帧
     rhythm = Column(Float, default=0.0)  # 平均场景时长（秒），用于判断剪辑节奏
+    play_count = Column(Integer, default=2000)  # 播放量
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
