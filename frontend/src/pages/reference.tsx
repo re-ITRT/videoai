@@ -492,11 +492,13 @@ const ReferencePage: React.FC = () => {
             {selectedVideo.selling_points && selectedVideo.selling_points.length > 0 && (
               <div>
                 <Text strong>核心卖点：</Text>
-                <ul style={{ margin: 0 }}>
-                  {selectedVideo.selling_points.map((p: string, i: number) => (
-                    <li key={i}>{p}</li>
-                  ))}
-                </ul>
+                <div style={{ marginTop: 4 }}>
+                  <Space wrap>
+                    {selectedVideo.selling_points.map((p: string, i: number) => (
+                      <Tag key={i} color="volcano">{p}</Tag>
+                    ))}
+                  </Space>
+                </div>
               </div>
             )}
 
