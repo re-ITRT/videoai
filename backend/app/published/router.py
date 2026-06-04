@@ -179,6 +179,7 @@ async def list_published(
             "rhythm": r.rhythm or 0.0,
             "scenes": r.scenes or [],
             "analysis_report": r.analysis_report or {},
+            "audio_features": r.audio_features or {},
             "created_at": r.created_at.isoformat() if r.created_at else "",
         })
 
