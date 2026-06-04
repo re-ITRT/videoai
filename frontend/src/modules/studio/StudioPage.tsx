@@ -39,6 +39,7 @@ export default function StudioPage() {
   const [asrLoadingId, setAsrLoadingId] = useState<number | null>(null)
   const [burning, setBurning] = useState(false)
   const [subbedUrl, setSubbedUrl] = useState('')
+  const [exporting, setExporting] = useState(false)
 
   // 加载 Session 列表
   useEffect(() => {
@@ -311,6 +312,25 @@ export default function StudioPage() {
     setBurning(false)
   }
 
+  // 导出：调 video-analyze → 存 published_videos
+  const doExport = async () => {
+    if (!subbedUrl) return
+    setExporting(true)
+    try {
+      const res: any = await request.post('/published/export', {
+        video_url: subbedUrl,
+        title: state.session_name || '导出视频',
+        session_id: sessionId,
+      }, { timeout: 300000 })
+      if (res.success) {
+        message.success('已导出到已生成视频！')
+      } else {
+        message.error(res.message || '导出失败')
+      }
+    } catch { message.error('导出请求失败') }
+    setExporting(false)
+  }
+
   const StepBox = ({ title, extra, children }: any) => (
     <Card title={title} size="small" extra={extra} style={{ width: 280, flexShrink: 0, minHeight: 380 }}>{children}</Card>
   )
@@ -538,6 +558,8 @@ export default function StudioPage() {
                     <a href={subbedUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#52c41a' }}>
                       ✅ 查看带字幕视频
                     </a>
+                    <Button size="small" type="primary" style={{ marginLeft: 8, fontSize: 11 }}
+                      loading={exporting} onClick={doExport}>导出</Button>
                   </div>
                 )}
               </div>
