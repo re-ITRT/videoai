@@ -44,6 +44,7 @@ interface ReferenceVideo {
   style?: string;
   analysis_report?: any;
   cover_url?: string;
+  rhythm?: number;
   scenes?: any[];
   tags?: string[];
   created_at: string;
@@ -422,6 +423,7 @@ const ReferencePage: React.FC = () => {
                 )}
                 {selectedVideo.category && <Tag color="blue">{selectedVideo.category}</Tag>}
                 {selectedVideo.style && <Tag color="green">{selectedVideo.style}</Tag>}
+                {selectedVideo.rhythm ? <Tag color="orange">{selectedVideo.rhythm <= 2 ? '⚡快' : selectedVideo.rhythm <= 5 ? '~中' : '🐢慢'}</Tag> : null}
               </Space>
               {selectedVideo.tags && selectedVideo.tags.length > 0 && (
                 <div style={{ marginTop: 8 }}>
@@ -507,7 +509,7 @@ const ReferencePage: React.FC = () => {
             {selectedVideo.analysis_report && Object.keys(selectedVideo.analysis_report).length > 0 && (
               <div>
                 <Text strong>分析报告</Text>
-                {Object.entries(selectedVideo.analysis_report).filter(([k]) => !['run_id', 'analysis_report'].includes(k)).map(([key, val]: [string, any]) => (
+                {Object.entries(selectedVideo.analysis_report).filter(([k]) => !['run_id', 'analysis_report', 'rhythm'].includes(k)).map(([key, val]: [string, any]) => (
                   <div key={key} style={{ marginTop: 8 }}>
                     <Text strong style={{ fontSize: 13 }}>{{
                       hook_quality: '📊 Hook质量',

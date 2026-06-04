@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, UniqueConstraint, Float
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import func
 from app.core.database import Base
@@ -25,6 +25,7 @@ class ReferenceVideo(Base):
     image_embedding = Column(JSONB, default=[])  # 图片向量
     scenes = Column(JSONB, default=[])  # scenes 列表（从 material-embed 提取）
     cover_url = Column(Text, default="")  # 视频封面截帧
+    rhythm = Column(Float, default=0.0)  # 平均场景时长（秒），用于判断剪辑节奏
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
