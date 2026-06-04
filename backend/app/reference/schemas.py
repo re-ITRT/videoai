@@ -38,6 +38,8 @@ class ReferenceVideoResponse(BaseModel):
     analysis_report: Optional[Dict[str, Any]]
     cover_url: Optional[str] = ""
     rhythm: float = 0.0
+    scenes: Optional[List[Dict[str, Any]]] = []
+    tags: Optional[List[str]] = []
     created_at: datetime
 
     class Config:
