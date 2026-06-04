@@ -346,29 +346,27 @@ async def analyze_reference_audio(
 
     # 找到本地视频文件
     video_path = None
-    if r.source_url and "/uploads/" in r.source_url:
-        idx = r.source_url.find("/uploads/")
-        local = "/app" + r.source_url[idx:]
-        # 去掉 signed 路径中的 /signed/xxx/ 前缀
-        if "/signed/" in local:
-            import re
-            m = re.search(r'/signed/[^/]+/(.+)', local)
-            if m:
-                local = "/app/uploads/" + m.group(1)
-        if os.path.exists(local):
-            video_path = local
-    # 也尝试从 cover_url 反向找视频文件
+    src = str(r.source_url or "")
+    if src:
+        import re
+        # 处理 /signed/xxx/filename 格式
+        m = re.search(r'/signed/[^/]+/(.+)', src)
+        if m:
+            candidate = "/app/uploads/" + m.group(1)
+            if os.path.exists(candidate):
+                video_path = candidate
+        # 处理 /uploads/ 格式
+        if not video_path and "/uploads/" in src:
+            candidate = "/app" + src[src.find("/uploads/"):]
+            if os.path.exists(candidate):
+                video_path = candidate
     if not video_path and r.cover_url:
-        idx = r.cover_url.find("/uploads/")
-        if idx >= 0:
-            local = "/app" + r.cover_url[idx:]
-            import re
-            m = re.search(r'/signed/[^/]+/(.+)', local)
-            if m:
-                local = "/app/uploads/" + m.group(1)
-            # cover 是 jpg，尝试找对应的 mp4
+        src2 = str(r.cover_url)
+        import re
+        m = re.search(r'/signed/[^/]+/(.+)', src2)
+        if m:
             for ext in ('.mp4', '.webm', '.mov'):
-                trial = re.sub(r'\.\w+$', ext, local)
+                trial = re.sub(r'\.\w+$', ext, "/app/uploads/" + m.group(1))
                 if os.path.exists(trial):
                     video_path = trial
                     break
