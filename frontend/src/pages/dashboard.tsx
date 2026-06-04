@@ -13,7 +13,6 @@ export default function Dashboard() {
   const [videos, setVideos] = useState<any[]>([])
   const [videosLoading, setVideosLoading] = useState(false)
 
-  // 详情弹窗
   const [detailVisible, setDetailVisible] = useState(false)
   const [detailVideo, setDetailVideo] = useState<any>(null)
   const [editingPlay, setEditingPlay] = useState(false)
@@ -49,11 +48,6 @@ export default function Dashboard() {
       message.success('已删除')
       loadVideos()
     } catch { message.error('删除失败') }
-  }
-
-  const handlePlay = (v: any) => {
-    window.open(v.video_url, '_blank')
-    request.post(`/published/${v.id}/view`).catch(() => {})
   }
 
   const openDetail = (v: any) => {
@@ -120,7 +114,7 @@ export default function Dashboard() {
                               </div>
                             }
                             actions={[
-                              <EyeOutlined key="play" onClick={() => handlePlay(v)} />,
+                              <EyeOutlined key="play" onClick={() => { openDetail(v); request.post(`/published/${v.id}/view`).catch(() => {}) }} />,
                               <DeleteOutlined key="del" onClick={() => handleDelete(v.id)} />,
                             ]}
                           >
@@ -141,7 +135,6 @@ export default function Dashboard() {
                 </Spin>
               </Card>
 
-              {/* 详情弹窗 */}
               <Modal title="视频详情" open={detailVisible} onCancel={() => setDetailVisible(false)} footer={null} width={800}>
                 {detailVideo && (
                   <Space direction="vertical" style={{ width: '100%' }} size="small">
@@ -150,7 +143,6 @@ export default function Dashboard() {
                       <Space wrap style={{ marginTop: 4 }}>
                         {detailVideo.style && <Tag color="green">{detailVideo.style}</Tag>}
                       </Space>
-                      {/* 播放量编辑 */}
                       <div style={{ marginTop: 6, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
                         <EyeOutlined /> 播放量：
                         {editingPlay ? (
@@ -174,24 +166,18 @@ export default function Dashboard() {
 
                     <Divider style={{ margin: '8px 0' }} />
 
-                    {/* 视频播放器 */}
                     <video src={detailVideo.video_url} controls style={{ width: '100%', maxHeight: 400, background: '#000', borderRadius: 4 }} />
 
-                    {/* analysis_report */}
                     {detailVideo.analysis_report && Object.keys(detailVideo.analysis_report).length > 0 && (
                       <>
                         <Divider style={{ margin: '8px 0' }} />
                         <Text strong style={{ fontSize: 13 }}>分析报告</Text>
                         {Object.entries(detailVideo.analysis_report).filter(([k]) => !['run_id', 'tags', 'hook_method', 'selling_points', 'storyboard'].includes(k)).map(([key, val]: [string, any]) => {
                           const label = ({
-                            hook_quality: '📊 Hook质量',
-                            pacing_score: '⏱ 节奏评分',
-                            engagement_strength: '🔥 互动强度',
-                            cta_clarity: '🎯 CTA清晰度',
-                            improvement_suggestions: '💡 优化建议',
-                            overall_score: '⭐ 综合评分',
-                            formula: '📐 公式',
-                            style: '🎨 风格',
+                            hook_quality: '📊 Hook质量', pacing_score: '⏱ 节奏评分',
+                            engagement_strength: '🔥 互动强度', cta_clarity: '🎯 CTA清晰度',
+                            improvement_suggestions: '💡 优化建议', overall_score: '⭐ 综合评分',
+                            formula: '📐 公式', style: '🎨 风格',
                           } as any)[key];
                           if (!label) return null;
                           return (
