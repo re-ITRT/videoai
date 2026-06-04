@@ -5,6 +5,7 @@ from sqlalchemy import select, func as sa_func, delete
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.auth.models import User
+from app.published.models import PublishedVideo
 
 router = APIRouter(prefix="/api/v1/published", tags=["published"])
 
@@ -16,7 +17,6 @@ async def publish_video(
     user: User = Depends(get_current_user),
 ):
     """导出视频：调 video-analyze 分析 → 存 published_videos"""
-    from app.published.models import PublishedVideo
     from app.workers.workflow import call_workflow
     import json
 
