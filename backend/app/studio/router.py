@@ -482,14 +482,33 @@ async def studio_asr(body: dict, db: AsyncSession = Depends(get_db), user: User 
 
     tmpdir = tempfile.mkdtemp()
     try:
-        # 下载视频
+        # 从 URL 提取本地路径（绕过 signed URL 过期问题）
         vid_path = os.path.join(tmpdir, "input.mp4")
-        async with httpx.AsyncClient(timeout=300) as client:
-            url = video_url if video_url.startswith("http") else f"http://114.117.242.17:3000{video_url}"
-            resp = await client.get(url)
-            resp.raise_for_status()
-            with open(vid_path, "wb") as f:
-                f.write(resp.content)
+        local_path = None
+        idx = video_url.find("/uploads/")
+        if idx >= 0:
+            local_path = "/app" + video_url[idx:]
+            if not os.path.exists(local_path):
+                local_path = None
+        if not local_path:
+            idx = video_url.find("/signed/")
+            if idx >= 0:
+                rest = video_url[idx + 8:]
+                slash = rest.find("/")
+                if slash >= 0:
+                    local_path = "/app/uploads/" + rest[slash+1:]
+                    if not os.path.exists(local_path):
+                        local_path = None
+        if local_path:
+            with open(local_path, "rb") as src, open(vid_path, "wb") as dst:
+                dst.write(src.read())
+        else:
+            async with httpx.AsyncClient(timeout=300) as client:
+                url = video_url if video_url.startswith("http") else f"http://114.117.242.17:3000{video_url}"
+                resp = await client.get(url)
+                resp.raise_for_status()
+                with open(vid_path, "wb") as f:
+                    f.write(resp.content)
 
         # 提取音频
         audio_path = os.path.join(tmpdir, "audio.wav")
@@ -531,14 +550,33 @@ async def studio_burn_subtitles(body: dict, db: AsyncSession = Depends(get_db), 
 
     tmpdir = tempfile.mkdtemp()
     try:
-        # 下载视频
+        # 从 URL 提取本地路径（绕过 signed URL 过期问题）
         vid_path = os.path.join(tmpdir, "input.mp4")
-        async with httpx.AsyncClient(timeout=300) as client:
-            url = video_url if video_url.startswith("http") else f"http://114.117.242.17:3000{video_url}"
-            resp = await client.get(url)
-            resp.raise_for_status()
-            with open(vid_path, "wb") as f:
-                f.write(resp.content)
+        local_path = None
+        idx = video_url.find("/uploads/")
+        if idx >= 0:
+            local_path = "/app" + video_url[idx:]
+            if not os.path.exists(local_path):
+                local_path = None
+        if not local_path:
+            idx = video_url.find("/signed/")
+            if idx >= 0:
+                rest = video_url[idx + 8:]
+                slash = rest.find("/")
+                if slash >= 0:
+                    local_path = "/app/uploads/" + rest[slash+1:]
+                    if not os.path.exists(local_path):
+                        local_path = None
+        if local_path:
+            with open(local_path, "rb") as src, open(vid_path, "wb") as dst:
+                dst.write(src.read())
+        else:
+            async with httpx.AsyncClient(timeout=300) as client:
+                url = video_url if video_url.startswith("http") else f"http://114.117.242.17:3000{video_url}"
+                resp = await client.get(url)
+                resp.raise_for_status()
+                with open(vid_path, "wb") as f:
+                    f.write(resp.content)
 
         # 生成 SRT 字幕文件
         srt_path = os.path.join(tmpdir, "subs.srt")
