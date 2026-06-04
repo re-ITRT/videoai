@@ -61,4 +61,5 @@ async def get_material_embedding(
         "text_content": material.text_content or "",
         "text_embedding_dim": 1024 if has_tags else 0,
         "image_embedding_dim": 1024 if has_tags else 0,
+        "audio_features": material.audio_features or {},
     }

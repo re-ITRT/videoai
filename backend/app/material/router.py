@@ -103,16 +103,51 @@ async def upload_material_file(
     import logging
     embed_logger = logging.getLogger("material-embed")
 
-    # 音频素材：直接标记完成，不调 Coze
+    # 音频素材：直接标记完成 + 跑 Librosa 分析
     if material_type == "audio" or input_type == "audio":
         try:
             tags = ["BGM", category or "音频"] if category else ["BGM"]
+            # Librosa 分析
+            audio_features = {}
+            try:
+                import librosa
+                filepath = UPLOAD_DIR / filename
+                y, sr = librosa.load(str(filepath), sr=None, mono=True)
+                duration = float(librosa.get_duration(y=y, sr=sr))
+                tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
+                bpm = float(tempo) if tempo else 120.0
+                cent = librosa.feature.spectral_centroid(y=y, sr=sr)
+                centroid_mean = float(cent.mean())
+                zcr = librosa.feature.zero_crossing_rate(y)
+                zcr_mean = float(zcr.mean())
+                rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr)
+                rolloff_mean = float(rolloff.mean())
+                mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
+                mfcc_mean = [round(float(mfcc[i].mean()), 4) for i in range(13)]
+                bpm_score = min(bpm / 2.0, 50.0)
+                cent_score = min(centroid_mean / 50.0, 25.0)
+                zcr_score = min(zcr_mean * 500, 25.0)
+                lightness = round(min(bpm_score + cent_score + zcr_score, 100), 1)
+                mood = "稳重" if lightness < 30 else "中性" if lightness < 55 else "轻快"
+                audio_features = {
+                    "duration": round(duration, 2), "bpm": round(bpm, 1),
+                    "spectral_centroid": round(centroid_mean, 2),
+                    "zero_crossing_rate": round(zcr_mean, 6),
+                    "spectral_rolloff": round(rolloff_mean, 2),
+                    "mfcc_mean": mfcc_mean,
+                    "lightness_score": lightness, "mood": mood,
+                    "features": {"bpm_score": round(bpm_score, 1), "centroid_score": round(cent_score, 1), "zcr_score": round(zcr_score, 1)},
+                }
+            except Exception as ae:
+                embed_logger.error(f"audio material {material.id} librosa analysis failed: {ae}")
             async with async_session() as session:
                 m = await session.get(type(material), material.id)
                 if m:
                     m.tags = tags
+                    if audio_features:
+                        m.audio_features = audio_features
                     await session.commit()
-            embed_logger.info(f"audio material {material.id}: tagged as BGM, no Coze embed needed")
+            embed_logger.info(f"audio material {material.id}: tagged+analyzed done")
         except Exception as e:
             embed_logger.error(f"audio material {material.id} tag failed: {e}")
         return {

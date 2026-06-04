@@ -66,27 +66,53 @@ export default function MaterialList() {
       </div>
       <Table dataSource={materials} columns={columns} rowKey="id" loading={loading} />
 
-      <Modal title="嵌入信息" open={embedModal.visible} onCancel={() => setEmbedModal({ visible: false, data: null, loading: false })} footer={null} width={700}>
-        {embedModal.loading ? <Spin /> : embedModal.data ? (
-          <Descriptions column={1} bordered size="small">
-            <Descriptions.Item label="状态"><Tag color={embedModal.data.status === 'completed' ? 'green' : 'orange'}>{embedModal.data.status}</Tag></Descriptions.Item>
-            {embedModal.data.tags?.length > 0 && <Descriptions.Item label="标签">{embedModal.data.tags.map((t: string) => <Tag key={t}>{t}</Tag>)}</Descriptions.Item>}
-            {embedModal.data.video_tags?.length > 0 && <Descriptions.Item label="视频标签">{embedModal.data.video_tags.map((t: string) => <Tag key={t}>{t}</Tag>)}</Descriptions.Item>}
-            {embedModal.data.scenes?.length > 0 && (
-              <Descriptions.Item label="场景">
-                {embedModal.data.scenes.map((s: any, i: number) => (
-                  <div key={i} style={{ marginBottom: 8, padding: 8, background: '#f5f5f5', borderRadius: 4 }}>
-                    <div><b>场景 {s.scene_id}</b> <Tag>{s.time_range}</Tag></div>
-                    <div style={{ fontSize: 12, color: '#666' }}>{s.description}</div>
-                    {s.script && <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>剧本: {s.script}</div>}
-                  </div>
-                ))}
-              </Descriptions.Item>
-            )}
-            {embedModal.data.error && <Descriptions.Item label="错误"><span style={{ color: 'red' }}>{embedModal.data.error}</span></Descriptions.Item>}
-          </Descriptions>
-        ) : <span>无数据</span>}
-      </Modal>
+          <Modal title="嵌入信息" open={embedModal.visible} onCancel={() => setEmbedModal({ visible: false, data: null, loading: false })} footer={null} width={700}>
+            {embedModal.loading ? <Spin /> : embedModal.data ? (
+              embedModal.data.audio_features && Object.keys(embedModal.data.audio_features).length > 0 ? (
+                <Descriptions column={2} bordered size="small">
+                  <Descriptions.Item label="🎵 风格" span={2}>
+                    <Tag color={embedModal.data.audio_features.mood === '轻快' ? 'green' : embedModal.data.audio_features.mood === '稳重' ? 'purple' : 'orange'}>
+                      {embedModal.data.audio_features.mood === '轻快' ? '⚡ 轻快' : embedModal.data.audio_features.mood === '稳重' ? '🐢 稳重' : '➡ 中性'}
+                    </Tag>
+                    <Tag>轻快度: {embedModal.data.audio_features.lightness_score}/100</Tag>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="BPM"><Tag color="blue">{embedModal.data.audio_features.bpm}</Tag></Descriptions.Item>
+                  <Descriptions.Item label="时长">{embedModal.data.audio_features.duration}s</Descriptions.Item>
+                  <Descriptions.Item label="频谱质心">{embedModal.data.audio_features.spectral_centroid} Hz</Descriptions.Item>
+                  <Descriptions.Item label="过零率">{embedModal.data.audio_features.zero_crossing_rate}</Descriptions.Item>
+                  <Descriptions.Item label="频谱滚降点">{embedModal.data.audio_features.spectral_rolloff} Hz</Descriptions.Item>
+                  <Descriptions.Item label="BPM得分" span={1}>{embedModal.data.audio_features.features?.bpm_score}</Descriptions.Item>
+                  <Descriptions.Item label="质心得分">{embedModal.data.audio_features.features?.centroid_score}</Descriptions.Item>
+                  <Descriptions.Item label="过零率得分">{embedModal.data.audio_features.features?.zcr_score}</Descriptions.Item>
+                  {embedModal.data.audio_features.mfcc_mean && (
+                    <Descriptions.Item label="MFCC(13维)" span={2}>
+                      <div style={{ fontSize: 11, color: '#666', wordBreak: 'break-all' }}>
+                        {embedModal.data.audio_features.mfcc_mean.join(', ')}
+                      </div>
+                    </Descriptions.Item>
+                  )}
+                </Descriptions>
+              ) : (
+              <Descriptions column={1} bordered size="small">
+                <Descriptions.Item label="状态"><Tag color={embedModal.data.status === 'completed' ? 'green' : 'orange'}>{embedModal.data.status}</Tag></Descriptions.Item>
+                {embedModal.data.tags?.length > 0 && <Descriptions.Item label="标签">{embedModal.data.tags.map((t: string) => <Tag key={t}>{t}</Tag>)}</Descriptions.Item>}
+                {embedModal.data.video_tags?.length > 0 && <Descriptions.Item label="视频标签">{embedModal.data.video_tags.map((t: string) => <Tag key={t}>{t}</Tag>)}</Descriptions.Item>}
+                {embedModal.data.scenes?.length > 0 && (
+                  <Descriptions.Item label="场景">
+                    {embedModal.data.scenes.map((s: any, i: number) => (
+                      <div key={i} style={{ marginBottom: 8, padding: 8, background: '#f5f5f5', borderRadius: 4 }}>
+                        <div><b>场景 {s.scene_id}</b> <Tag>{s.time_range}</Tag></div>
+                        <div style={{ fontSize: 12, color: '#666' }}>{s.description}</div>
+                        {s.script && <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>剧本: {s.script}</div>}
+                      </div>
+                    ))}
+                  </Descriptions.Item>
+                )}
+                {embedModal.data.error && <Descriptions.Item label="错误"><span style={{ color: 'red' }}>{embedModal.data.error}</span></Descriptions.Item>}
+              </Descriptions>
+              )
+            ) : <span>无数据</span>}
+          </Modal>
     </Card>
   )
 }

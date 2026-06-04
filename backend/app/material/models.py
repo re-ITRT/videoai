@@ -36,6 +36,7 @@ class Material(Base):
     text_content = Column(Text)
     embedding = Column(Vector(1024))  # 1024维向量
     tags = Column(JSONB, default=[])
+    audio_features = Column(JSONB, default={})  # Librosa 分析结果
     source = Column(String(64))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
