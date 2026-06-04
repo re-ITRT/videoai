@@ -20,6 +20,7 @@ const menuItems = [
   { key: '/script', icon: <FileTextOutlined />, label: '剧本模板' },
   { key: '/reference', icon: <PlayCircleOutlined />, label: '参考视频' },
   { key: '/templates', icon: <BookOutlined />, label: '灵感模板' },
+  { key: '/attribution', icon: <ExperimentOutlined />, label: '归因分析' },
   { key: '/profile', icon: <UserOutlined />, label: '个人中心' },
 ]
 

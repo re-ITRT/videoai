@@ -13,6 +13,7 @@ import ScriptGenerate from './modules/script/generate'
 import ScriptDetail from './modules/script/detail'
 import Profile from './pages/profile'
 import AdminUsers from './pages/admin/users'
+import Attribution from './pages/attribution'
 
 function App() {
   return (
@@ -31,6 +32,7 @@ function App() {
           <Route path="script/:id" element={<ScriptDetail />} />
           <Route path="profile" element={<Profile />} />
           <Route path="admin/users" element={<AdminUsers />} />
+          <Route path="attribution" element={<Attribution />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
