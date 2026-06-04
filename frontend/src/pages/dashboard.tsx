@@ -164,7 +164,38 @@ export default function Dashboard() {
                       <Tag color="geekblue" style={{ fontSize: 12 }}>🎣 {detailVideo.hook_method}</Tag>
                     )}
 
+                    {detailVideo.selling_points && detailVideo.selling_points.length > 0 && (
+                      <Space wrap size={[4, 4]}>
+                        {detailVideo.selling_points.map((p: string, i: number) => (
+                          <Tag key={i} color="volcano">{p}</Tag>
+                        ))}
+                      </Space>
+                    )}
+
+                    {detailVideo.video_url && (
+                      <div>
+                        <Text type="secondary" style={{ fontSize: 12 }}>来源：</Text>
+                        <a href={detailVideo.video_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12 }}>{detailVideo.video_url}</a>
+                      </div>
+                    )}
+
                     <Divider style={{ margin: '8px 0' }} />
+
+                    {detailVideo.scenes && detailVideo.scenes.length > 0 && (
+                      <div>
+                        <Text strong style={{ fontSize: 13 }}>🎬 分镜（{detailVideo.scenes.length} 景）</Text>
+                        {detailVideo.scenes.map((scene: any, i: number) => (
+                          <div key={i} style={{ background: '#f5f5f5', padding: 8, borderRadius: 4, marginTop: 4, fontSize: 12 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                              <Tag color="default" style={{ fontSize: 10, margin: 0 }}>#{(i+1).toString().padStart(2,'0')}</Tag>
+                              <span style={{ color: '#666' }}>{scene.time_range}</span>
+                              {scene.script && <span style={{ color: '#1677ff' }}>🎙 {scene.script}</span>}
+                            </div>
+                            <div style={{ color: '#333' }}>{scene.description}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
 
                     {detailVideo.analysis_report && Object.keys(detailVideo.analysis_report).length > 0 && (
                       <>
