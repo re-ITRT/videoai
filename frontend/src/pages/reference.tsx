@@ -308,6 +308,7 @@ const ReferencePage: React.FC = () => {
                             )}
                             {video.category && <Tag color="blue">{video.category}</Tag>}
                             {video.style && <Tag color="green">{video.style}</Tag>}
+                            {video.rhythm ? <Tag color="orange">{video.rhythm <= 2 ? '⚡快' : video.rhythm <= 5 ? '~中' : '🐢慢'}</Tag> : null}
                           </Space>
                           {video.hook_method && (
                             <Text type="secondary" ellipsis>
