@@ -142,63 +142,75 @@ export default function Dashboard() {
               </Card>
 
               {/* 详情弹窗 */}
-              <Modal title="视频详情" open={detailVisible} onCancel={() => setDetailVisible(false)} footer={null} width={700}>
+              <Modal title="视频详情" open={detailVisible} onCancel={() => setDetailVisible(false)} footer={null} width={800}>
                 {detailVideo && (
                   <Space direction="vertical" style={{ width: '100%' }} size="small">
-                    <Title level={4} style={{ margin: 0 }}>{detailVideo.title}</Title>
-                    <Space>
-                      {detailVideo.style && <Tag color="green">{detailVideo.style}</Tag>}
-                      {detailVideo.hook_method && <Tag color="geekblue">🎣 {detailVideo.hook_method}</Tag>}
-                    </Space>
-
-                    {/* 播放量编辑 */}
-                    <div style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <EyeOutlined /> 播放量：
-                      {editingPlay ? (
-                        <InputNumber size="small" min={0} value={editPlayVal}
-                          onChange={(v) => setEditPlayVal(v || 0)}
-                          onPressEnter={() => savePlayCount(editPlayVal)}
-                          onBlur={() => savePlayCount(editPlayVal)}
-                          autoFocus style={{ width: 80 }} />
-                      ) : (
-                        <span style={{ cursor: 'pointer', fontWeight: 600, color: '#1677ff' }}
-                          onClick={() => { setEditPlayVal(detailVideo.play_count ?? 2000); setEditingPlay(true) }}>
-                          {detailVideo.play_count ?? 2000}
-                        </span>
-                      )}
+                    <div>
+                      <Title level={4} style={{ margin: 0 }}>{detailVideo.title || '未命名视频'}</Title>
+                      <Space wrap style={{ marginTop: 4 }}>
+                        {detailVideo.style && <Tag color="green">{detailVideo.style}</Tag>}
+                      </Space>
+                      {/* 播放量编辑 */}
+                      <div style={{ marginTop: 6, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <EyeOutlined /> 播放量：
+                        {editingPlay ? (
+                          <InputNumber size="small" min={0} value={editPlayVal}
+                            onChange={(v) => setEditPlayVal(v || 0)}
+                            onPressEnter={() => savePlayCount(editPlayVal)}
+                            onBlur={() => savePlayCount(editPlayVal)}
+                            autoFocus style={{ width: 80 }} />
+                        ) : (
+                          <span style={{ cursor: 'pointer', fontWeight: 600, color: '#1677ff' }}
+                            onClick={() => { setEditPlayVal(detailVideo.play_count ?? 2000); setEditingPlay(true) }}>
+                            {detailVideo.play_count ?? 2000}
+                          </span>
+                        )}
+                      </div>
                     </div>
+
+                    {detailVideo.hook_method && (
+                      <Tag color="geekblue" style={{ fontSize: 12 }}>🎣 {detailVideo.hook_method}</Tag>
+                    )}
 
                     <Divider style={{ margin: '8px 0' }} />
 
                     {/* 视频播放器 */}
                     <video src={detailVideo.video_url} controls style={{ width: '100%', maxHeight: 400, background: '#000', borderRadius: 4 }} />
 
+                    {/* analysis_report */}
                     {detailVideo.analysis_report && Object.keys(detailVideo.analysis_report).length > 0 && (
                       <>
                         <Divider style={{ margin: '8px 0' }} />
                         <Text strong style={{ fontSize: 13 }}>分析报告</Text>
-                        {Object.entries(detailVideo.analysis_report).filter(([k]) => !['run_id', 'tags', 'storyboard'].includes(k)).map(([key, val]: [string, any]) => {
-                          const label: any = {
-                            hook_quality: '📊 Hook质量', pacing_score: '⏱ 节奏评分',
-                            engagement_strength: '🔥 互动强度', cta_clarity: '🎯 CTA清晰度',
-                            improvement_suggestions: '💡 优化建议', overall_score: '⭐ 综合评分',
+                        {Object.entries(detailVideo.analysis_report).filter(([k]) => !['run_id', 'tags', 'hook_method', 'selling_points', 'storyboard'].includes(k)).map(([key, val]: [string, any]) => {
+                          const label = ({
+                            hook_quality: '📊 Hook质量',
+                            pacing_score: '⏱ 节奏评分',
+                            engagement_strength: '🔥 互动强度',
+                            cta_clarity: '🎯 CTA清晰度',
+                            improvement_suggestions: '💡 优化建议',
+                            overall_score: '⭐ 综合评分',
                             formula: '📐 公式',
-                          }
+                            style: '🎨 风格',
+                          } as any)[key];
+                          if (!label) return null;
                           return (
-                            <div key={key} style={{ marginTop: 4, fontSize: 12 }}>
+                            <div key={key} style={{ marginTop: 6 }}>
                               {typeof val === 'number' ? (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                  <span style={{ width: 80, flexShrink: 0 }}>{label[key] || key}</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                                  <span style={{ width: 80, flexShrink: 0 }}>{label}</span>
                                   <div style={{ flex: 1, height: 8, background: '#f0f0f0', borderRadius: 4 }}>
                                     <div style={{ width: `${Math.min(val, 100)}%`, height: 8, background: val >= 70 ? '#52c41a' : val >= 40 ? '#faad14' : '#ff4d4f', borderRadius: 4 }} />
                                   </div>
                                   <span style={{ fontWeight: 600 }}>{val}</span>
                                 </div>
-                              ) : typeof val === 'string' ? (
-                                <div>{label[key] || key}：{val}</div>
+                              ) : typeof val === 'string' && key === 'formula' ? (
+                                <Tag color="purple">{label.replace(/^[^\s]+\s/, '')}: {val}</Tag>
+                              ) : typeof val === 'string' && key === 'improvement_suggestions' ? (
+                                <div style={{ fontSize: 12, marginTop: 2 }}>{val}</div>
                               ) : null}
                             </div>
-                          )
+                          );
                         })}
                       </>
                     )}
