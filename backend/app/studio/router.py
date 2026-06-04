@@ -518,7 +518,11 @@ async def studio_asr(body: dict, db: AsyncSession = Depends(get_db), user: User 
         )
 
         # 语音识别
-        model = WhisperModel("tiny", device="cpu", compute_type="int8")
+        # 语音识别（本地模型优先）
+        model_dir = "/app/models/whisper_tiny"
+        if not os.path.exists(os.path.join(model_dir, "model.bin")):
+            model_dir = "tiny"  # fallback
+        model = WhisperModel(model_dir, device="cpu", compute_type="int8")
         segments, info = model.transcribe(audio_path, language="zh", vad_filter=True)
 
         subs = []
