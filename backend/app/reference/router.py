@@ -202,6 +202,20 @@ async def upload_and_analyze(
     scenes = local_scenes or scenes or []
     tags = local_tags or tags or []
     text_content = local_text_content or (embed_data.get("text_content", "") if isinstance(embed_data, dict) else "")
+    # 计算平均场景时长（节奏）
+    rhythm = 0.0
+    if scenes:
+        import re
+        durs = []
+        for sc in scenes:
+            tr = sc.get("time_range", "")
+            nums = re.findall(r"[\d.]+", tr)
+            if len(nums) >= 2:
+                d = float(nums[-1]) - float(nums[0])
+                if d > 0:
+                    durs.append(d)
+        if durs:
+            rhythm = round(sum(durs) / len(durs), 2)
 
     db_video = ReferenceVideo(
         user_id=str(current_user.id),
@@ -216,6 +230,7 @@ async def upload_and_analyze(
         image_embedding=embed_data.get("image_embedding", []) if isinstance(embed_data, dict) else [],
         scenes=scenes,
         cover_url=cover_url,
+        rhythm=rhythm,
         # video-analyze 数据
         hook_method=analyze_result.get("hook_method", ""),
         selling_points=analyze_result.get("selling_points", []),
