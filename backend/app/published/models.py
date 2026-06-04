@@ -21,6 +21,7 @@ class PublishedVideo(Base):
     style = Column(String(64), default="")
     tags = Column(JSONB, default=[])
     scenes = Column(JSONB, default=[])
+    rhythm = Column(Float, default=0.0)
     # 播放量
     play_count = Column(Integer, default=2000)
     # 来源

@@ -62,6 +62,21 @@ async def publish_video(
         if analyze_tags:
             tags = list(dict.fromkeys(tags + analyze_tags))
 
+    # 计算节奏
+    rhythm = 0.0
+    if scenes:
+        import re
+        durs = []
+        for sc in scenes:
+            tr = sc.get("time_range", "")
+            nums = re.findall(r"[\d.]+", tr)
+            if len(nums) >= 2:
+                d = float(nums[-1]) - float(nums[0])
+                if d > 0:
+                    durs.append(d)
+        if durs:
+            rhythm = round(sum(durs) / len(durs), 2)
+
     pv = PublishedVideo(
         user_id=user.id,
         title=title,
@@ -73,6 +88,7 @@ async def publish_video(
         style=analyze_result.get("style", ""),
         tags=tags,
         scenes=scenes,
+        rhythm=rhythm,
         play_count=2000,
         source_session_id=source_session_id,
     )
@@ -117,6 +133,8 @@ async def list_published(
             "hook_method": r.hook_method,
             "style": r.style,
             "tags": r.tags or [],
+            "rhythm": r.rhythm or 0.0,
+            "scenes": r.scenes or [],
             "analysis_report": r.analysis_report or {},
             "created_at": r.created_at.isoformat() if r.created_at else "",
         })
