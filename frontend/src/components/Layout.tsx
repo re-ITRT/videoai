@@ -9,6 +9,7 @@ import {
   UserOutlined,
   TeamOutlined,
   LogoutOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../hooks/useAuth'
 

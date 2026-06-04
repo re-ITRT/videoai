@@ -23,7 +23,6 @@ const FEATURE_LABELS: Record<string, string> = {
 export default function AttributionPage() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
-  const [analyzing, setAnalyzing] = useState(false)
   const [data, setData] = useState<any[]>([])
   const [result, setResult] = useState<any>(null)
   const [tab, setTab] = useState('data')
