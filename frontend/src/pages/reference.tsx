@@ -18,6 +18,7 @@ import {
   Empty,
   Typography,
   Divider,
+  InputNumber,
 } from 'antd';
 import {
   PlayCircleOutlined,
@@ -83,6 +84,8 @@ const ReferencePage: React.FC = () => {
   // 详情弹窗
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<ReferenceVideo | null>(null);
+  const [editingPlayCount, setEditingPlayCount] = useState(false);
+  const [editPlayValue, setEditPlayValue] = useState(2000);
 
   // 加载视频列表
   const loadVideos = async () => {
@@ -435,6 +438,32 @@ const ReferencePage: React.FC = () => {
                   </Space>
                 </div>
               )}
+              {/* 播放量编辑 */}
+              <div style={{ marginTop: 6, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <EyeOutlined /> 播放量：
+                {editingPlayCount ? (
+                  <InputNumber size="small" min={0} value={editPlayValue}
+                    onChange={(v) => setEditPlayValue(v || 0)}
+                    onPressEnter={async () => {
+                      await request.put(`/reference/videos/${selectedVideo.id}/play-count`, { play_count: editPlayValue })
+                      setSelectedVideo({ ...selectedVideo, play_count: editPlayValue })
+                      setEditingPlayCount(false)
+                      loadVideos()
+                    }}
+                    onBlur={async () => {
+                      await request.put(`/reference/videos/${selectedVideo.id}/play-count`, { play_count: editPlayValue })
+                      setSelectedVideo({ ...selectedVideo, play_count: editPlayValue })
+                      setEditingPlayCount(false)
+                      loadVideos()
+                    }}
+                    autoFocus style={{ width: 80 }} />
+                ) : (
+                  <span style={{ cursor: 'pointer', fontWeight: 600, color: '#1677ff' }}
+                    onClick={() => { setEditPlayValue(selectedVideo.play_count ?? 2000); setEditingPlayCount(true) }}>
+                    {selectedVideo.play_count ?? 2000}
+                  </span>
+                )}
+              </div>
             </div>
 
             {selectedVideo.hook_method && (
