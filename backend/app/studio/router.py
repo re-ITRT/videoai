@@ -546,6 +546,44 @@ async def studio_asr(body: dict, db: AsyncSession = Depends(get_db), user: User 
                 "text": text,
             })
 
+        # 4. LLM 错别字校正
+        if subs:
+            try:
+                from app.ai.models import UserAIConfig
+                from sqlalchemy import select as _s
+                cfg = await db.execute(_s(UserAIConfig).where(UserAIConfig.user_id == user.id))
+                cfg = cfg.scalar_one_or_none()
+                if cfg and cfg.api_key:
+                    all_text = "\n".join([s["text"] for s in subs])
+                    prompt = f"""你是一个视频字幕校对专家。请修正以下ASR识别文本中的错别字、繁体字和标点符号。
+只输出修正后的文本，每行对应一行，不要添加额外说明。
+
+待修正文本：
+{all_text}"""
+                    payload = {
+                        "model": cfg.model or "doubao-seed-2.0-pro",
+                        "messages": [
+                            {"role": "system", "content": "你是一个字幕校对助手，只输出修正后的文本，不要添加任何额外内容。"},
+                            {"role": "user", "content": prompt}
+                        ],
+                        "temperature": 0.1,
+                    }
+                    base_url = (cfg.base_url or "https://api.deepseek.com/v1").rstrip("/")
+                    async with httpx.AsyncClient(timeout=30) as client:
+                        resp = await client.post(
+                            f"{base_url}/chat/completions",
+                            json=payload,
+                            headers={"Authorization": f"Bearer {cfg.api_key}", "Content-Type": "application/json"},
+                        )
+                        if resp.status_code == 200:
+                            result = resp.json()
+                            corrected = result["choices"][0]["message"]["content"].strip().split("\n")
+                            for i, line in enumerate(corrected):
+                                if i < len(subs):
+                                    subs[i]["text"] = line.strip()
+            except Exception:
+                pass
+
         return {"segments": subs, "duration": round(info.duration, 1) if info.duration else 0}
 
     except Exception as e:
