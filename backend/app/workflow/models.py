@@ -58,4 +58,13 @@ AVAILABLE_WORKFLOWS = {
             {"key": "model", "label": "EP（模型端点 ID）", "type": "text", "placeholder": "ep-20260514120705-pqv86", "disabled": True},
         ],
     },
+    "asr-correct": {
+        "name": "ASR 纠错",
+        "description": "语音识别后自动用 LLM 校正错别字和繁体字",
+        "fields": [
+            {"key": "api_key", "label": "API Key", "type": "password", "placeholder": "sk-..."},
+            {"key": "base_url", "label": "API 地址", "type": "text", "placeholder": "https://api.deepseek.com/v1"},
+            {"key": "model", "label": "模型名称", "type": "text", "placeholder": "deepseek-v4-flash"},
+        ],
+    },
 }
