@@ -19,6 +19,8 @@ import {
   Typography,
   Divider,
   InputNumber,
+  Descriptions,
+  message,
 } from 'antd';
 import {
   PlayCircleOutlined,
@@ -48,6 +50,7 @@ interface ReferenceVideo {
   scenes?: any[];
   tags?: string[];
   play_count?: number;
+  audio_features?: any;
   created_at: string;
 }
 
@@ -86,6 +89,9 @@ const ReferencePage: React.FC = () => {
   const [selectedVideo, setSelectedVideo] = useState<ReferenceVideo | null>(null);
   const [editingPlayCount, setEditingPlayCount] = useState(false);
   const [editPlayValue, setEditPlayValue] = useState(2000);
+  const [audioModalVisible, setAudioModalVisible] = useState(false);
+  const [audioAnalyzing, setAudioAnalyzing] = useState(false);
+  const [audioData, setAudioData] = useState<any>(null);
 
   // 加载视频列表
   const loadVideos = async () => {
@@ -539,7 +545,56 @@ const ReferencePage: React.FC = () => {
                 })}
               </div>
             )}
+
+            {/* 🎵 BGM 分析 */}
+            {selectedVideo.id && (
+              <div>
+                <Button size="small" type="default" loading={audioAnalyzing}
+                  onClick={async () => {
+                    setAudioAnalyzing(true)
+                    try {
+                      const res: any = await request.post(`/reference/videos/${selectedVideo.id}/analyze-audio`, {}, { timeout: 180000 })
+                      if (res.bpm) {
+                        setAudioData(res)
+                        setAudioModalVisible(true)
+                      } else {
+                        message.error(res.detail || '分析失败')
+                      }
+                    } catch { message.error('音频分析请求失败') }
+                    setAudioAnalyzing(false)
+                  }}>
+                  🎵 BGM 分析
+                </Button>
+              </div>
+            )}
           </Space>
+        )}
+      </Modal>
+
+      {/* 音频分析弹窗 */}
+      <Modal title="🎵 BGM 音频特征分析" open={audioModalVisible} onCancel={() => setAudioModalVisible(false)} footer={null} width={600}>
+        {audioData && (
+          <Descriptions column={2} bordered size="small">
+            <Descriptions.Item label="🎵 风格" span={2}>
+              <Tag color={audioData.mood === '轻快' ? 'green' : audioData.mood === '稳重' ? 'purple' : 'orange'}>
+                {audioData.mood === '轻快' ? '⚡ 轻快' : audioData.mood === '稳重' ? '🐢 稳重' : '➡ 中性'}
+              </Tag>
+              <Tag>轻快度: {audioData.lightness_score}/100</Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="BPM"><Tag color="blue">{audioData.bpm}</Tag></Descriptions.Item>
+            <Descriptions.Item label="时长">{audioData.duration}s</Descriptions.Item>
+            <Descriptions.Item label="频谱质心">{audioData.spectral_centroid} Hz</Descriptions.Item>
+            <Descriptions.Item label="过零率">{audioData.zero_crossing_rate}</Descriptions.Item>
+            <Descriptions.Item label="频谱滚降点">{audioData.spectral_rolloff} Hz</Descriptions.Item>
+            <Descriptions.Item label="BPM得分">{audioData.features?.bpm_score}</Descriptions.Item>
+            <Descriptions.Item label="质心得分">{audioData.features?.centroid_score}</Descriptions.Item>
+            <Descriptions.Item label="过零率得分">{audioData.features?.zcr_score}</Descriptions.Item>
+            {audioData.mfcc_mean && (
+              <Descriptions.Item label="MFCC(13维)" span={2}>
+                <div style={{ fontSize: 11, color: '#666', wordBreak: 'break-all' }}>{audioData.mfcc_mean.join(', ')}</div>
+              </Descriptions.Item>
+            )}
+          </Descriptions>
         )}
       </Modal>
     </div>

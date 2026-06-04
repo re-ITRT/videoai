@@ -27,6 +27,7 @@ class ReferenceVideo(Base):
     cover_url = Column(Text, default="")  # 视频封面截帧
     rhythm = Column(Float, default=0.0)  # 平均场景时长（秒），用于判断剪辑节奏
     play_count = Column(Integer, default=2000)  # 播放量
+    audio_features = Column(JSONB, default={})  # Librosa 音频分析结果
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 

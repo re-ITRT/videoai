@@ -41,6 +41,7 @@ class ReferenceVideoResponse(BaseModel):
     scenes: Optional[List[Dict[str, Any]]] = []
     tags: Optional[List[str]] = []
     play_count: int = 2000
+    audio_features: Optional[Dict[str, Any]] = {}
     created_at: datetime
 
     class Config:

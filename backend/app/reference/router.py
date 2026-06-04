@@ -330,6 +330,85 @@ async def update_reference_play_count(
     return {"play_count": r.play_count}
 
 
+@router.post("/videos/{video_id}/analyze-audio")
+async def analyze_reference_audio(
+    video_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """分析参考视频的音频 → 提取 Librosa 特征"""
+    from app.script.models import ReferenceVideo
+    import subprocess, tempfile, os, shutil, numpy as np
+
+    r = await db.get(ReferenceVideo, video_id)
+    if not r or str(r.user_id) != str(current_user.id):
+        raise HTTPException(404, "视频不存在")
+
+    # 找到本地视频文件
+    video_path = None
+    if r.source_url and "/uploads/" in r.source_url:
+        idx = r.source_url.find("/uploads/")
+        local = "/app" + r.source_url[idx:]
+        if os.path.exists(local):
+            video_path = local
+    if not video_path and r.cover_url:
+        local = r.cover_url.replace("/uploads/", "/app/uploads/")
+        if os.path.exists(local):
+            video_path = local
+    if not video_path:
+        raise HTTPException(400, "视频文件不存在，无法分析音频")
+
+    tmpdir = tempfile.mkdtemp()
+    try:
+        # FFmpeg 提取音频
+        audio_path = os.path.join(tmpdir, "audio.wav")
+        subprocess.run(
+            ["ffmpeg", "-i", video_path, "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", "-y", audio_path],
+            capture_output=True, text=True, timeout=120,
+        )
+        if not os.path.exists(audio_path):
+            raise HTTPException(500, "音频提取失败")
+
+        # Librosa 分析
+        import librosa
+        y, sr = librosa.load(audio_path, sr=None, mono=True)
+        duration = float(librosa.get_duration(y=y, sr=sr))
+        tempo_val, _ = librosa.beat.beat_track(y=y, sr=sr)
+        bpm = float(np.atleast_1d(tempo_val)[0]) if tempo_val else 120.0
+        cent = librosa.feature.spectral_centroid(y=y, sr=sr)
+        centroid_mean = float(np.atleast_1d(cent.mean())[0])
+        zcr = librosa.feature.zero_crossing_rate(y)
+        zcr_mean = float(np.atleast_1d(zcr.mean())[0])
+        rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr)
+        rolloff_mean = float(np.atleast_1d(rolloff.mean())[0])
+        mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
+        mfcc_mean = [round(float(np.atleast_1d(mfcc[i].mean())[0]), 4) for i in range(13)]
+        bpm_score = min(bpm / 2.0, 50.0)
+        cent_score = min(centroid_mean / 50.0, 25.0)
+        zcr_score = min(zcr_mean * 500, 25.0)
+        lightness = round(min(bpm_score + cent_score + zcr_score, 100), 1)
+        mood = "稳重" if lightness < 30 else "中性" if lightness < 55 else "轻快"
+        audio_features = {
+            "duration": round(duration, 2), "bpm": round(bpm, 1),
+            "spectral_centroid": round(centroid_mean, 2),
+            "zero_crossing_rate": round(zcr_mean, 6),
+            "spectral_rolloff": round(rolloff_mean, 2),
+            "mfcc_mean": mfcc_mean,
+            "lightness_score": lightness, "mood": mood,
+            "features": {"bpm_score": round(bpm_score, 1), "centroid_score": round(cent_score, 1), "zcr_score": round(zcr_score, 1)},
+        }
+
+        r.audio_features = audio_features
+        await db.commit()
+        return audio_features
+    except ImportError:
+        raise HTTPException(500, "librosa 未安装")
+    except Exception as e:
+        raise HTTPException(500, f"音频分析失败: {str(e)}")
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
 @router.delete("/videos/{video_id}")
 async def delete_video(
     video_id: int,
