@@ -485,6 +485,7 @@ async def studio_asr(body: dict, db: AsyncSession = Depends(get_db), user: User 
     from faster_whisper import WhisperModel
 
     video_url = body.get("video_url", "")
+    session_id = body.get("session_id")
     if not video_url:
         raise HTTPException(400, "video_url required")
 
@@ -554,7 +555,7 @@ async def studio_asr(body: dict, db: AsyncSession = Depends(get_db), user: User 
                 "text": text,
             })
 
-        # 4. LLM 错别字校正（通过 ASR 纠错工作流配置）
+        # 4. LLM 错别字校正（通过 ASR 纠错工作流配置），并传入剧本辅助纠错
         if subs:
             try:
                 from app.workflow.models import WorkflowConfig
@@ -571,12 +572,40 @@ async def studio_asr(body: dict, db: AsyncSession = Depends(get_db), user: User 
                     base_url = (cfg_dict.get("base_url") or "https://api.deepseek.com/v1").rstrip("/")
                     model = cfg_dict.get("model", "deepseek-v4-flash")
                     if api_key:
-                        all_text = "\n".join([s["text"] for s in subs])
-                        prompt = f"""你是一个视频字幕校对专家。请修正以下ASR识别文本中的错别字、繁体字和标点符号。
-只输出修正后的文本，每行对应一行，不要添加额外说明。
+                        # 读取剧本作为纠错参考
+                        script_context = ""
+                        try:
+                            from app.agent.models import ensure_session_dir
+                            sp = os.path.join(ensure_session_dir(session_id)["scripts"], f"script_{session_id}.json")
+                            if os.path.exists(sp):
+                                with open(sp, "r", encoding="utf-8") as sf:
+                                    sd = json.loads(sf.read())
+                                lines_text = []
+                                for sc in (sd.get("script", sd).get("scenes", sd.get("scenes", []))):
+                                    for ln in sc.get("lines", []):
+                                        speaker = ln.get("speaker", "")
+                                        text = ln.get("text", "")
+                                        if text:
+                                            lines_text.append(f"[{speaker}] {text}")
+                                if lines_text:
+                                    script_context = "\n".join(lines_text)
+                        except Exception:
+                            pass
 
-待修正文本：
-{all_text}"""
+                        all_text = "\n".join([s["text"] for s in subs])
+                        prompt = f"""你是一个视频字幕校对专家。以下是该视频对应的剧本台词（每行格式为 [说话人] 台词文本），请以其为标准参考，修正下方ASR识别文本中的错别字、繁体字和标点符号。如果ASR结果与剧本台词一致，则保持原样。如果有部分匹配，以剧本为准修正。剧本中不存在的片段按原意修正错别字即可。"""
+                        if script_context:
+                            prompt += f"""
+
+参考剧本台词：
+{script_context}
+"""
+                        prompt += f"""
+
+待修正ASR文本（每行对应一个时间片段）：
+{all_text}
+
+只输出修正后的文本，每行对应一行，不要添加额外说明。"""
                         payload = {
                             "model": model,
                             "messages": [
@@ -601,7 +630,6 @@ async def studio_asr(body: dict, db: AsyncSession = Depends(get_db), user: User 
                 pass
 
         # 保存 ASR 结果到 SessionFile
-        session_id = body.get("session_id")
         if session_id:
             from app.agent.models import SessionFile
             # 删除旧的 ASR 记录
