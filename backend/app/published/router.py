@@ -77,6 +77,48 @@ async def publish_video(
         if durs:
             rhythm = round(sum(durs) / len(durs), 2)
 
+    audio_features = body.get("audio_features", {})
+    if not audio_features and video_url:
+        # 尝试从本地视频提取音频特征
+        import re, subprocess, tempfile, numpy as np, shutil
+        m = re.search(r'/signed/[^/]+/(.+)', video_url)
+        if m:
+            local = '/app/uploads/' + m.group(1)
+            if os.path.exists(local):
+                tmpdir = tempfile.mkdtemp()
+                try:
+                    ap = os.path.join(tmpdir, "audio.wav")
+                    subprocess.run(["ffmpeg", "-i", local, "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", "-y", ap],
+                        capture_output=True, text=True, timeout=120)
+                    if os.path.exists(ap):
+                        import librosa
+                        y, sr = librosa.load(ap, sr=None, mono=True)
+                        duration = float(librosa.get_duration(y=y, sr=sr))
+                        tempo_val, _ = librosa.beat.beat_track(y=y, sr=sr)
+                        bpm = float(np.atleast_1d(tempo_val)[0]) if tempo_val else 120.0
+                        centroid_mean = float(np.atleast_1d(librosa.feature.spectral_centroid(y=y, sr=sr).mean())[0])
+                        zcr_mean = float(np.atleast_1d(librosa.feature.zero_crossing_rate(y).mean())[0])
+                        rolloff_mean = float(np.atleast_1d(librosa.feature.spectral_rolloff(y=y, sr=sr).mean())[0])
+                        mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
+                        mfcc_mean = [round(float(np.atleast_1d(mfcc[i].mean())[0]), 4) for i in range(13)]
+                        bpm_score = min(bpm / 2.0, 50.0)
+                        cent_score = min(centroid_mean / 50.0, 25.0)
+                        zcr_score = min(zcr_mean * 500, 25.0)
+                        lightness = round(min(bpm_score + cent_score + zcr_score, 100), 1)
+                        mood = "轻快" if lightness >= 55 else "中性" if lightness >= 30 else "稳重"
+                        audio_features = {
+                            "duration": round(duration, 2), "bpm": round(bpm, 1),
+                            "spectral_centroid": round(centroid_mean, 2), "zero_crossing_rate": round(zcr_mean, 6),
+                            "spectral_rolloff": round(rolloff_mean, 2), "mfcc_mean": mfcc_mean,
+                            "lightness_score": lightness, "mood": mood,
+                            "features": {"bpm_score": round(bpm_score, 1), "centroid_score": round(cent_score, 1), "zcr_score": round(zcr_score, 1)},
+                        }
+                        print(f"[publish] audio analysis: {mood}({lightness}) BPM={bpm}")
+                except Exception as e:
+                    print(f"[publish] audio analysis failed: {e}")
+                finally:
+                    shutil.rmtree(tmpdir, ignore_errors=True)
+
     pv = PublishedVideo(
         user_id=user.id,
         title=title,
@@ -89,6 +131,7 @@ async def publish_video(
         tags=tags,
         scenes=scenes,
         rhythm=rhythm,
+        audio_features=audio_features,
         play_count=2000,
         source_session_id=source_session_id,
     )

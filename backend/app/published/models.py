@@ -26,4 +26,5 @@ class PublishedVideo(Base):
     play_count = Column(Integer, default=2000)
     # 来源
     source_session_id = Column(Integer, default=0)
+    audio_features = Column(JSONB, default={})  # Librosa 音频分析
     created_at = Column(DateTime(timezone=True), server_default=func.now())

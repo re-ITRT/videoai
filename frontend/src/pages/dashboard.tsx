@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Card, Row, Col, Statistic, Skeleton, Tabs, Tag, Empty, Spin, Button, message, Modal, Space, Typography, Divider, InputNumber } from 'antd'
+import { Card, Row, Col, Statistic, Skeleton, Tabs, Tag, Empty, Spin, Button, message, Modal, Space, Typography, Divider, InputNumber, Descriptions } from 'antd'
 import { VideoCameraOutlined, FileTextOutlined, ThunderboltOutlined, AppstoreOutlined, PlayCircleOutlined, EyeOutlined, DeleteOutlined } from '@ant-design/icons'
 import request from '../utils/request'
 import { getMaterials, getTasks } from '../utils/api'
@@ -17,6 +17,8 @@ export default function Dashboard() {
   const [detailVideo, setDetailVideo] = useState<any>(null)
   const [editingPlay, setEditingPlay] = useState(false)
   const [editPlayVal, setEditPlayVal] = useState(2000)
+  const [audioModalVisible, setAudioModalVisible] = useState(false)
+  const [audioData, setAudioData] = useState<any>(null)
 
   useEffect(() => {
     Promise.all([
@@ -258,7 +260,47 @@ export default function Dashboard() {
                         })}
                       </div>
                     )}
+
+                    {/* 🎵 BGM 分析 */}
+                    {detailVideo.audio_features?.bpm && (
+                      <div style={{ marginTop: 8 }}>
+                        <Button size="small" type="default"
+                          onClick={() => {
+                            setAudioData(detailVideo.audio_features)
+                            setAudioModalVisible(true)
+                          }}>
+                          🎵 BGM 分析
+                        </Button>
+                      </div>
+                    )}
                   </Space>
+                )}
+              </Modal>
+
+              {/* 音频分析弹窗 */}
+              <Modal title="🎵 BGM 音频特征分析" open={audioModalVisible} onCancel={() => setAudioModalVisible(false)} footer={null} width={600}>
+                {audioData && (
+                  <Descriptions column={2} bordered size="small">
+                    <Descriptions.Item label="🎵 风格" span={2}>
+                      <Tag color={audioData.mood === '轻快' ? 'green' : audioData.mood === '稳重' ? 'purple' : 'orange'}>
+                        {audioData.mood === '轻快' ? '⚡ 轻快' : audioData.mood === '稳重' ? '🐢 稳重' : '➡ 中性'}
+                      </Tag>
+                      <Tag>轻快度: {audioData.lightness_score}/100</Tag>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="BPM"><Tag color="blue">{audioData.bpm}</Tag></Descriptions.Item>
+                    <Descriptions.Item label="时长">{audioData.duration}s</Descriptions.Item>
+                    <Descriptions.Item label="频谱质心">{audioData.spectral_centroid} Hz</Descriptions.Item>
+                    <Descriptions.Item label="过零率">{audioData.zero_crossing_rate}</Descriptions.Item>
+                    <Descriptions.Item label="频谱滚降点">{audioData.spectral_rolloff} Hz</Descriptions.Item>
+                    <Descriptions.Item label="BPM得分">{audioData.features?.bpm_score}</Descriptions.Item>
+                    <Descriptions.Item label="质心得分">{audioData.features?.centroid_score}</Descriptions.Item>
+                    <Descriptions.Item label="过零率得分">{audioData.features?.zcr_score}</Descriptions.Item>
+                    {audioData.mfcc_mean && (
+                      <Descriptions.Item label="MFCC(13维)" span={2}>
+                        <div style={{ fontSize: 11, color: '#666', wordBreak: 'break-all' }}>{audioData.mfcc_mean.join(', ')}</div>
+                      </Descriptions.Item>
+                    )}
+                  </Descriptions>
                 )}
               </Modal>
             </>
