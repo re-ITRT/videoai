@@ -108,7 +108,7 @@ export default function Dashboard() {
                             style={{ height: '100%' }}
                             cover={
                               <div style={{ position: 'relative', background: '#000', height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                                onClick={() => openDetail(v)}>
+                                onClick={() => window.open(v.video_url, '_blank')}>
                                 <video src={v.video_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                 <PlayCircleOutlined style={{ position: 'absolute', fontSize: 40, color: 'rgba(255,255,255,0.8)' }} />
                               </div>
