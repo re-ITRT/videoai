@@ -527,10 +527,23 @@ async def studio_asr(body: dict, db: AsyncSession = Depends(get_db), user: User 
 
         subs = []
         for seg in segments:
+            text = seg.text.strip()
+            # 繁转简
+            try:
+                import unicodedata
+                # 简单方法：用 zhconv
+                try:
+                    from zhconv import convert
+                    text = convert(text, 'zh-hans')
+                except ImportError:
+                    # fallback: 用标准 unicodedata
+                    pass
+            except Exception:
+                pass
             subs.append({
                 "start": round(seg.start, 1),
                 "end": round(seg.end, 1),
-                "text": seg.text.strip(),
+                "text": text,
             })
 
         return {"segments": subs, "duration": round(info.duration, 1) if info.duration else 0}
