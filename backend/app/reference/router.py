@@ -349,12 +349,29 @@ async def analyze_reference_audio(
     if r.source_url and "/uploads/" in r.source_url:
         idx = r.source_url.find("/uploads/")
         local = "/app" + r.source_url[idx:]
+        # 去掉 signed 路径中的 /signed/xxx/ 前缀
+        if "/signed/" in local:
+            import re
+            m = re.search(r'/signed/[^/]+/(.+)', local)
+            if m:
+                local = "/app/uploads/" + m.group(1)
         if os.path.exists(local):
             video_path = local
+    # 也尝试从 cover_url 反向找视频文件
     if not video_path and r.cover_url:
-        local = r.cover_url.replace("/uploads/", "/app/uploads/")
-        if os.path.exists(local):
-            video_path = local
+        idx = r.cover_url.find("/uploads/")
+        if idx >= 0:
+            local = "/app" + r.cover_url[idx:]
+            import re
+            m = re.search(r'/signed/[^/]+/(.+)', local)
+            if m:
+                local = "/app/uploads/" + m.group(1)
+            # cover 是 jpg，尝试找对应的 mp4
+            for ext in ('.mp4', '.webm', '.mov'):
+                trial = re.sub(r'\.\w+$', ext, local)
+                if os.path.exists(trial):
+                    video_path = trial
+                    break
     if not video_path:
         raise HTTPException(400, "视频文件不存在，无法分析音频")
 
