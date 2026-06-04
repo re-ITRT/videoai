@@ -196,6 +196,22 @@ export default function Dashboard() {
                         ))}
                       </div>
                     )}
+                    {/* fallback: 从 analysis_report.storyboard 渲染 */}
+                    {(!detailVideo.scenes || detailVideo.scenes.length === 0) && detailVideo.analysis_report?.storyboard?.length > 0 && (
+                      <div>
+                        <Text strong style={{ fontSize: 13 }}>🎬 分镜（{detailVideo.analysis_report.storyboard.length} 景）</Text>
+                        {detailVideo.analysis_report.storyboard.map((s: any, i: number) => (
+                          <div key={i} style={{ background: '#f5f5f5', padding: 8, borderRadius: 4, marginTop: 4, fontSize: 12 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                              <Tag color="default" style={{ fontSize: 10, margin: 0 }}>#{(i+1).toString().padStart(2,'0')}</Tag>
+                              <span style={{ color: '#666' }}>{s.time_range}</span>
+                              {s.narration && <span style={{ color: '#1677ff' }}>🎙 {s.narration}</span>}
+                            </div>
+                            <div style={{ color: '#333' }}>{s.visual}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
 
                     {detailVideo.analysis_report && Object.keys(detailVideo.analysis_report).length > 0 && (
                       <>
