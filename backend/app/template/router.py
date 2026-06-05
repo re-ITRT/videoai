@@ -242,11 +242,39 @@ async def get_attribution_insights(
         corrs[col] = round(num/(d1*d2) if d1*d2 > 0 else 0, 4)
     top_features = sorted(corrs.items(), key=lambda x: abs(x[1]), reverse=True)
 
+    # 模型分析
+    model_analysis = {}
+    from app.published.models import PublishedVideo as PV
+    pub_rows = (await db.execute(_sel(PV).limit(100))).scalars().all()
+    model_groups = {}
+    for p in pub_rows:
+        m = p.model_name or "unknown"
+        if m not in model_groups:
+            model_groups[m] = {"count": 0, "total_play": 0, "titles": []}
+        model_groups[m]["count"] += 1
+        model_groups[m]["total_play"] += (p.play_count or 2000)
+        model_groups[m]["titles"].append(p.title or "未命名")
+    model_analysis = {m: {"count": d["count"], "avg_play_count": round(d["total_play"] / d["count"]),
+                           "feedback": _get_model_feedback(m, d)} for m, d in model_groups.items()}
+
     return {
         "best_combos": combos[:10],
         "top_features": [{"name": n, "correlation": v} for n, v in top_features],
         "sample_count": len(features),
+        "model_analysis": model_analysis,
     }
+
+
+def _get_model_feedback(model_name: str, data: dict) -> str:
+    """根据模型使用数据生成反馈"""
+    avg = data["avg_play_count"]
+    if avg >= 10000:
+        return f"表现优秀（平均播放量{avg}），建议优先使用"
+    elif avg >= 5000:
+        return f"表现良好（平均播放量{avg}），可继续使用"
+    elif data["count"] == 1:
+        return f"仅有一个样本，平均播放量{avg}，需更多数据评估"
+    return f"平均播放量{avg}，建议尝试其他模型对比"
 
 
 @router.post("/templates/ai-generate")

@@ -321,6 +321,7 @@ export default function StudioPage() {
         video_url: subbedUrl,
         title: state.session_name || '导出视频',
         session_id: sessionId,
+        model_name: 'doubao-seedance-1.5-pro',
       }, { timeout: 300000 })
       if (res.success) {
         message.success('已导出到已生成视频！')

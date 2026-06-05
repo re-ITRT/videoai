@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Card, Row, Col, Statistic, Skeleton, Tabs, Tag, Empty, Spin, Button, message, Modal, Space, Typography, Divider, Descriptions } from 'antd'
-import { VideoCameraOutlined, FileTextOutlined, ThunderboltOutlined, AppstoreOutlined, PlayCircleOutlined, EyeOutlined, DeleteOutlined, RiseOutlined } from '@ant-design/icons'
+import { VideoCameraOutlined, FileTextOutlined, ThunderboltOutlined, AppstoreOutlined, PlayCircleOutlined, EyeOutlined, DeleteOutlined, RiseOutlined, RobotOutlined } from '@ant-design/icons'
 import request from '../utils/request'
 import { getMaterials, getTasks } from '../utils/api'
 import StudioPage from '../modules/studio/StudioPage'
@@ -148,6 +148,12 @@ export default function Dashboard() {
                         </span>
                         <Tag color="blue" style={{ fontSize: 10 }}>AI预测</Tag>
                       </div>
+                      {/* 模型信息 */}
+                      {detailVideo.model_name && (
+                        <div style={{ marginTop: 4, fontSize: 12 }}>
+                          <RobotOutlined /> 生成模型：<Tag color="cyan">{detailVideo.model_name}</Tag>
+                        </div>
+                      )}
                     </div>
 
                     {detailVideo.hook_method && (
