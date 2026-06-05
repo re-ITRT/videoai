@@ -478,8 +478,9 @@ export default function StudioPage() {
                   <Space>
                     <SoundOutlined style={{ color: '#fa8c16' }} />
                     <div style={{ fontSize: 12 }}>
-                      <div>{m.tags?.join(', ') || 'BGM'}</div>
-                      {m.image_url && <audio src={m.image_url} controls style={{ width: 120, height: 24 }} />}
+                      <div style={{ fontWeight: 500 }}>{m.name || '未命名'}</div>
+                      <div style={{ color: '#999', fontSize: 11 }}>{m.tags?.join(', ') || ''}</div>
+                      {m.image_url && <audio src={m.image_url} controls style={{ width: 140, height: 28, marginTop: 4 }} />}
                     </div>
                   </Space>
                 </List.Item>
