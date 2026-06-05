@@ -188,10 +188,10 @@ async def get_attribution_insights(
     """获取归因分析洞察：最佳组合 + 特征重要性 + 推荐策略"""
     from app.script.models import ReferenceVideo
     from sqlalchemy import select as _sel
-    q = _sel(ReferenceVideo).where(ReferenceVideo.user_id == DEFAULT_USER_ID)
+    q = _sel(ReferenceVideo).limit(100)
     rows = (await db.execute(q)).scalars().all()
     if len(rows) < 3:
-        return {"insights": [], "message": "至少需要3个参考视频"}
+        return {"insights": [], "message": f"至少需要3个参考视频，当前{len(rows)}个"}
 
     import math
     # 提取特征
@@ -258,7 +258,7 @@ async def ai_generate_template(
     from sqlalchemy import select as _sel
     import json, httpx
 
-    q = _sel(ReferenceVideo).where(ReferenceVideo.user_id == DEFAULT_USER_ID)
+    q = _sel(ReferenceVideo).limit(100)
     rows = (await db.execute(q)).scalars().all()
     if len(rows) < 1:
         raise HTTPException(400, "至少需要1个参考视频")
