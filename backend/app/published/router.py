@@ -78,7 +78,7 @@ async def publish_video(
             rhythm = round(sum(durs) / len(durs), 2)
 
     audio_features = body.get("audio_features", {})
-    if not audio_features and video_url:
+    if not audio_features and isinstance(video_url, str) and video_url:
         # 尝试从本地视频提取音频特征
         import re, subprocess, tempfile, numpy as np, shutil
         m = re.search(r'/signed/[^/]+/(.+)', video_url)
@@ -139,6 +139,15 @@ async def publish_video(
     db.add(pv)
     await db.commit()
     await db.refresh(pv)
+
+    # 保存 BGM 信息
+    bgm_url = body.get("bgm_url", "")
+    bgm_name = body.get("bgm_name", "")
+    if bgm_url or bgm_name:
+        # 存入 analysis_report 中
+        bgm_info = {"url": bgm_url, "name": bgm_name}
+        pv.analysis_report = {**(pv.analysis_report or {}), "bgm": bgm_info}
+        await db.commit()
 
     return {"success": True, "id": pv.id, "video_url": video_url}
 
