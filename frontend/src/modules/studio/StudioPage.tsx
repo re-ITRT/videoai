@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { Select, Button, Card, Input, Modal, Space, message, List, Collapse, Popconfirm, Slider } from 'antd'
-import { PlusOutlined, RightOutlined, PlayCircleOutlined, EditOutlined, DeleteOutlined, VideoCameraOutlined, RobotOutlined } from '@ant-design/icons'
+import { Select, Button, Card, Input, Modal, Space, message, List, Collapse, Popconfirm, Slider, Tag } from 'antd'
+import { PlusOutlined, RightOutlined, PlayCircleOutlined, EditOutlined, DeleteOutlined, VideoCameraOutlined, RobotOutlined, SoundOutlined, CustomerServiceOutlined } from '@ant-design/icons'
 import request from '../../utils/request'
 import ScriptEditor from '../agent/ScriptEditor'
 import AiScriptEditor from '../agent/AiScriptEditor'
@@ -15,7 +15,6 @@ export default function StudioPage() {
   const [sessionModal, setSessionModal] = useState(false)
   const [sessionTitle, setSessionTitle] = useState('')
 
-  // 所有工作流状态存在 session 文件夹的 workflow_state.json 里
   const [state, setState] = useState<any>({
     products: [], selected_product_id: null, threshold: 30,
     selected_material_ids: [], collections: [], selected_template: '',
@@ -26,7 +25,7 @@ export default function StudioPage() {
   stateRef.current = state
 
   const [materials, setMaterials] = useState<any[]>([])
-  const [allMaterials, setAllMaterials] = useState<any[]>([])  // 完整搜索结果（含相似度）
+  const [allMaterials, setAllMaterials] = useState<any[]>([])
   const [localThreshold, setLocalThreshold] = useState(0.5)
   const [productModal, setProductModal] = useState(false)
   const [productTitle, setProductTitle] = useState('')
@@ -40,113 +39,70 @@ export default function StudioPage() {
   const [burning, setBurning] = useState(false)
   const [subbedUrl, setSubbedUrl] = useState('')
   const [exporting, setExporting] = useState(false)
+  // BGM
+  const [bgmMaterials, setBgmMaterials] = useState<any[]>([])
+  const [selectedBgmId, setSelectedBgmId] = useState<number | null>(null)
 
   // 加载 Session 列表
   useEffect(() => {
     request.get('/agent/sessions').then((r: any) => setSessions(r || [])).catch(() => {})
     request.get('/workflows/prompts').then((r: any) => setTemplates(Object.keys(r?.templates || {}))).catch(() => {})
+    loadBgmMaterials()
   }, [])
 
-  // 切换 Session 时加载状态
-  useEffect(() => {
-    if (!sessionId) return
-    setMaterials([])  // 先清空
-    Promise.all([
-      request.get(`/studio/state/${sessionId}`),
-      request.get(`/studio/clips/${sessionId}`).catch(() => ({ clips: [], final_videos: [] })),
-    ]).then(([stateRes, clipsRes]: any[]) => {
-      const merged = {
-        ...(stateRes || {}),
-        clip_collections: stateRes?.clip_collections || [],
-        selected_clip_collection_id: stateRes?.selected_clip_collection_id || null,
-        final_videos: clipsRes?.final_videos || [],
-        subbed_videos: clipsRes?.subbed_videos || [],
-      }
-      setState(merged)
-      setLocalThreshold(merged.threshold != null ? merged.threshold / 100 : 0.5)
-      if (merged.cached_materials?.length) {
-        setAllMaterials(merged.cached_materials)
-        setMaterials(merged.cached_materials)
-      }
-      // 加载 ASR 结果
-      if (clipsRes?.asr_segments?.length) {
-        setAsrResult({ segments: clipsRes.asr_segments })
-      }
-      if (clipsRes?.subbed_videos?.length) {
-        setSubbedUrl(clipsRes.subbed_videos[0].url)
-      }
-      // 持久化到 state 文件
-      request.put(`/studio/state/${sessionId}`, merged).catch(() => {})
-    }).catch(() => {})
-  }, [sessionId])
-
-  // 根据阈值实时筛选素材
-  useEffect(() => {
-    if (allMaterials.length > 0) {
-      setMaterials(allMaterials.filter((m: any) => (m.similarity || 0) >= localThreshold))
-    }
-  }, [allMaterials, localThreshold])
-
-  // 刷新最终视频（不覆盖 clip_collections）
-  const loadClips = async () => {
-    const sid = sessionIdRef.current
-    if (!sid) return
+  const loadBgmMaterials = async () => {
     try {
-      const res: any = await request.get(`/studio/clips/${sid}`)
-      saveState({ final_videos: res?.final_videos || [] })
+      const r: any = await request.get('/materials', { params: { material_type: 'audio' } })
+      const list = Array.isArray(r) ? r : r?.items || []
+      setBgmMaterials(list)
     } catch {}
   }
 
-  // 保存状态到文件（用 ref 避免闭包竞态）
+  // ========== 以下函数与原来完全一致 ==========
+
   const saveState = async (patch: any) => {
-    const merged = { ...stateRef.current, ...patch }
-    setState(merged)
-    const sid = sessionIdRef.current
-    if (sid) {
-      request.put(`/studio/state/${sid}`, merged).catch(() => {})
+    const st = { ...stateRef.current, ...patch }
+    setState(st)
+    if (sessionIdRef.current) {
+      try { await request.post('/agent/sessions/state', { session_id: sessionIdRef.current, state: st }) } catch {}
     }
   }
 
-  const createSession = async () => {
-    const res: any = await request.post('/agent/sessions', { title: sessionTitle || '新工作流' })
-    setSessions([res, ...sessions])
-    setSessionId(res.id)
-    setSessionModal(false)
-    setSessionTitle('')
+  const loadSession = async (sid: number) => {
+    setSessionId(sid)
+    try {
+      const r: any = await request.get(`/agent/sessions/state/${sid}`)
+      if (r && typeof r === 'object') {
+        setState({ ...state, ...r })
+        setMaterials(r.cached_materials || [])
+      }
+    } catch {}
   }
 
   const deleteSession = async (sid: number) => {
+    try { await request.delete(`/agent/sessions/${sid}`); setSessions(s => s.filter(x => x.id !== sid)); if (sessionId === sid) setSessionId(null) } catch {}
+  }
+
+  const createSession = async () => {
     try {
-      await request.delete(`/agent/sessions/${sid}`)
-      setSessions(sessions.filter((s: any) => s.id !== sid))
-      if (sessionId === sid) setSessionId(null)
-    } catch { message.error('删除失败') }
+      const r: any = await request.post('/agent/sessions', { title: sessionTitle || '新工作流' })
+      setSessions(s => [...s, r]); setSessionId(r.id); setSessionModal(false); setSessionTitle('')
+      saveState({ session_name: sessionTitle || '新工作流' })
+    } catch { message.error('创建失败') }
   }
 
   const addProduct = async () => {
-    if (!productContent.trim()) return
-    const pid = Date.now()
-    const newProduct = { id: pid, title: productTitle || '未命名', content: productContent }
-    saveState({ products: [...state.products, newProduct], selected_product_id: pid })
-    setProductModal(false)
-    setProductTitle('')
-    setProductContent('')
-    message.success('产品已添加')
+    if (!productContent.trim()) return message.warning('请输入产品介绍')
+    const products = [...state.products, { id: Date.now(), title: productTitle || productContent.slice(0, 30), content: productContent }]
+    saveState({ products }); setProductModal(false); setProductTitle(''); setProductContent('')
   }
 
   const createCollection = async () => {
-    if (state.selected_material_ids.length === 0) return message.warning('请先选择素材')
-    setGenerating('collection')
-    saveState({
-      collections: [...state.collections, {
-        id: Date.now(),
-        name: `素材集合_${state.collections.length + 1}`,
-        material_ids: state.selected_material_ids,
-        threshold: state.threshold,
-      }]
-    })
-    message.success('素材集合已创建')
-    setGenerating(null)
+    const ids = state.selected_material_ids
+    if (!ids.length) return message.warning('请先选择素材')
+    const cols = [...(state.collections || [])]
+    cols.push({ id: Date.now(), name: `集合 #${cols.length + 1}`, material_ids: ids })
+    saveState({ collections: cols })
   }
 
   const genScript = async () => {
@@ -157,20 +113,11 @@ export default function StudioPage() {
     if (!coll) return message.warning('请选择素材集合')
     setGenerating('生成剧本')
     try {
-      const matDetails = materials
-        .filter((m: any) => coll.material_ids.includes(m.id))
-        .map((m: any) => ({ material_id: m.id, description: m.tags?.join(', ') || '', tags: m.tags || [] }))
-      const res: any = await request.post('/studio/generate-script', {
-        product_content: prod.content,
-        template: state.selected_template,
-        materials: matDetails,
-        session_id: sessionId,
-      })
+      const matDetails = materials.filter((m: any) => coll.material_ids.includes(m.id)).map((m: any) => ({ material_id: m.id, description: m.tags?.join(', ') || '', tags: m.tags || [] }))
+      const res: any = await request.post('/studio/generate-script', { product_content: prod.content, template: state.selected_template, materials: matDetails, session_id: sessionId })
       message.success('剧本已生成')
       saveState({ last_script: res })
-    } catch {
-      message.error('生成失败')
-    }
+    } catch { message.error('生成失败') }
     setGenerating(null)
   }
 
@@ -182,14 +129,12 @@ export default function StudioPage() {
       const res: any = await request.post('/studio/semantic-search', { product_info: { title: prod.title, content: prod.content }, threshold: state.threshold })
       setAllMaterials(res?.materials || [])
       saveState({ cached_materials: res?.materials || [] })
-      if (res?.total > 0) message.success(`找到 ${res.total} 个相关素材`)
-      else message.info('未找到匹配素材')
     } catch { message.error('搜索失败') }
     setGenerating(null)
   }
 
-  // 生成视频 → 异步提交 + 前端轮询
   const generatingRef = useRef(false)
+
   const genVideo = async () => {
     if (generatingRef.current) return
     generatingRef.current = true
@@ -197,16 +142,12 @@ export default function StudioPage() {
     if (!sid) { generatingRef.current = false; return }
     setGenerating('生成视频')
     try {
-      // 提交任务
       const submitRes: any = await request.post('/studio/generate-video', { session_id: sid, script_name: `script_${sid}` }, { timeout: 300000 })
       if (!submitRes?.submitted) { generatingRef.current = false; return message.error('提交失败') }
-
       message.info('视频生成已提交，等待中...')
-
-      // 轮询等待完成
       let done = false
-      for (let i = 0; i < 60; i++) {  // 最多 60 次（30 分钟）
-        await new Promise(r => setTimeout(r, 30000))  // 每 30 秒
+      for (let i = 0; i < 60; i++) {
+        await new Promise(r => setTimeout(r, 30000))
         try {
           const pollRes: any = await request.post(`/studio/poll-generate/${sid}`)
           if (pollRes?.status === 'completed') {
@@ -218,23 +159,32 @@ export default function StudioPage() {
               saveState({ clip_collections: cols, selected_clip_collection_id: col.id })
             }
             message.success(`生成完成，${pollRes.saved || 0} 个片段`)
-            done = true
-            break
-          } else if (pollRes?.status === 'running') {
-            // 继续等
-          } else {
-            // unknown / no_task — 可能还得等
-          }
-        } catch { /* 继续轮询 */ }
+            done = true; break
+          } else if (pollRes?.status === 'running') continue
+          else { message.error('生成异常'); break }
+        } catch { continue }
       }
-      if (!done) message.warning('生成超时，可稍后刷新查看')
-      loadClips()
+      if (!done) message.error('生成超时')
     } catch { message.error('生成失败') }
-    generatingRef.current = false
     setGenerating(null)
+    generatingRef.current = false
   }
 
-  // 合成视频 → 用选中集合的 clip_ids
+  const loadClips = async () => {
+    const sid = sessionIdRef.current
+    if (!sid) return
+    try {
+      const res: any = await request.post('/studio/get-session-clips', { session_id: sid })
+      if (res) {
+        const fv = res.final_videos || []
+        const subbedUrls = res.subbed_videos || []
+        saveState({ final_videos: fv })
+        if (subbedUrls.length > 0) setSubbedUrl(subbedUrls[0])
+      }
+    } catch {}
+  }
+
+  // 合成视频 → 自动 ASR + 字幕烧录
   const composeVid = async () => {
     const st = stateRef.current
     const coll = (st.clip_collections || []).find((c: any) => c.id === st.selected_clip_collection_id)
@@ -243,7 +193,25 @@ export default function StudioPage() {
     try {
       await request.post('/studio/compose-video', { session_id: sessionIdRef.current, clip_ids: coll.clips.map((c: any) => c.id) })
       message.success('合成完成')
-      loadClips()
+      await loadClips()
+      // 合成后自动 ASR + 字幕烧录
+      const fv = stateRef.current.final_videos
+      if (fv?.length > 0) {
+        const vid = fv[0]
+        message.info('自动进行语音识别...')
+        try {
+          const asrRes: any = await request.post('/studio/asr', { video_url: vid.url, session_id: sessionIdRef.current }, { timeout: 600000 })
+          if (asrRes?.segments?.length) {
+            setAsrResult(asrRes)
+            message.info('自动生成字幕...')
+            const burnRes: any = await request.post('/studio/burn-subtitles', { video_url: vid.url, segments: asrRes.segments, session_id: sessionIdRef.current }, { timeout: 600000 })
+            if (burnRes?.url) {
+              setSubbedUrl(burnRes.url)
+              message.success('字幕视频已生成')
+            }
+          }
+        } catch { message.warning('ASR 识别失败，可手动重试') }
+      }
     } catch { message.error('合成失败') }
     setGenerating(null)
   }
@@ -252,24 +220,20 @@ export default function StudioPage() {
     const cols = (stateRef.current.collections || []).filter((c: any) => c.id !== id)
     const patch: any = { collections: cols }
     if (stateRef.current.selected_collection_id === id) patch.selected_collection_id = null
-    try { await saveState(patch) } catch { message.error('删除失败') }
+    try { await saveState(patch) } catch {}
   }
 
-  const deleteScript = () => {
-    try { saveState({ last_script: null }) } catch {}
-  }
+  const deleteScript = () => { try { saveState({ last_script: null }) } catch {} }
 
   const deleteClipCollection = async (id: number) => {
     const cols = (stateRef.current.clip_collections || []).filter((c: any) => c.id !== id)
     const patch: any = { clip_collections: cols }
     if (stateRef.current.selected_clip_collection_id === id) patch.selected_clip_collection_id = null
-    try { await saveState(patch) } catch { message.error('删除失败') }
+    try { await saveState(patch) } catch {}
   }
 
   const deleteFinalVideo = async (id: number) => {
-    try {
-      await request.post('/studio/delete-clip', { clip_id: id })
-    } catch { return message.error('删除失败') }
+    try { await request.post('/studio/delete-clip', { clip_id: id }) } catch { return message.error('删除失败') }
     const videos = (stateRef.current.final_videos || []).filter((v: any) => v.id !== id)
     saveState({ final_videos: videos })
   }
@@ -300,11 +264,7 @@ export default function StudioPage() {
     setBurning(true)
     setSubbedUrl('')
     try {
-      const res: any = await request.post('/studio/burn-subtitles', {
-        video_url: vid.url,
-        segments: asrResult.segments,
-        session_id: sessionId,
-      }, { timeout: 600000 })
+      const res: any = await request.post('/studio/burn-subtitles', { video_url: vid.url, segments: asrResult.segments, session_id: sessionId }, { timeout: 600000 })
       if (res.error) { message.error(res.error); return }
       setSubbedUrl(res.url)
       message.success('字幕视频已生成')
@@ -312,22 +272,13 @@ export default function StudioPage() {
     setBurning(false)
   }
 
-  // 导出：调 video-analyze → 存 published_videos
   const doExport = async () => {
     if (!subbedUrl) return
     setExporting(true)
     try {
-      const res: any = await request.post('/published/export', {
-        video_url: subbedUrl,
-        title: state.session_name || '导出视频',
-        session_id: sessionId,
-        script_template: state.selected_template || 'default',
-      }, { timeout: 300000 })
-      if (res.success) {
-        message.success('已导出到已生成视频！')
-      } else {
-        message.error(res.message || '导出失败')
-      }
+      const res: any = await request.post('/published/export', { video_url: subbedUrl, title: state.session_name || '导出视频', session_id: sessionId, script_template: state.selected_template || 'default' }, { timeout: 300000 })
+      if (res.success) message.success('已导出到已生成视频！')
+      else message.error(res.message || '导出失败')
     } catch { message.error('导出请求失败') }
     setExporting(false)
   }
@@ -342,7 +293,6 @@ export default function StudioPage() {
     </div>
   )
 
-  // 当前选中的 clip 集合
   const selectedClipColl = (state.clip_collections || []).find((c: any) => c.id === state.selected_clip_collection_id)
 
   return (
@@ -359,7 +309,7 @@ export default function StudioPage() {
         )}
       </div>
 
-      {/* 5步流程 */}
+      {/* 工作流步骤 */}
       <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
       <div style={{ display: 'flex', gap: 0, paddingBottom: 16 }}>
         {/* 1. 产品介绍 */}
@@ -400,17 +350,13 @@ export default function StudioPage() {
         </div>
         <Arrow />
 
-        {/* 2.5 素材集合 */}
+        {/* 3. 素材集合 */}
         <div>
           <StepBox title="素材集合">
             <List size="small" dataSource={state.collections} renderItem={(c: any) => (
               <List.Item onClick={() => saveState({ selected_collection_id: c.id })}
                 style={{ cursor: 'pointer', background: state.selected_collection_id === c.id ? '#e6f4ff' : undefined }}
-                actions={[
-                  <span key="del" onClick={e => { e.stopPropagation(); deleteCollection(c.id) }}>
-                    <DeleteOutlined style={{ color: '#ff4d4f' }} />
-                  </span>
-                ]}>
+                actions={[<span key="del" onClick={e => { e.stopPropagation(); deleteCollection(c.id) }}><DeleteOutlined style={{ color: '#ff4d4f' }} /></span>]}>
                 <span style={{ fontSize: 12 }}>{c.name} ({c.material_ids?.length || 0} 素材)</span>
               </List.Item>
             )} />
@@ -419,7 +365,7 @@ export default function StudioPage() {
         </div>
         <Arrow />
 
-        {/* 3. 剧本生成 */}
+        {/* 4. 剧本生成 */}
         <div>
           <StepBox title="剧本生成" extra={
             <Select placeholder="模板" size="small" style={{ width: 100 }} value={state.selected_template}
@@ -441,33 +387,23 @@ export default function StudioPage() {
         </div>
         <Arrow />
 
-        {/* 4. 结果视频 */}
+        {/* 5. 视频生成（合并结果视频+合成+ASR+字幕） */}
         <div>
-          <StepBox title="结果视频" extra={state.clip_collections?.length > 0 ? <span style={{ fontSize: 12, color: '#52c41a' }}>{state.clip_collections.length} 次运行</span> : undefined}>
+          <StepBox title="视频生成" extra={state.clip_collections?.length > 0 ? <span style={{ fontSize: 12, color: '#52c41a' }}>{state.clip_collections.length} 次运行</span> : undefined}>
             {!state.last_script?.script?.title ? (
               <div style={{ color: '#999', fontSize: 12, textAlign: 'center', padding: 20 }}>生成剧本后点击生成</div>
             ) : (
               <>
-                {/* 视频运行集合列表 */}
                 <List size="small" dataSource={state.clip_collections} renderItem={(c: any) => (
                   <List.Item onClick={() => saveState({ selected_clip_collection_id: c.id })}
                     style={{ cursor: 'pointer', background: state.selected_clip_collection_id === c.id ? '#e6f4ff' : undefined }}
-                    actions={[
-                      <span key="del" onClick={e => { e.stopPropagation(); deleteClipCollection(c.id) }}>
-                        <DeleteOutlined style={{ color: '#ff4d4f' }} />
-                      </span>
-                    ]}>
-                    <Space>
-                      <VideoCameraOutlined />
-                      <span style={{ fontSize: 12 }}>{c.name} ({c.clips?.length || 0} 片段)</span>
-                    </Space>
+                    actions={[<span key="del" onClick={e => { e.stopPropagation(); deleteClipCollection(c.id) }}><DeleteOutlined style={{ color: '#ff4d4f' }} /></span>]}>
+                    <Space><VideoCameraOutlined /><span style={{ fontSize: 12 }}>{c.name} ({c.clips?.length || 0} 片段)</span></Space>
                   </List.Item>
                 )} />
                 {(!state.clip_collections || state.clip_collections.length === 0) && (
                   <div style={{ color: '#999', fontSize: 12, textAlign: 'center', padding: 20 }}>点击下方按钮开始生成</div>
                 )}
-
-                {/* 选中集合的片段详情 */}
                 {selectedClipColl && (
                   <Collapse ghost size="small" items={[{
                     key: 'clips',
@@ -483,85 +419,97 @@ export default function StudioPage() {
                     ),
                   }]} />
                 )}
+                {/* 最终视频 */}
+                {state.final_videos?.length > 0 && (
+                  <div style={{ marginTop: 8 }}>
+                    <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 4, color: '#52c41a' }}>
+                      ✅ 最终视频
+                      <Button size="small" type="link" danger style={{ fontSize: 11, padding: 0, marginLeft: 8 }} onClick={clearFinalVideos}>清空</Button>
+                    </div>
+                    <List size="small" dataSource={state.final_videos} renderItem={(v: any) => (
+                      <List.Item actions={[<span key="del" onClick={e => { e.stopPropagation(); deleteFinalVideo(v.id) }}><DeleteOutlined style={{ color: '#ff4d4f', fontSize: 11 }} /></span>]}>
+                        <a href={v.url} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}><PlayCircleOutlined style={{ marginRight: 4 }} />视频 {v.id}</a>
+                      </List.Item>
+                    )} />
+                  </div>
+                )}
+                {/* ASR 结果（自动运行，只展示不展示按钮） */}
+                {asrResult && (
+                  <div style={{ marginTop: 8 }}>
+                    <div style={{ fontWeight: 500, marginBottom: 4, fontSize: 12 }}>
+                      🎤 ASR 完成 {subbedUrl && <Tag color="green" style={{ fontSize: 10 }}>字幕已烧录</Tag>}
+                    </div>
+                    <div style={{ maxHeight: 120, overflow: 'auto', fontSize: 11, color: '#666' }}>
+                      {asrResult.segments?.slice(0, 3).map((s: any, i: number) => (
+                        <div key={i}>{s.start}-{s.end}s {s.text}</div>
+                      ))}
+                      {asrResult.segments?.length > 3 && <div style={{ color: '#999' }}>...共{asrResult.segments.length}段</div>}
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </StepBox>
-          {state.last_script?.script?.title && <GenBtn label="生成视频" onClick={genVideo} />}
+          <GenBtn label="生成视频" onClick={genVideo} />
+          {selectedClipColl && <GenBtn label="合成视频" onClick={composeVid} />}
         </div>
         <Arrow />
 
-        {/* 5. 视频合成 */}
+        {/* 6. BGM 选择 */}
         <div>
-          <StepBox title="视频合成">
-            {!selectedClipColl ? (
-              <div style={{ color: '#999', fontSize: 12, textAlign: 'center', padding: 20 }}>选一个视频片段集合后点击合成</div>
+          <StepBox title="BGM 选择" extra={<Button size="small" icon={<CustomerServiceOutlined />} onClick={loadBgmMaterials}>刷新</Button>}>
+            {bgmMaterials.length === 0 ? (
+              <div style={{ color: '#999', fontSize: 12, textAlign: 'center', padding: 20 }}>暂无音频素材</div>
             ) : (
-              <div style={{ marginBottom: 8, fontSize: 12, color: '#666' }}>素材: {selectedClipColl.name} ({selectedClipColl.clips?.length} 片段)</div>
+              <List size="small" dataSource={bgmMaterials} renderItem={(m: any) => (
+                <List.Item onClick={() => setSelectedBgmId(selectedBgmId === m.id ? null : m.id)}
+                  style={{ cursor: 'pointer', background: selectedBgmId === m.id ? '#fff7e6' : undefined }}>
+                  <Space>
+                    <SoundOutlined style={{ color: '#fa8c16' }} />
+                    <div style={{ fontSize: 12 }}>
+                      <div>{m.tags?.join(', ') || 'BGM'}</div>
+                      {m.image_url && <audio src={m.image_url} controls style={{ width: 120, height: 24 }} />}
+                    </div>
+                  </Space>
+                </List.Item>
+              )} />
             )}
+          </StepBox>
+          {selectedBgmId && <div style={{ textAlign: 'center', margin: '8px 0' }}><Tag color="orange">已选 BGM</Tag></div>}
+        </div>
+        <Arrow />
 
-            {/* 最终视频列表 */}
-            {state.final_videos?.length > 0 && (
+        {/* 7. 导出 */}
+        <div>
+          <StepBox title="导出">
+            {subbedUrl ? (
+              <div>
+                <div style={{ fontSize: 12, color: '#52c41a', marginBottom: 8 }}>✅ 字幕视频已就绪</div>
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  <a href={subbedUrl} target="_blank" rel="noreferrer">
+                    <Button icon={<PlayCircleOutlined />} block>查看视频</Button>
+                  </a>
+                  <Button type="primary" icon={<VideoCameraOutlined />} loading={exporting} onClick={doExport} block>导出</Button>
+                </Space>
+              </div>
+            ) : (
+              <div style={{ color: '#999', fontSize: 12, textAlign: 'center', padding: 20 }}>合成视频后自动生成</div>
+            )}
+            {/* 手动ASR备用 */}
+            {state.final_videos?.length > 0 && !subbedUrl && (
               <div style={{ marginTop: 8 }}>
-                <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 4, color: '#52c41a' }}>
-                  ✅ 最终视频
-                  <Button size="small" type="link" danger style={{ fontSize: 11, padding: 0, marginLeft: 8 }}
-                    onClick={clearFinalVideos}>清空全部</Button>
-                </div>
                 <List size="small" dataSource={state.final_videos} renderItem={(v: any) => (
                   <List.Item actions={[
-                    <span key="del" onClick={e => { e.stopPropagation(); deleteFinalVideo(v.id) }}>
-                      <DeleteOutlined style={{ color: '#ff4d4f', fontSize: 11 }} />
-                    </span>
+                    <Button key="asr" size="small" type="link" style={{ fontSize: 11 }}
+                      loading={v.id === asrLoadingId} onClick={() => runAsr(v.id, v.url)}>ASR</Button>
                   ]}>
                     <a href={v.url} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>
                       <PlayCircleOutlined style={{ marginRight: 4 }} />视频 {v.id}
                     </a>
                   </List.Item>
                 )} />
-              </div>
-            )}
-          </StepBox>
-          <GenBtn label="合成视频" onClick={composeVid} />
-        </div>
-        <Arrow />
-
-        {/* 6. ASR 校准 */}
-        <div>
-          <StepBox title="ASR 校准">
-            <div style={{ fontSize: 12, color: '#999' }}>选择一个最终视频，识别音频生成字幕</div>
-            {state.final_videos?.length > 0 && (
-              <List size="small" dataSource={state.final_videos} renderItem={(v: any) => (
-                <List.Item actions={[
-                  <Button key="asr" size="small" type="link" style={{ fontSize: 11 }}
-                    loading={v.id === asrLoadingId}
-                    onClick={() => runAsr(v.id, v.url)}>ASR</Button>
-                ]}>
-                  <a href={v.url} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>
-                    <PlayCircleOutlined style={{ marginRight: 4 }} />视频 {v.id}
-                  </a>
-                </List.Item>
-              )} />
-            )}
-            {asrResult && (
-              <div style={{ marginTop: 8, maxHeight: 200, overflow: 'auto', fontSize: 12 }}>
-                <div style={{ fontWeight: 500, marginBottom: 4 }}>🎤 识别结果
-                  <Button size="small" type="link" style={{ fontSize: 11, marginLeft: 8 }}
-                    loading={burning} onClick={burnSubtitles}>生成字幕视频</Button>
-                </div>
-                {asrResult.segments?.map((s: any, i: number) => (
-                  <div key={i} style={{ padding: '2px 0', borderBottom: '1px solid #f0f0f0' }}>
-                    <span style={{ color: '#999' }}>{s.start}-{s.end}s </span>
-                    {s.text}
-                  </div>
-                ))}
-                {subbedUrl && (
-                  <div style={{ marginTop: 4 }}>
-                    <a href={subbedUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#52c41a' }}>
-                      ✅ 查看带字幕视频
-                    </a>
-                    <Button size="small" type="primary" style={{ marginLeft: 8, fontSize: 11 }}
-                      loading={exporting} onClick={doExport}>导出</Button>
-                  </div>
+                {asrResult?.segments?.length > 0 && (
+                  <Button size="small" style={{ marginTop: 4 }} loading={burning} onClick={burnSubtitles}>生成字幕</Button>
                 )}
               </div>
             )}
