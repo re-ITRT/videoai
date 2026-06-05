@@ -103,6 +103,13 @@ async def studio_generate_script(body: dict, db: AsyncSession = Depends(get_db),
     template = body.get("template", "default")
     materials = body.get("materials", [])  # [{id, description, tags}]
     session_id = body.get("session_id", 0)
+    script_data = body.get("script")
+    save_only = body.get("save_only", False)
+
+    if save_only and script_data:
+        # 只保存剧本，不重新生成
+        _save_script(session_id, {"script": script_data})
+        return {"success": True, "saved": True}
 
     params = {
         "product_info": {"product_id": 1, "name": product_content[:30], "description": product_content, "selling_points": []},
