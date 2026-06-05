@@ -42,6 +42,7 @@ class MaterialResponse(BaseModel):
     image_url: Optional[str] = None
     video_url: Optional[str] = None
     text_content: Optional[str] = None
+    name: str = ""
     tags: list = []
     audio_features: dict = {}
     source: Optional[str] = None
@@ -49,6 +50,15 @@ class MaterialResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class MaterialCreate(BaseModel):
+    material_type: str
+    input_type: str
+    image_url: Optional[str] = None
+    text_content: Optional[str] = None
+    name: str = ""
+    source: Optional[str] = "upload"
 
 
 # ── Slice ─────────────────────────────────

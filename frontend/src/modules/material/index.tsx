@@ -48,6 +48,7 @@ export default function MaterialList() {
 
   const columns = [
     { title: 'ID', dataIndex: 'id', width: 60 },
+    { title: '名称', dataIndex: 'name', ellipsis: true, width: 140 },
     { title: '类型', dataIndex: 'material_type', render: (v: string) => <Tag color={v === 'audio' ? 'purple' : v === 'video' ? 'blue' : 'green'}>{v === 'audio' ? '🎵 BGM' : v}</Tag> },
     { title: '分类', render: (_: any, r: Material) => r.category ? <Tag>{r.category}</Tag> : null },
     { title: '标签', dataIndex: 'tags', render: (tags: string[]) => tags?.map(t => <Tag key={t}>{t}</Tag>) },

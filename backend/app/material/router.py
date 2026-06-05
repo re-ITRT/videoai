@@ -61,6 +61,7 @@ async def upload_material_file(
     material_type: str = Form("product"),
     input_type: str = Form("image"),
     category: str = Form(None),
+    name: str = Form(""),
     text_content: str = Form(None),
     product_name: str = Form(None),
     db: AsyncSession = Depends(get_db),
@@ -69,8 +70,6 @@ async def upload_material_file(
     """上传素材文件（图片/视频），保存文件并创建素材记录"""
     image_url = None
     signed_url = None
-    product_name = None
-    text_content = None
     if file and file.filename:
         ext = os.path.splitext(file.filename or "file")[1] or ".bin"
         filename = f"{uuid.uuid4().hex}{ext}"
@@ -87,6 +86,7 @@ async def upload_material_file(
         input_type=input_type,
         image_url=image_url,
         text_content=text_content,
+        name=name,
         source="upload",
     )
     # 异步触发 material-embed 工作流（不阻塞返回）

@@ -34,6 +34,7 @@ class Material(Base):
     image_url = Column(Text)
     video_url = Column(Text)
     text_content = Column(Text)
+    name = Column(String(256), default="")  # 素材名称
     embedding = Column(Vector(1024))  # 1024维向量
     tags = Column(JSONB, default=[])
     audio_features = Column(JSONB, default={})  # Librosa 分析结果

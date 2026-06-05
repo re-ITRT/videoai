@@ -35,6 +35,7 @@ export default function MaterialUpload() {
     fd.append('material_type', autoType)
     fd.append('input_type', autoType)
     fd.append('category', values.category || '其他')
+    fd.append('name', values.name || fileObj.name || '未命名')
     if (values.brief_description) fd.append('text_content', values.brief_description)
     if (values.product_name && values.product_name.trim()) fd.append('product_name', values.product_name)
     fd.append('file', fileObj)
@@ -81,6 +82,11 @@ export default function MaterialUpload() {
             <Input.TextArea rows={3} placeholder="如：白色运动鞋 透气网面" />
           </Form.Item>
         )}
+
+        <Form.Item name="name" label="素材名称"
+          rules={[{ required: true, message: '请填写素材名称' }]}>
+          <Input placeholder="输入素材名称，如：轻快BGM、产品主图等" />
+        </Form.Item>
 
         <Form.Item label="选择文件">
           <Upload.Dragger
