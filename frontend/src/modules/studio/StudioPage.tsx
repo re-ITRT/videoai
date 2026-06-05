@@ -203,7 +203,7 @@ export default function StudioPage() {
     const sid = sessionIdRef.current
     if (!sid) return
     try {
-      const res: any = await request.post('/studio/get-session-clips', { session_id: sid })
+      const res: any = await request.get(`/studio/clips/${sid}`)
       if (res) {
         const fv = res.final_videos || []
         const subbedUrls = res.subbed_videos || []
