@@ -50,6 +50,11 @@ export default function ScriptTemplates() {
   const [aiTemplates, setAiTemplates] = useState<any[]>([])
   const [aiSource, setAiSource] = useState('')
 
+  // 优化建议
+  const [optLoading, setOptLoading] = useState<string | null>(null)
+  const [optResult, setOptResult] = useState<any>(null)
+  const [optVisible, setOptVisible] = useState(false)
+
   const load = async () => {
     setLoading(true)
     try {
@@ -108,6 +113,17 @@ export default function ScriptTemplates() {
     setAiGenerating(false)
   }
 
+  // 优化建议
+  const handleOptimize = async (name: string) => {
+    setOptLoading(name)
+    try {
+      const res: any = await request.post('/template/templates/optimize', { template_name: name })
+      setOptResult(res)
+      setOptVisible(true)
+    } catch { message.error('获取优化建议失败') }
+    setOptLoading(null)
+  }
+
   // 应用AI模板（保存为剧本模板）
   const applyAiTemplate = async (tpl: any) => {
     const name = tpl.name || `AI推荐-${Date.now()}`
@@ -152,6 +168,7 @@ export default function ScriptTemplates() {
     { title: '操作', render: (_: any, r: any) => (
       <Space>
         <Button size="small" icon={<EditOutlined />} disabled={r.name === 'default'} onClick={() => openEdit(r.name)}>编辑</Button>
+        <Button size="small" loading={optLoading === r.name} onClick={() => handleOptimize(r.name)} disabled={r.name === 'default'}>优化建议</Button>
         {r.name !== 'default' && <Button size="small" danger onClick={async () => {
           try { await request.delete(`/workflows/templates/${r.name}`); message.success('已删除'); load() }
           catch { message.error('删除失败') }
@@ -237,6 +254,36 @@ export default function ScriptTemplates() {
             </div>
           )}
         </Spin>
+      </Modal>
+
+      {/* 优化建议弹窗 */}
+      <Modal title={`💡 优化建议：${optResult?.template || ''}`} open={optVisible} onCancel={() => setOptVisible(false)}
+        footer={null} width={600} destroyOnClose>
+        {optResult && (
+          <div>
+            <div style={{ marginBottom: 12, padding: 8, background: '#f5f5f5', borderRadius: 4, fontSize: 13 }}>
+              <Text strong>概述：</Text>{optResult.summary}
+            </div>
+            {optResult.suggestions?.map((s: any, i: number) => (
+              <Card key={i} size="small" style={{ marginBottom: 8 }}>
+                <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                  <Space>
+                    <Tag color="blue">#{i + 1}</Tag>
+                    <Text strong style={{ fontSize: 13 }}>{s.aspect}</Text>
+                  </Space>
+                  <div style={{ fontSize: 12 }}>{s.suggestion}</div>
+                  <div style={{ fontSize: 11, color: '#666' }}>预期效果：{s.expected_impact}</div>
+                </Space>
+              </Card>
+            ))}
+            <div style={{ textAlign: 'right', marginTop: 8 }}>
+              <Tag color={optResult.priority === '高' ? 'red' : optResult.priority === '中' ? 'orange' : 'blue'}>
+                优先级: {optResult.priority}
+              </Tag>
+              <Tag color="default" style={{ marginLeft: 4 }}>来源: {optResult.source === 'ai' ? 'AI分析' : '归因数据'}</Tag>
+            </div>
+          </div>
+        )}
       </Modal>
     </Card>
   )
