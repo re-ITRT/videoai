@@ -341,26 +341,36 @@ export default function StudioPage() {
           </div>
           {/* 主内容区 */}
           <div style={{ flex: 1, overflow: 'auto' }}>
-            {step === 0 && <div><StepBox title="产品介绍" extra={<Button size="small" icon={<PlusOutlined />} onClick={() => setProductModal(true)} />} style={{ minHeight: 400 }}>
-              <List size="small" dataSource={state.products} renderItem={(p: any) => (
-                <List.Item onClick={() => saveState({ selected_product_id: p.id })}
-                  style={{ cursor: 'pointer', background: state.selected_product_id === p.id ? '#e6f4ff' : undefined }}>
-                  {p.title || p.content?.slice(0, 30)}
-                </List.Item>
-              )} />
-            </StepBox><GenBtn label="嵌入搜索" onClick={semanticSearch} /></div>}
-            {step === 1 && <div><StepBox title="素材选择" style={{ minHeight: 400 }}>
-              <div style={{ marginBottom: 16 }}>
-                <span>相似度阈值: {localThreshold}</span>
-                <Slider min={0} max={0.95} step={0.05} value={localThreshold} onChange={setLocalThreshold} />
+            {step === 0 && (
+              <div>
+                <StepBox title="产品介绍" extra={<Button size="small" icon={<PlusOutlined />} onClick={() => setProductModal(true)} />} style={{ minHeight: 400 }}>
+                  <List size="small" dataSource={state.products} renderItem={(p: any) => (
+                    <List.Item onClick={() => saveState({ selected_product_id: p.id })}
+                      style={{ cursor: 'pointer', background: state.selected_product_id === p.id ? '#e6f4ff' : undefined }}>
+                      {p.title || p.content?.slice(0, 30)}
+                    </List.Item>
+                  )} />
+                </StepBox>
+                <GenBtn label="嵌入搜索" onClick={semanticSearch} />
               </div>
-              <List size="small" dataSource={materials} renderItem={(m: any) => (
-                <List.Item style={{ cursor: 'pointer', background: state.selected_material_ids.includes(m.id) ? '#e6f4ff' : undefined }}
-                  onClick={() => saveState({ selected_material_ids: state.selected_material_ids.includes(m.id) ? state.selected_material_ids.filter((x: number) => x !== m.id) : [...state.selected_material_ids, m.id] })}>
-                  <Space>{m.image_url && <img src={m.image_url} style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 4 }} />}<span>{m.id}</span></Space>
-                </List.Item>
-              )} />
-            </StepBox><GenBtn label="生成素材集合" onClick={createCollection} /></div>}
+            )}
+            {step === 1 && (
+              <div>
+                <StepBox title="素材选择" style={{ minHeight: 400 }}>
+                  <div style={{ marginBottom: 16 }}>
+                    <span>相似度阈值: {localThreshold}</span>
+                    <Slider min={0} max={0.95} step={0.05} value={localThreshold} onChange={setLocalThreshold} />
+                  </div>
+                  <List size="small" dataSource={materials} renderItem={(m: any) => (
+                    <List.Item style={{ cursor: 'pointer', background: state.selected_material_ids.includes(m.id) ? '#e6f4ff' : undefined }}
+                      onClick={() => saveState({ selected_material_ids: state.selected_material_ids.includes(m.id) ? state.selected_material_ids.filter((x: number) => x !== m.id) : [...state.selected_material_ids, m.id] })}>
+                      <Space>{m.image_url && <img src={m.image_url} style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 4 }} />}<span>{m.id}</span></Space>
+                    </List.Item>
+                  )} />
+                </StepBox>
+                <GenBtn label="生成素材集合" onClick={createCollection} />
+              </div>
+            )}
             {step === 2 && <div><StepBox title="素材集合" style={{ minHeight: 400 }}>
               <List size="small" dataSource={state.collections} renderItem={(c: any) => (
                 <List.Item onClick={() => saveState({ selected_collection_id: c.id })}
