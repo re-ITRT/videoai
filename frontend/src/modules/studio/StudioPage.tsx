@@ -265,14 +265,32 @@ export default function StudioPage() {
     try { await saveState(patch) } catch {}
   }
 
-  // @ts-ignore
   const doExport = async () => {
     if (!subbedUrl) return
     setExporting(true)
     try {
-      const res: any = await request.post('/published/export', { video_url: subbedUrl, title: state.session_name || '导出视频', session_id: sessionId, script_template: state.selected_template || 'default' }, { timeout: 300000 })
-      if (res.success) message.success('已导出到已生成视频！')
-      else message.error(res.message || '导出失败')
+      const bgmId = selectedBgmId
+      const bgm = bgmId ? bgmMaterials.find((m: any) => m.id === bgmId) : null
+      const payload: any = {
+        video_url: subbedUrl,
+        title: state.session_name || '导出视频',
+        session_id: sessionId,
+        script_template: state.selected_template || 'default',
+      }
+      if (bgm) {
+        payload.bgm_url = bgm.image_url
+        payload.bgm_name = bgm.name || ''
+      }
+      const res: any = await request.post('/published/export', payload, { timeout: 300000 })
+      if (res.success) {
+        const exp = { id: Date.now(), video_url: subbedUrl, title: state.session_name || '导出视频', bgm_name: bgm?.name || '', script_template: state.selected_template || 'default', created_at: new Date().toISOString() }
+        const exports = [...(state.exports || []), exp]
+        saveState({ exports, selected_export_id: exp.id })
+        setSubbedUrl('')
+        message.success('导出成功！')
+      } else {
+        message.error(res.message || '导出失败')
+      }
     } catch { message.error('导出请求失败') }
     setExporting(false)
   }
