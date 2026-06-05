@@ -97,6 +97,12 @@ export default function StudioPage() {
     } catch {}
   }
 
+  const deleteFinalVideo = async (id: number) => {
+    try { await request.post('/studio/delete-clip', { clip_id: id }) } catch { return message.error('删除失败') }
+    const videos = (stateRef.current.final_videos || []).filter((v: any) => v.id !== id)
+    saveState({ final_videos: videos })
+  }
+
   const deleteSession = async (sid: number) => {
     try { await request.delete(`/agent/sessions/${sid}`); setSessions(s => s.filter(x => x.id !== sid)); if (sessionId === sid) setSessionId(null) } catch {}
   }
@@ -460,7 +466,9 @@ export default function StudioPage() {
                           style={{ cursor: 'pointer', background: selectedAsrVideo === v.id ? '#e6f4ff' : undefined }}
                           actions={[
                             !hasAsr ? <Button key="go" size="small" type="link" loading={asrLoadingId === v.id}>ASR中...</Button>
-                              : <Tag key="done" color="green">已识别</Tag>
+                              : <Tag key="done" color="green">已识别</Tag>,
+                            <DeleteOutlined key="del" style={{ color: '#ff4d4f', fontSize: 12 }}
+                              onClick={e => { e.stopPropagation(); deleteFinalVideo(v.id) }} />
                           ]}>
                           <Space><PlayCircleOutlined /><span>视频 {v.id}</span></Space>
                         </List.Item>
