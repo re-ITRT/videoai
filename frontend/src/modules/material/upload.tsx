@@ -1,12 +1,10 @@
 import { useState } from 'react'
 import { Card, Button, Upload, message, Tag, Progress, List, Space } from 'antd'
-import { InboxOutlined, SoundOutlined } from '@ant-design/icons'
+import { InboxOutlined } from '@ant-design/icons'
 import { uploadMaterial } from '../../utils/api'
-import { useNavigate } from 'react-router-dom'
 import type { UploadFile } from 'antd'
 
 export default function MaterialUpload() {
-  const navigate = useNavigate()
   const [fileList, setFileList] = useState<UploadFile[]>([])
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState({ current: 0, total: 0 })
