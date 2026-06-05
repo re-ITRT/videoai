@@ -425,16 +425,31 @@ export default function StudioPage() {
                     )} />
                   )}
                 </Card>
-                {selectedBgmId && <Tag color="orange" style={{ marginTop: 8 }}>已选 BGM（导出时自动附加）</Tag>}
+                {selectedBgmId && <Tag color="orange" style={{ marginTop: 8 }}>已选 BGM（到导出步骤时自动附带）</Tag>}
+                <div style={{ fontSize: 11, color: '#999', marginTop: 4, textAlign: 'center' }}>选好 BGM 后去导出步骤</div>
               </div>
             )}
             {step === 6 && (
               <div>
                 <Card title="导出" size="small" style={{ minHeight: 400 }}>
-                  {(state.exports || []).length === 0 ? (
-                    <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>合成视频后自动生成字幕，在此查看和导出</div>
-                  ) : (
+                  {/* 当前视频 */}
+                  {subbedUrl && (
+                    <div style={{ marginBottom: 16, padding: 12, background: '#f6ffed', borderRadius: 4 }}>
+                      <div style={{ fontWeight: 600, marginBottom: 8, color: '#52c41a' }}>✅ 当前视频已就绪</div>
+                      <Space direction="vertical" style={{ width: '100%' }}>
+                        <a href={subbedUrl} target="_blank" rel="noreferrer" style={{ width: '100%' }}>
+                          <Button icon={<PlayCircleOutlined />} block>查看视频</Button>
+                        </a>
+                        <Button type="primary" icon={<VideoCameraOutlined />} loading={exporting} onClick={doExport} block>
+                          {selectedBgmId ? '导出（含BGM）' : '导出'}
+                        </Button>
+                      </Space>
+                    </div>
+                  )}
+                  {/* 已导出的列表 */}
+                  {(state.exports || []).length > 0 && (
                     <div>
+                      <div style={{ fontWeight: 500, marginBottom: 8, fontSize: 13 }}>📦 已导出记录</div>
                       <List size="small" dataSource={state.exports} renderItem={(e: any) => (
                         <List.Item onClick={() => saveState({ selected_export_id: e.id })}
                           style={{ cursor: 'pointer', background: state.selected_export_id === e.id ? '#e6f4ff' : undefined }}
