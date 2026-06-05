@@ -49,6 +49,8 @@ class InspirationTemplateBase(BaseModel):
     reference_video_ids: List[int] = Field(default_factory=list, description="聚类来源的参考视频ID")
     category: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
+    attribution_score: float = 0.0
+    predicted_play_count: int = 2000
 
 
 class InspirationTemplateCreate(InspirationTemplateBase):

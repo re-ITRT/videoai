@@ -151,6 +151,8 @@ async def create_template(
         reference_video_ids=data.reference_video_ids,
         category=data.category,
         tags=data.tags,
+        attribution_score=data.attribution_score,
+        predicted_play_count=data.predicted_play_count,
     )
     db.add(template)
     await db.commit()

@@ -177,3 +177,194 @@ async def generate_script(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"生成失败: {str(e)}")
+
+
+# ── AI Template Generation ─────────────────
+
+@router.get("/attribution-insights")
+async def get_attribution_insights(
+    db: AsyncSession = Depends(get_db),
+):
+    """获取归因分析洞察：最佳组合 + 特征重要性 + 推荐策略"""
+    from app.script.models import ReferenceVideo
+    q = select(ReferenceVideo).where(ReferenceVideo.user_id == DEFAULT_USER_ID)
+    rows = (await db.execute(q)).scalars().all()
+    if len(rows) < 3:
+        return {"insights": [], "message": "至少需要3个参考视频"}
+
+    import math
+    # 提取特征
+    features = []
+    for r in rows:
+        af = r.audio_features or {}
+        ar = r.analysis_report or {}
+        features.append({
+            "id": r.id, "title": r.title or "",
+            "style": r.style or "", "hook_method": r.hook_method or "",
+            "rhythm": r.rhythm or 0.0, "play_count": r.play_count or 2000,
+            "hook_quality": ar.get("hook_quality", 0) if isinstance(ar, dict) else 0,
+            "pacing_score": ar.get("pacing_score", 0) if isinstance(ar, dict) else 0,
+            "engagement_strength": ar.get("engagement_strength", 0) if isinstance(ar, dict) else 0,
+            "cta_clarity": ar.get("cta_clarity", 0) if isinstance(ar, dict) else 0,
+            "overall_score": ar.get("overall_score", 0) if isinstance(ar, dict) else 0,
+            "bpm": af.get("bpm", 0) or 0, "lightness_score": af.get("lightness_score", 0) or 0,
+        })
+
+    # 最佳组合
+    from collections import defaultdict
+    groups = defaultdict(list)
+    for f in features:
+        bgm = "轻快" if f["lightness_score"] >= 55 else ("中性" if f["lightness_score"] >= 30 else "稳重") if f["lightness_score"] else "无BGM"
+        rt = "快" if f["rhythm"] <= 2 else ("中" if f["rhythm"] <= 5 else "慢")
+        key = f"{f['style']}|{f['hook_method'][:10]}|{bgm}|{rt}"
+        groups[key].append(f)
+    combos = []
+    for k, v in groups.items():
+        parts = k.split("|")
+        avg_pc = round(sum(c["play_count"] for c in v) / len(v))
+        combos.append({"combo": k, "style": parts[0], "hook": parts[1], "bgm": parts[2], "rhythm": parts[3],
+                       "avg_play_count": avg_pc, "count": len(v)})
+    combos.sort(key=lambda x: x["avg_play_count"], reverse=True)
+
+    # 最佳特征（依据重要性排序）
+    numeric_cols = ["hook_quality", "pacing_score", "engagement_strength", "cta_clarity", "overall_score"]
+    corrs = {}
+    for col in numeric_cols:
+        vals = [(f[col], f["play_count"]) for f in features if isinstance(f.get(col), (int, float))]
+        if len(vals) < 3: continue
+        xs, ys = zip(*vals)
+        n = len(xs)
+        mx, my = sum(xs)/n, sum(ys)/n
+        num = sum((xs[i]-mx)*(ys[i]-my) for i in range(n))
+        d1 = math.sqrt(sum((xs[i]-mx)**2 for i in range(n)))
+        d2 = math.sqrt(sum((ys[i]-my)**2 for i in range(n)))
+        corrs[col] = round(num/(d1*d2) if d1*d2 > 0 else 0, 4)
+    top_features = sorted(corrs.items(), key=lambda x: abs(x[1]), reverse=True)
+
+    return {
+        "best_combos": combos[:10],
+        "top_features": [{"name": n, "correlation": v} for n, v in top_features],
+        "sample_count": len(features),
+    }
+
+
+@router.post("/templates/ai-generate")
+async def ai_generate_template(
+    db: AsyncSession = Depends(get_db),
+):
+    """AI 根据归因分析自动生成推荐模板"""
+    from app.script.models import ReferenceVideo
+    import json, httpx
+
+    q = select(ReferenceVideo).where(ReferenceVideo.user_id == DEFAULT_USER_ID)
+    rows = (await db.execute(q)).scalars().all()
+    if len(rows) < 1:
+        raise HTTPException(400, "至少需要1个参考视频")
+
+    # 提取最佳组合
+    features = []
+    for r in rows:
+        af = r.audio_features or {}
+        ar = r.analysis_report or {}
+        bgm = "轻快" if (af.get("lightness_score") or 0) >= 55 else "稳重"
+        features.append({
+            "style": r.style, "hook": r.hook_method[:10],
+            "bgm": bgm, "rhythm": r.rhythm or 0,
+            "play_count": r.play_count or 2000,
+        })
+
+    # 按 play_count 排序，取前3
+    features.sort(key=lambda x: x["play_count"], reverse=True)
+    best = features[:3]
+
+    # 构造策略提示
+    combo_desc = "; ".join([f"风格={f['style']} Hook={f['hook']} BGM={f['bgm']} 节奏={f['rhythm']}s 播放量={f['play_count']}" for f in best])
+
+    # 调用本地 LLM 生成模板
+    from app.workflow.models import WorkflowConfig
+    from sqlalchemy import select as _s
+    wf = await db.execute(_s(WorkflowConfig).where(
+        WorkflowConfig.user_id == DEFAULT_USER_ID,
+        WorkflowConfig.workflow_name == "material-analyze",
+        WorkflowConfig.enabled == 1,
+    ))
+    wf_cfg = wf.scalar_one_or_none()
+    if not wf_cfg:
+        # fallback: 直接基于数据生成
+        return _build_fallback_templates(best)
+
+    cfg = json.loads(wf_cfg.config or "{}")
+    api_key = cfg.get("api_key")
+    base_url = (cfg.get("base_url") or "https://api.deepseek.com/v1").rstrip("/")
+    model = cfg.get("model", "deepseek-v4-flash")
+
+    prompt = f"""你是一个电商短视频策略专家。根据以下高播放量视频的组合数据，生成3个灵感模板。
+
+组合数据（风格|Hook|BGM|节奏|播放量）：
+{combo_desc}
+
+请输出JSON数组（不要其他文本）：
+[
+  {{
+    "name": "模板名称（简短有力）",
+    "strategy": "创作策略描述（包含风格选择、Hook手法、BGM建议、节奏把控等完整策略说明）",
+    "factors": {{
+      "hook": {{"type": "Hook手法", "description": "具体开场方式"}},
+      "scene": {{"type": "场景设计", "description": "画面和场景安排"}},
+      "narration": {{"type": "旁白策略", "description": "旁白/台词风格"}},
+      "visual": {{"type": "画面风格", "description": "视觉风格和特效"}},
+      "ending": {{"type": "结尾CTA", "description": "引导转化方式"}}
+    }},
+    "category": "适用品类（食品/美妆/家电/服饰等）",
+    "tags": ["标签1", "标签2", "标签3"],
+    "attribution_score": 0-100的整数（基于数据评估的推荐强度）
+  }}
+]
+
+要求：
+1. 模板要具体可执行，不能太抽象
+2. 每个模板聚焦一个不同的风格方向
+3. attribution_score 反映该模板被数据支持的强度"""
+
+    try:
+        payload = {
+            "model": model, "temperature": 0.7,
+            "messages": [
+                {"role": "system", "content": "你是电商短视频策略专家，输出结构化JSON。"},
+                {"role": "user", "content": prompt},
+            ],
+            "response_format": {"type": "json_object"},
+        }
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(f"{base_url}/chat/completions", json=payload,
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"})
+            if resp.status_code == 200:
+                content = resp.json()["choices"][0]["message"]["content"]
+                parsed = json.loads(content)
+                templates = parsed if isinstance(parsed, list) else parsed.get("templates", [parsed])
+                return {"templates": templates, "source": "ai"}
+    except Exception as e:
+        print(f"[ai-generate] LLM failed: {e}")
+
+    return _build_fallback_templates(best)
+
+
+def _build_fallback_templates(best: list) -> dict:
+    """LLM不可用时，基于数据硬编码模板"""
+    templates = []
+    for i, f in enumerate(best[:3]):
+        templates.append({
+            "name": f"{f['style']}+{f['hook']}模板",
+            "strategy": f"采用{f['style']}风格，{f['hook']}手法开场，配合{f['bgm']}背景音乐，节奏控制在{f['rhythm']}秒/镜左右。参考高播放量视频的策略。",
+            "factors": {
+                "hook": {"type": f["hook"], "description": f"以{f['hook']}方式开场，前3秒抓住注意力"},
+                "scene": {"type": "场景串联", "description": "2-3个场景快速切换，保持节奏紧凑"},
+                "narration": {"type": "旁白配合", "description": "简洁有力的旁白配合画面节奏"},
+                "visual": {"type": f["style"], "description": f"采用{f['style']}的视觉风格和剪辑手法"},
+                "ending": {"type": "CTA引导", "description": "结尾明确引导用户行动"},
+            },
+            "category": "通用",
+            "tags": [f["style"], f["hook"], f["bgm"]],
+            "attribution_score": 85 - i * 5,
+        })
+    return {"templates": templates, "source": "data"}
