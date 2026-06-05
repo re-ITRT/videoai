@@ -21,6 +21,7 @@ class EmbeddingResult(BaseModel):
     text_content: str = ""
     text_embedding_dim: int = 0
     image_embedding_dim: int = 0
+    audio_features: dict = {}
 
 
 @router.get("/{material_id}/embedding")

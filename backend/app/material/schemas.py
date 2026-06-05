@@ -43,6 +43,7 @@ class MaterialResponse(BaseModel):
     video_url: Optional[str] = None
     text_content: Optional[str] = None
     tags: list = []
+    audio_features: dict = {}
     source: Optional[str] = None
     created_at: Optional[datetime] = None
 
