@@ -271,6 +271,7 @@ export default function StudioPage() {
     setAsrLoadingId(null)
   }
 
+  // @ts-ignore
   const burnSubtitles = async () => {
     if (!asrResult?.segments?.length) return
     const vid = state.final_videos?.[0]
@@ -297,10 +298,6 @@ export default function StudioPage() {
     setExporting(false)
   }
 
-  const StepBox = ({ title, extra, children }: any) => (
-    <Card title={title} size="small" extra={extra} style={{ width: 280, flexShrink: 0, minHeight: 380 }}>{children}</Card>
-  )
-  const Arrow = () => <div style={{ display: 'flex', alignItems: 'center', padding: '0 8px' }}><RightOutlined style={{ fontSize: 24, color: '#1677ff' }} /></div>
   const GenBtn = ({ label, onClick }: any) => (
     <div style={{ textAlign: 'center', margin: '8px 0' }}>
       <Button type="primary" icon={<PlayCircleOutlined />} loading={generating === label} onClick={onClick} style={{ width: 180 }}>{label}</Button>
