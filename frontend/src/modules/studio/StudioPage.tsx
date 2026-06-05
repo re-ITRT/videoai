@@ -420,6 +420,20 @@ export default function StudioPage() {
                       )} />
                       {(!state.clip_collections || state.clip_collections.length === 0) && <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>点击下方按钮开始生成</div>}
                       {selectedClipColl && <Collapse ghost size="small" items={[{key:'clips',label:<span>查看片段 ({selectedClipColl.clips?.length||0})</span>,children:<div style={{maxHeight:200,overflow:'auto'}}>{selectedClipColl.clips?.map((clip:any)=>(<div key={clip.id} style={{padding:'4px 0',borderBottom:'1px solid #f0f0f0'}}><a href={clip.url} target="_blank" rel="noreferrer">场景 {clip.scene_id}</a></div>))}</div>}]} />}
+                      {/* ASR 校错 */}
+                      {asrResult?.segments?.length > 0 && (
+                        <div style={{ marginTop: 16 }}>
+                          <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>🎤 ASR 识别结果</div>
+                          <div style={{ maxHeight: 250, overflow: 'auto', fontSize: 12 }}>
+                            {asrResult.segments.map((seg: any, i: number) => (
+                              <div key={i} style={{ padding: '6px 0', borderBottom: '1px solid #f0f0f0', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                                <Tag style={{ fontSize: 10, flexShrink: 0, margin: 0 }}>{seg.start}-{seg.end}s</Tag>
+                                <span style={{ color: '#333' }}>{seg.text}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </Card>
