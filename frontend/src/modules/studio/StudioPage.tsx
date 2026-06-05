@@ -49,6 +49,17 @@ export default function StudioPage() {
     loadBgmMaterials()
   }, [])
 
+  // 切换 Session 时加载状态
+  useEffect(() => {
+    if (!sessionId) return
+    request.get(`/agent/sessions/state/${sessionId}`).then((r: any) => {
+      if (r && typeof r === 'object') {
+        setState({ ...state, ...r })
+        setMaterials(r.cached_materials || [])
+      }
+    }).catch(() => {})
+  }, [sessionId])
+
   const loadBgmMaterials = async () => {
     try {
       const r: any = await request.get('/materials', { params: { material_type: 'audio' } })
