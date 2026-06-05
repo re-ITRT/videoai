@@ -364,6 +364,14 @@ async def studio_compose_video(body: dict, db: AsyncSession = Depends(get_db), u
     clips = [f for f in files if f.file_type == "video_clip"]
     if clip_ids:
         clips = [f for f in clips if f.id in clip_ids]
+    # 按 scene_id 排序（从 description 提取场景号）
+    def _scene_sort_key(f):
+        desc = f.description or ""
+        try:
+            return int(desc.replace("场景 ", "").replace(" 视频片段", ""))
+        except:
+            return 999
+    clips.sort(key=_scene_sort_key)
     if not clips:
         raise HTTPException(400, "没有可合成的视频片段")
 
