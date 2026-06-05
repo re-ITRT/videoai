@@ -53,7 +53,15 @@ async def run_video_generate(api_key: str, params: dict) -> dict:
                     else:
                         prompt += f"{s}-{e}秒: 画面中的{speaker}说出「{text}」(语气: {tone})\n"
                 prompt += "\n【区分说明】旁白是画外音不出镜，其他角色须在画面中出现并说出台词。以上顺序不能颠倒。\n"
-                prompt += "【重要】不要在视频中添加任何文字、字幕、标签、标题或文字动画。只生成纯画面内容。"
+                prompt += "【重要】不要在视频中添加任何文字、字幕、标签、标题或文字动画。只生成纯画面内容。\n"
+            # 空间关系强化
+            prompt += "\n【空间布局要求】\n"
+            prompt += "1. 参考图仅作为产品外观和风格参考，不要完全照搬构图\n"
+            prompt += "2. 产品应位于画面中心或黄金分割点（偏左/偏右1/3处），占据画面1/4到1/2的面积\n"
+            prompt += "3. 人物和产品之间的前后关系要明确：谁在前谁在后\n"
+            prompt += "4. 避免画面过于空旷或过于拥挤，保持视觉平衡\n"
+            prompt += "5. 如果有多个人物/物体，说明它们之间的相对位置（左右/前后/上下）\n"
+            prompt += "6. 背景元素和前景元素要分层，营造景深感"
             content_items.append({"type": "text", "text": prompt})
 
             body = {"model": MODEL_EP, "content": content_items, "return_last_frame": False}
