@@ -19,7 +19,7 @@ export default function StudioPage() {
     products: [], selected_product_id: null, threshold: 30,
     selected_material_ids: [], collections: [], selected_template: '',
     clip_collections: [], selected_clip_collection_id: null,
-    final_videos: [], scripts: [], selected_script_id: null,
+    final_videos: [], scripts: [], selected_script_id: null, exports: [], selected_export_id: null,
   })
   const stateRef = useRef(state)
   stateRef.current = state
@@ -435,13 +435,39 @@ export default function StudioPage() {
             {step === 6 && (
               <div>
                 <Card title="导出" size="small" style={{ minHeight: 400 }}>
-                  {subbedUrl ? <Space direction="vertical" style={{ width: '100%' }}>
-                    <div style={{color:'#52c41a',marginBottom:8}}>✅ 字幕视频已就绪</div>
-                    <a href={subbedUrl} target="_blank" rel="noreferrer"><Button icon={<PlayCircleOutlined />} block>查看视频</Button></a>
-                    <Button type="primary" icon={<VideoCameraOutlined />} loading={exporting} onClick={doExport} block>导出</Button>
-                  </Space> : <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>合成视频后自动生成</div>}
-                  {state.final_videos?.length > 0 && !subbedUrl && <div style={{marginTop:12}}>
-                    <List size="small" dataSource={state.final_videos} renderItem={(v:any)=>(<List.Item actions={[<Button key="asr" size="small" type="link" loading={v.id===asrLoadingId} onClick={()=>runAsr(v.id,v.url)}>ASR</Button>]}><a href={v.url} target="_blank" rel="noreferrer"><PlayCircleOutlined style={{marginRight:4}}/>视频 {v.id}</a></List.Item>)}/></div>}
+                  {(state.exports || []).length === 0 ? (
+                    <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>合成视频后自动生成字幕，在此查看和导出</div>
+                  ) : (
+                    <div>
+                      <List size="small" dataSource={state.exports} renderItem={(e: any) => (
+                        <List.Item onClick={() => saveState({ selected_export_id: e.id })}
+                          style={{ cursor: 'pointer', background: state.selected_export_id === e.id ? '#e6f4ff' : undefined }}
+                          actions={[
+                            <span key="del" onClick={ev => { ev.stopPropagation(); deleteExport(e.id) }}><DeleteOutlined style={{ color: '#ff4d4f' }} /></span>
+                          ]}>
+                          <Space>
+                            <PlayCircleOutlined />
+                            <span style={{ fontWeight: state.selected_export_id === e.id ? 600 : 400 }}>{e.title}</span>
+                            {e.bgm_name && <Tag color="orange" style={{ fontSize: 10 }}>🎵 {e.bgm_name}</Tag>}
+                            <Tag style={{ fontSize: 10 }}>{e.script_template}</Tag>
+                          </Space>
+                        </List.Item>
+                      )} />
+                      {state.selected_export_id && (() => {
+                        const sel = (state.exports || []).find((x: any) => x.id === state.selected_export_id)
+                        return sel ? (
+                          <div style={{ marginTop: 12 }}>
+                            <Space direction="vertical" style={{ width: '100%' }}>
+                              <a href={sel.video_url} target="_blank" rel="noreferrer" style={{ width: '100%' }}>
+                                <Button icon={<PlayCircleOutlined />} block>查看视频</Button>
+                              </a>
+                              <Button type="primary" icon={<VideoCameraOutlined />} block onClick={() => window.open(sel.video_url, '_blank')}>下载视频</Button>
+                            </Space>
+                          </div>
+                        ) : null
+                      })()}
+                    </div>
+                  )}
                 </Card>
               </div>
             )}
