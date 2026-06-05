@@ -283,14 +283,17 @@ async def ai_generate_template(
     combo_desc = "; ".join([f"风格={f['style']} Hook={f['hook']} BGM={f['bgm']} 节奏={f['rhythm']}s 播放量={f['play_count']}" for f in best])
 
     # 调用本地 LLM 生成模板
-    from app.workflow.models import WorkflowConfig
-    from sqlalchemy import select as _s
-    wf = await db.execute(_s(WorkflowConfig).where(
-        WorkflowConfig.user_id == DEFAULT_USER_ID,
-        WorkflowConfig.workflow_name == "material-analyze",
-        WorkflowConfig.enabled == 1,
-    ))
-    wf_cfg = wf.scalar_one_or_none()
+    wf_cfg = None
+    try:
+        from app.workflow.models import WorkflowConfig
+        from sqlalchemy import select as _s
+        q = _s(WorkflowConfig).where(
+            WorkflowConfig.workflow_name == "material-analyze",
+            WorkflowConfig.enabled == 1,
+        ).limit(1)
+        wf_cfg = (await db.execute(q)).scalar_one_or_none()
+    except Exception as e:
+        print(f"[ai-generate] workflow query: {e}")
     if not wf_cfg:
         # fallback: 直接基于数据生成
         return _build_fallback_templates(best)
