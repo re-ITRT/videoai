@@ -19,7 +19,7 @@ export default function StudioPage() {
     products: [], selected_product_id: null, threshold: 30,
     selected_material_ids: [], collections: [], selected_template: '',
     clip_collections: [], selected_clip_collection_id: null,
-    final_videos: [],
+    final_videos: [], scripts: [], selected_script_id: null,
   })
   const stateRef = useRef(state)
   stateRef.current = state
@@ -130,8 +130,10 @@ export default function StudioPage() {
     try {
       const matDetails = materials.filter((m: any) => coll.material_ids.includes(m.id)).map((m: any) => ({ material_id: m.id, description: m.tags?.join(', ') || '', tags: m.tags || [] }))
       const res: any = await request.post('/studio/generate-script', { product_content: prod.content, template: state.selected_template, materials: matDetails, session_id: sessionId })
+      const newScript = { id: Date.now(), name: `${prod.title?.slice(0, 16) || '剧本'} #${(state.scripts?.length || 0) + 1}`, script: res.script || res, created_at: new Date().toISOString() }
+      const scripts = [...(state.scripts || []), newScript]
       message.success('剧本已生成')
-      saveState({ last_script: res })
+      saveState({ scripts, selected_script_id: newScript.id })
     } catch { message.error('生成失败') }
     setGenerating(null)
   }
@@ -155,9 +157,14 @@ export default function StudioPage() {
     generatingRef.current = true
     const sid = sessionIdRef.current
     if (!sid) { generatingRef.current = false; return }
+    const selScript = state.scripts?.find((s: any) => s.id === state.selected_script_id)
+    if (!selScript) { generatingRef.current = false; return message.warning('请选择剧本') }
     setGenerating('生成视频')
     try {
-      const submitRes: any = await request.post('/studio/generate-video', { session_id: sid, script_name: `script_${sid}` }, { timeout: 300000 })
+      const script_name = `script_${selScript.id}`
+      // Save the script to session file
+      await request.post('/studio/generate-script', { product_content: '', template: state.selected_template, materials: [], session_id: sid, save_only: true, script: selScript.script }).catch(() => {})
+      const submitRes: any = await request.post('/studio/generate-video', { session_id: sid, script_name }, { timeout: 300000 })
       if (!submitRes?.submitted) { generatingRef.current = false; return message.error('提交失败') }
       message.info('视频生成已提交，等待中...')
       let done = false
@@ -238,7 +245,11 @@ export default function StudioPage() {
     try { await saveState(patch) } catch {}
   }
 
-  const deleteScript = () => { try { saveState({ last_script: null }) } catch {} }
+  const deleteScript = (id?: number) => {
+    const scripts = (state.scripts || []).filter((s: any) => s.id !== (id || state.selected_script_id))
+    const sel = state.selected_script_id === id ? null : state.selected_script_id
+    try { saveState({ scripts, selected_script_id: sel || (scripts.length > 0 ? scripts[0].id : null) }) } catch {}
+  }
 
   const deleteClipCollection = async (id: number) => {
     const cols = (stateRef.current.clip_collections || []).filter((c: any) => c.id !== id)
@@ -350,18 +361,33 @@ export default function StudioPage() {
             {step === 3 && (
               <div>
                 <Card title="剧本生成" size="small" extra={<Select placeholder="模板" size="small" style={{ width: 120 }} value={state.selected_template} onChange={v => saveState({ selected_template: v })} options={templates.map(t => ({ value: t, label: t }))} />} style={{ minHeight: 400 }}>
-                  <div style={{ color: '#999' }}>选产品+素材集合+模板后点击生成</div>
-                  {state.last_script?.script?.title && (
-                    <div style={{ marginTop: 12, padding: 12, background: '#f6ffed', borderRadius: 4 }}>
-                      <div style={{ fontWeight: 600 }}>✅ 剧本: {state.last_script.script.title}</div>
-                      <div style={{ color: '#666', fontSize: 12 }}>{state.last_script.script.scenes?.length || 0} 个场景</div>
-                      <Space style={{ marginTop: 8 }}>
-                        <Button size="small" icon={<EditOutlined />} onClick={() => setScriptEditorOpen(true)}>编辑</Button>
-                        <Button size="small" icon={<RobotOutlined />} onClick={() => setAiScriptEditorOpen(true)}>AI编辑</Button>
-                        <Button size="small" danger icon={<DeleteOutlined />} onClick={e => { e.stopPropagation(); deleteScript() }} />
-                      </Space>
-                    </div>
+                  {(state.scripts || []).length === 0 ? (
+                    <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>在素材集合步骤生成剧本后在此查看和选择</div>
+                  ) : (
+                    <List size="small" dataSource={state.scripts} renderItem={(s: any) => (
+                      <List.Item onClick={() => saveState({ selected_script_id: s.id })}
+                        style={{ cursor: 'pointer', background: state.selected_script_id === s.id ? '#e6f4ff' : undefined }}
+                        actions={[
+                          <Button key="edit" size="small" type="link" icon={<EditOutlined />} onClick={e => { e.stopPropagation(); setScriptEditorOpen(true) }} />,
+                          <Button key="ai" size="small" type="link" icon={<RobotOutlined />} onClick={e => { e.stopPropagation(); setAiScriptEditorOpen(true) }} />,
+                          <span key="del" onClick={e => { e.stopPropagation(); deleteScript(s.id) }}><DeleteOutlined style={{ color: '#ff4d4f' }} /></span>
+                        ]}>
+                        <Space>
+                          <span style={{ fontWeight: state.selected_script_id === s.id ? 600 : 400 }}>{s.name}</span>
+                          <Tag style={{ fontSize: 10 }}>{s.script?.scenes?.length || 0} 场景</Tag>
+                        </Space>
+                      </List.Item>
+                    )} />
                   )}
+                  {state.selected_script_id && (() => {
+                    const sel = (state.scripts || []).find((s: any) => s.id === state.selected_script_id)
+                    return sel ? (
+                      <div style={{ marginTop: 12, padding: 12, background: '#f6ffed', borderRadius: 4 }}>
+                        <div style={{ fontWeight: 600 }}>✅ {sel.script?.title || sel.name}</div>
+                        <div style={{ color: '#666', fontSize: 12 }}>{sel.script?.scenes?.length || 0} 个场景</div>
+                      </div>
+                    ) : null
+                  })()}
                 </Card>
                 <GenBtn label="生成视频" onClick={genVideo} />
               </div>
