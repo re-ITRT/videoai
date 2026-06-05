@@ -35,10 +35,10 @@ export default function StudioPage() {
   const [aiScriptEditorOpen, setAiScriptEditorOpen] = useState(false)
   const [asrLoadingId, setAsrLoadingId] = useState<number | null>(null)
   const [asrResult, setAsrResult] = useState<any>(null)
-  // Keep reference to asrResult for composeVid callback
   void asrResult;
-  const [subbedUrl, setSubbedUrl] = useState('')
   const [exporting, setExporting] = useState(false)
+  void exporting;
+  const [subbedUrl, setSubbedUrl] = useState('')
   // BGM
   const [bgmMaterials, setBgmMaterials] = useState<any[]>([])
   const [selectedBgmId, setSelectedBgmId] = useState<number | null>(null)
@@ -118,6 +118,12 @@ export default function StudioPage() {
     const cols = [...(state.collections || [])]
     cols.push({ id: Date.now(), name: `集合 #${cols.length + 1}`, material_ids: ids })
     saveState({ collections: cols })
+  }
+
+  const deleteExport = (id: number) => {
+    const exports = (stateRef.current.exports || []).filter((e: any) => e.id !== id)
+    const sel = stateRef.current.selected_export_id === id ? null : stateRef.current.selected_export_id
+    try { saveState({ exports, selected_export_id: sel || (exports.length > 0 ? exports[0].id : null) }) } catch {}
   }
 
   const genScript = async () => {
@@ -256,17 +262,6 @@ export default function StudioPage() {
     const patch: any = { clip_collections: cols }
     if (stateRef.current.selected_clip_collection_id === id) patch.selected_clip_collection_id = null
     try { await saveState(patch) } catch {}
-  }
-
-  const runAsr = async (id: number, url: string) => {
-    setAsrLoadingId(id)
-    setAsrResult(null)
-    try {
-      const res: any = await request.post('/studio/asr', { video_url: url, session_id: sessionId }, { timeout: 600000 })
-      if (res.error) { message.error(res.error); return }
-      setAsrResult(res)
-    } catch { message.error('ASR 请求失败') }
-    setAsrLoadingId(null)
   }
 
   // @ts-ignore
