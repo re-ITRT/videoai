@@ -253,60 +253,65 @@ async def get_attribution_insights(
 async def ai_generate_template(
     db: AsyncSession = Depends(get_db),
 ):
-    """AI 根据归因分析自动生成推荐模板"""
+    """AI 根据归因分析+工作台预测数据自动生成推荐模板"""
     from app.script.models import ReferenceVideo
+    from app.published.models import PublishedVideo
     from sqlalchemy import select as _sel
     import json, httpx
 
-    q = _sel(ReferenceVideo).limit(100)
-    rows = (await db.execute(q)).scalars().all()
-    if len(rows) < 1:
+    refs = (await db.execute(_sel(ReferenceVideo).limit(100))).scalars().all()
+    pub_refs = (await db.execute(_sel(PublishedVideo).limit(50))).scalars().all()
+    if len(refs) < 1:
         raise HTTPException(400, "至少需要1个参考视频")
 
-    # 提取最佳组合
-    features = []
-    for r in rows:
+    ref_features = []
+    for r in refs:
         af = r.audio_features or {}
         ar = r.analysis_report or {}
         bgm = "轻快" if (af.get("lightness_score") or 0) >= 55 else "稳重"
-        features.append({
-            "style": r.style, "hook": r.hook_method[:10],
+        ref_features.append({
+            "style": r.style or "", "hook": (r.hook_method or "")[:12],
             "bgm": bgm, "rhythm": r.rhythm or 0,
-            "play_count": r.play_count or 2000,
+            "hook_quality": ar.get("hook_quality", 0) if isinstance(ar, dict) else 0,
+            "pacing_score": ar.get("pacing_score", 0) if isinstance(ar, dict) else 0,
+            "engagement_strength": ar.get("engagement_strength", 0) if isinstance(ar, dict) else 0,
+            "cta_clarity": ar.get("cta_clarity", 0) if isinstance(ar, dict) else 0,
+            "overall_score": ar.get("overall_score", 0) if isinstance(ar, dict) else 0,
+            "lightness_score": af.get("lightness_score", 0) or 0,
+            "bpm": af.get("bpm", 0) or 0, "play_count": r.play_count or 2000,
         })
+    ref_features.sort(key=lambda x: x["play_count"], reverse=True)
+    best_refs = ref_features[:3]
 
-    # 按 play_count 排序，取前3
-    features.sort(key=lambda x: x["play_count"], reverse=True)
-    best = features[:3]
+    pub_features = []
+    for p in pub_refs:
+        af = p.audio_features or {}
+        ar = p.analysis_report or {}
+        bgm = "轻快" if (af.get("lightness_score") or 0) >= 55 else "稳重"
+        pub_features.append({
+            "title": p.title or "", "style": p.style or "", "hook": (p.hook_method or "")[:12],
+            "bgm": bgm, "rhythm": p.rhythm or 0, "play_count": p.play_count or 2000,
+            "hook_quality": ar.get("hook_quality", 0) if isinstance(ar, dict) else 0,
+            "overall_score": ar.get("overall_score", 0) if isinstance(ar, dict) else 0,
+        })
+    pub_features.sort(key=lambda x: x["play_count"], reverse=True)
+    best_pubs = pub_features[:3]
 
-    # 构造策略提示
-    combo_desc = "; ".join([f"风格={f['style']} Hook={f['hook']} BGM={f['bgm']} 节奏={f['rhythm']}s 播放量={f['play_count']}" for f in best])
+    ref_desc = "\n".join([f"  风格={f['style']} Hook={f['hook']} BGM={f['bgm']} 节奏={f['rhythm']}s 播放量={f['play_count']} Hook质量={f['hook_quality']} 综合评分={f['overall_score']}" for f in best_refs])
+    pub_desc = "\n".join([f"  标题={f['title']} 风格={f['style']} Hook={f['hook']} BGM={f['bgm']} 播放量={f['play_count']}" for f in best_pubs]) if best_pubs else "  暂无已生成视频"
 
-    # 调用本地 LLM 生成模板
-    wf_cfg = None
-    try:
-        from app.workflow.models import WorkflowConfig
-        from sqlalchemy import select as _s
-        q = _s(WorkflowConfig).where(
-            WorkflowConfig.workflow_name == "material-analyze",
-            WorkflowConfig.enabled == 1,
-        ).limit(1)
-        wf_cfg = (await db.execute(q)).scalar_one_or_none()
-    except Exception as e:
-        print(f"[ai-generate] workflow query: {e}")
-    if not wf_cfg:
-        # fallback: 直接基于数据生成
-        return _build_fallback_templates(best)
+    prompt = f"""你是一个电商短视频策略专家。根据以下数据生成3个高质量可执行的灵感模板。
 
-    cfg = json.loads(wf_cfg.config or "{}")
-    api_key = cfg.get("api_key")
-    base_url = (cfg.get("base_url") or "https://api.deepseek.com/v1").rstrip("/")
-    model = cfg.get("model", "deepseek-v4-flash")
+【参考视频最佳组合（按实际播放量排序）】
+{ref_desc}
 
-    prompt = f"""你是一个电商短视频策略专家。根据以下高播放量视频的组合数据，生成3个灵感模板。
+【已生成视频数据】
+{pub_desc}
 
-组合数据（风格|Hook|BGM|节奏|播放量）：
-{combo_desc}
+分析要求：
+1. 参考视频的"播放量"是真实数据
+2. 找出高播放量组合的共同特征（风格、Hook、BGM、节奏）
+3. 生成的模板要具体、可执行
 
 请输出JSON数组（不要其他文本）：
 [
@@ -331,6 +336,25 @@ async def ai_generate_template(
 2. 每个模板聚焦一个不同的风格方向
 3. attribution_score 反映该模板被数据支持的强度"""
 
+    wf_cfg = None
+    try:
+        from app.workflow.models import WorkflowConfig
+        from sqlalchemy import select as _s
+        q = _s(WorkflowConfig).where(
+            WorkflowConfig.workflow_name == "material-analyze",
+            WorkflowConfig.enabled == 1,
+        ).limit(1)
+        wf_cfg = (await db.execute(q)).scalar_one_or_none()
+    except Exception as e:
+        print(f"[ai-generate] workflow query: {e}")
+    if not wf_cfg:
+        return _build_fallback_templates(best_refs)
+
+    cfg = json.loads(wf_cfg.config or "{}")
+    api_key = cfg.get("api_key")
+    base_url = (cfg.get("base_url") or "https://api.deepseek.com/v1").rstrip("/")
+    model = cfg.get("model", "deepseek-v4-flash")
+
     try:
         payload = {
             "model": model, "temperature": 0.7,
@@ -344,16 +368,14 @@ async def ai_generate_template(
             resp = await client.post(f"{base_url}/chat/completions", json=payload,
                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"})
             if resp.status_code == 200:
-                content = resp.json()["choices"][0]["message"]["content"]
-                parsed = json.loads(content)
+                c = resp.json()["choices"][0]["message"]["content"]
+                parsed = json.loads(c)
                 templates = parsed if isinstance(parsed, list) else parsed.get("templates", [parsed])
                 return {"templates": templates, "source": "ai"}
     except Exception as e:
         print(f"[ai-generate] LLM failed: {e}")
 
-    return _build_fallback_templates(best)
-
-
+    return _build_fallback_templates(best_refs)
 def _build_fallback_templates(best: list) -> dict:
     """LLM不可用时，基于数据硬编码模板"""
     templates = []
