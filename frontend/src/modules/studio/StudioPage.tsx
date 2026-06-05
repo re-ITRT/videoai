@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Select, Button, Card, Input, Modal, Space, message, List, Collapse, Popconfirm, Slider, Tag, Menu } from 'antd'
-import { PlusOutlined, RightOutlined, PlayCircleOutlined, EditOutlined, DeleteOutlined, VideoCameraOutlined, RobotOutlined, SoundOutlined, CustomerServiceOutlined } from '@ant-design/icons'
+import { PlusOutlined, RightOutlined, PlayCircleOutlined, EditOutlined, DeleteOutlined, VideoCameraOutlined, RobotOutlined, SoundOutlined, CustomerServiceOutlined, AppstoreOutlined, FileTextOutlined } from '@ant-design/icons'
 import request from '../../utils/request'
 import ScriptEditor from '../agent/ScriptEditor'
 import AiScriptEditor from '../agent/AiScriptEditor'
@@ -35,7 +35,6 @@ export default function StudioPage() {
   const [aiScriptEditorOpen, setAiScriptEditorOpen] = useState(false)
   const [asrResult, setAsrResult] = useState<any>(null)
   const [asrLoadingId, setAsrLoadingId] = useState<number | null>(null)
-  const [burning, setBurning] = useState(false)
   const [subbedUrl, setSubbedUrl] = useState('')
   const [exporting, setExporting] = useState(false)
   // BGM
