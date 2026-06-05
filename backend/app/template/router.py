@@ -254,8 +254,11 @@ async def get_attribution_insights(
         model_groups[m]["count"] += 1
         model_groups[m]["total_play"] += (p.play_count or 2000)
         model_groups[m]["titles"].append(p.title or "未命名")
-    model_analysis = {m: {"count": d["count"], "avg_play_count": round(d["total_play"] / d["count"]),
-                           "feedback": _get_model_feedback(m, d)} for m, d in model_groups.items()}
+    model_analysis = {}
+    for m, d in model_groups.items():
+        avg = round(d["total_play"] / d["count"]) if d["count"] else 0
+        model_analysis[m] = {"count": d["count"], "avg_play_count": avg,
+                             "feedback": _get_model_feedback(m, avg, d["count"])}
 
     return {
         "best_combos": combos[:10],
@@ -265,16 +268,17 @@ async def get_attribution_insights(
     }
 
 
-def _get_model_feedback(model_name: str, data: dict) -> str:
+def _get_model_feedback(model_name: str, avg_play_count: int, sample_count: int) -> str:
     """根据模型使用数据生成反馈"""
-    avg = data["avg_play_count"]
-    if avg >= 10000:
-        return f"表现优秀（平均播放量{avg}），建议优先使用"
-    elif avg >= 5000:
-        return f"表现良好（平均播放量{avg}），可继续使用"
-    elif data["count"] == 1:
-        return f"仅有一个样本，平均播放量{avg}，需更多数据评估"
-    return f"平均播放量{avg}，建议尝试其他模型对比"
+    if sample_count == 0:
+        return "暂无数据"
+    if avg_play_count >= 10000:
+        return f"表现优秀（平均播放量{avg_play_count}），建议优先使用"
+    elif avg_play_count >= 5000:
+        return f"表现良好（平均播放量{avg_play_count}），可继续使用"
+    elif sample_count == 1:
+        return f"仅有一个样本，平均播放量{avg_play_count}，需更多数据评估"
+    return f"平均播放量{avg_play_count}，建议尝试其他模型对比"
 
 
 @router.post("/templates/ai-generate")
