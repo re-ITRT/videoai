@@ -356,6 +356,7 @@ export default function StudioPage() {
                   )} />
                   {state.collections.length === 0 && <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>选素材后点击生成</div>}
                 </Card>
+                <GenBtn label="生成剧本" onClick={genScript} />
               </div>
             )}
             {step === 3 && (
@@ -374,7 +375,6 @@ export default function StudioPage() {
                     </div>
                   )}
                 </Card>
-                <GenBtn label="生成剧本" onClick={genScript} />
               </div>
             )}
             {step === 4 && (
