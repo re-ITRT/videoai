@@ -25,8 +25,7 @@ export default function StudioPage() {
   stateRef.current = state
 
   const [materials, setMaterials] = useState<any[]>([])
-  const [allMaterials, setAllMaterials] = useState<any[]>([])
-  const [localThreshold, setLocalThreshold] = useState(0.5)
+    const [localThreshold, setLocalThreshold] = useState(0.5)
   const [productModal, setProductModal] = useState(false)
   const [productTitle, setProductTitle] = useState('')
   const [productContent, setProductContent] = useState('')
@@ -68,6 +67,7 @@ export default function StudioPage() {
     }
   }
 
+// @ts-ignore - kept for potential future use
   const loadSession = async (sid: number) => {
     setSessionId(sid)
     try {
@@ -127,7 +127,7 @@ export default function StudioPage() {
     setGenerating('嵌入搜索')
     try {
       const res: any = await request.post('/studio/semantic-search', { product_info: { title: prod.title, content: prod.content }, threshold: state.threshold })
-      setAllMaterials(res?.materials || [])
+      setMaterials(res?.materials || [])
       saveState({ cached_materials: res?.materials || [] })
     } catch { message.error('搜索失败') }
     setGenerating(null)
