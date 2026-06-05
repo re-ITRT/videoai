@@ -52,9 +52,12 @@ export default function StudioPage() {
   // 切换 Session 时加载状态
   useEffect(() => {
     if (!sessionId) return
-    request.get(`/agent/sessions/state/${sessionId}`).then((r: any) => {
-      if (r && typeof r === 'object') {
-        setState({ ...state, ...r })
+    // 用 raw fetch 避免触发全局错误提示
+    fetch(`/api/v1/agent/sessions/state/${sessionId}`, {
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+    }).then(r => r.json()).then((r: any) => {
+      if (r && typeof r === 'object' && !r.detail) {
+        setState((prev: any) => ({ ...prev, ...r }))
         setMaterials(r.cached_materials || [])
       }
     }).catch(() => {})
