@@ -27,5 +27,5 @@ class PublishedVideo(Base):
     # 来源
     source_session_id = Column(Integer, default=0)
     audio_features = Column(JSONB, default={})  # Librosa 音频分析
-    model_name = Column(String(64), default="doubao-seedance-1.5-pro")  # 生成模型
+    script_template = Column(String(64), default="default")  # 使用的剧本模板
     created_at = Column(DateTime(timezone=True), server_default=func.now())

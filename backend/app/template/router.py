@@ -242,43 +242,42 @@ async def get_attribution_insights(
         corrs[col] = round(num/(d1*d2) if d1*d2 > 0 else 0, 4)
     top_features = sorted(corrs.items(), key=lambda x: abs(x[1]), reverse=True)
 
-    # 模型分析
-    model_analysis = {}
+    # 模板分析
+    template_analysis = {}
     from app.published.models import PublishedVideo as PV
     pub_rows = (await db.execute(_sel(PV).limit(100))).scalars().all()
-    model_groups = {}
+    tpl_groups = {}
     for p in pub_rows:
-        m = p.model_name or "unknown"
-        if m not in model_groups:
-            model_groups[m] = {"count": 0, "total_play": 0, "titles": []}
-        model_groups[m]["count"] += 1
-        model_groups[m]["total_play"] += (p.play_count or 2000)
-        model_groups[m]["titles"].append(p.title or "未命名")
-    model_analysis = {}
-    for m, d in model_groups.items():
+        t = p.script_template or "default"
+        if t not in tpl_groups:
+            tpl_groups[t] = {"count": 0, "total_play": 0, "titles": []}
+        tpl_groups[t]["count"] += 1
+        tpl_groups[t]["total_play"] += (p.play_count or 2000)
+        tpl_groups[t]["titles"].append(p.title or "未命名")
+    template_analysis = {}
+    for t, d in tpl_groups.items():
         avg = round(d["total_play"] / d["count"]) if d["count"] else 0
-        model_analysis[m] = {"count": d["count"], "avg_play_count": avg,
-                             "feedback": _get_model_feedback(m, avg, d["count"])}
+        template_analysis[t] = {"count": d["count"], "avg_play_count": avg,
+                                "feedback": _get_template_feedback(t, avg, d["count"])}
 
     return {
         "best_combos": combos[:10],
         "top_features": [{"name": n, "correlation": v} for n, v in top_features],
         "sample_count": len(features),
-        "model_analysis": model_analysis,
+        "template_analysis": template_analysis,
     }
 
 
-def _get_model_feedback(model_name: str, avg_play_count: int, sample_count: int) -> str:
-    """根据模型使用数据生成反馈"""
+def _get_template_feedback(template_name: str, avg_play_count: int, sample_count: int) -> str:
     if sample_count == 0:
         return "暂无数据"
     if avg_play_count >= 10000:
-        return f"表现优秀（平均播放量{avg_play_count}），建议优先使用"
+        return f"表现优秀（平均播放量{avg_play_count}），建议推广此模板"
     elif avg_play_count >= 5000:
-        return f"表现良好（平均播放量{avg_play_count}），可继续使用"
-    elif sample_count == 1:
-        return f"仅有一个样本，平均播放量{avg_play_count}，需更多数据评估"
-    return f"平均播放量{avg_play_count}，建议尝试其他模型对比"
+        return f"表现良好（平均播放量{avg_play_count}），可继续优化"
+    elif sample_count <= 2:
+        return f"仅{sample_count}个样本，平均播放量{avg_play_count}，需更多数据评估"
+    return f"平均播放量{avg_play_count}较低，建议调整模板策略"
 
 
 @router.post("/templates/ai-generate")

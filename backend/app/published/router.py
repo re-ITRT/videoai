@@ -132,7 +132,7 @@ async def publish_video(
         scenes=scenes,
         rhythm=rhythm,
         audio_features=audio_features,
-        model_name=body.get("model_name", "doubao-seedance-1.5-pro"),
+        script_template=body.get("script_template", "default"),
         play_count=2000,
         source_session_id=source_session_id,
     )
@@ -245,7 +245,7 @@ async def list_published(
             "scenes": r.scenes or [],
             "analysis_report": r.analysis_report or {},
             "audio_features": r.audio_features or {},
-            "model_name": r.model_name or "doubao-seedance-1.5-pro",
+            "script_template": r.script_template or "default",
             "created_at": r.created_at.isoformat() if r.created_at else "",
         })
 
