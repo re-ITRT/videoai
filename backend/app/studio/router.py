@@ -742,11 +742,39 @@ async def studio_burn_subtitles(body: dict, db: AsyncSession = Depends(get_db), 
         # FFmpeg 烧录字幕
         out_name = f"subbed_{uuid.uuid4().hex[:8]}.mp4"
         out_path = os.path.join(tmpdir, out_name)
-        result = subprocess.run(
-            ["ffmpeg", "-i", vid_path, "-vf", f"subtitles={srt_path}:fontsdir=/app/models/fonts:force_style='FontName=WenQuanYi Micro Hei\,FontSize=18\,PrimaryColour=&H00FFFFFF\,OutlineColour=&H00000000\,BorderStyle=1\,Outline=1'",
-             "-c:a", "copy", "-y", out_path],
-            capture_output=True, text=True, timeout=120,
-        )
+        # BGM 混音（如果传了 bgm_url）
+        bgm_url = body.get("bgm_url", "")
+        if bgm_url:
+            bgm_path = os.path.join(tmpdir, "bgm.mp3")
+            try:
+                async with httpx.AsyncClient(timeout=30) as client:
+                    bgm_resp = await client.get(bgm_url)
+                    if bgm_resp.status_code == 200:
+                        with open(bgm_path, "wb") as f:
+                            f.write(bgm_resp.content)
+            except Exception as e:
+                print(f"[burn] BGM download failed: {e}")
+                bgm_path = None
+        else:
+            bgm_path = None
+
+        if bgm_path and os.path.exists(bgm_path):
+            # 混音：BGM 音量 15%，原声保持 100%
+            result = subprocess.run(
+                ["ffmpeg", "-i", vid_path, "-i", bgm_path,
+                 "-filter_complex", "[1:a]volume=0.15[a1];[0:a][a1]amix=inputs=2:duration=first[aout]",
+                 "-map", "0:v", "-map", "[aout]", "-c:v", "copy",
+                 "-vf", f"subtitles={srt_path}:fontsdir=/app/models/fonts:force_style='FontName=WenQuanYi Micro Hei\\,FontSize=18\\,PrimaryColour=&H00FFFFFF\\,OutlineColour=&H00000000\\,BorderStyle=1\\,Outline=1'",
+                 "-y", out_path],
+             capture_output=True, text=True, timeout=120,
+         )
+        else:
+            # 无 BGM：直接烧录字幕，保留原音频
+            result = subprocess.run(
+                ["ffmpeg", "-i", vid_path, "-vf", f"subtitles={srt_path}:fontsdir=/app/models/fonts:force_style='FontName=WenQuanYi Micro Hei\\,FontSize=18\\,PrimaryColour=&H00FFFFFF\\,OutlineColour=&H00000000\\,BorderStyle=1\\,Outline=1'",
+                 "-c:a", "copy", "-y", out_path],
+                capture_output=True, text=True, timeout=120,
+            )
         if result.returncode != 0:
             return {"error": f"字幕烧录失败: {result.stderr[:200]}"}
 

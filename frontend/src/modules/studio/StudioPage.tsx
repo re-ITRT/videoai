@@ -499,7 +499,11 @@ export default function StudioPage() {
                           const segments = asrResults[selectedAsrVideo].segments.map((s: any, i: number) => ({ ...s, text: editedSegments?.[i] ?? s.text }))
                           setBurningSub(true)
                           try {
-                            const res: any = await request.post('/studio/burn-subtitles', { video_url: fv.url, segments, session_id: sessionIdRef.current }, { timeout: 600000 })
+                            const bgmId = selectedBgmId
+                            const bgm = bgmId ? bgmMaterials.find((m: any) => m.id === bgmId) : null
+                            const payload: any = { video_url: fv.url, segments, session_id: sessionIdRef.current }
+                            if (bgm) payload.bgm_url = bgm.image_url
+                            const res: any = await request.post('/studio/burn-subtitles', payload, { timeout: 600000 })
                             if (res?.url) setSubbedUrl(res.url)
                             message.success('字幕已烧录')
                           } catch { message.error('烧录失败') }
