@@ -280,6 +280,121 @@ def _get_template_feedback(template_name: str, avg_play_count: int, sample_count
     return f"平均播放量{avg_play_count}较低，建议调整模板策略"
 
 
+@router.post("/templates/optimize")
+async def optimize_template(
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+):
+    """根据归因分析+已生成视频数据，给出特定剧本模板的优化建议"""
+    template_name = body.get("template_name", "default")
+    from app.published.models import PublishedVideo
+    from app.script.models import ReferenceVideo
+    from sqlalchemy import select as _sel
+    import json, httpx, math
+
+    # 获取模板使用数据
+    pub_videos = (await db.execute(
+        _sel(PublishedVideo).where(PublishedVideo.script_template == template_name)
+    )).scalars().all()
+
+    # 获取参考视频最佳组合
+    refs = (await db.execute(_sel(ReferenceVideo).limit(100))).scalars().all()
+
+    # 构造数据
+    pub_count = len(pub_videos)
+    avg_play = round(sum(p.play_count or 2000 for p in pub_videos) / pub_count) if pub_count else 0
+
+    # 最佳组合（从参考视频提取）
+    combo_counts = {}
+    for r in refs:
+        af = r.audio_features or {}
+        bgm = "轻快" if (af.get("lightness_score") or 0) >= 55 else "稳重"
+        key = (r.style or "?", (r.hook_method or "")[:8], bgm)
+        combo_counts[key] = combo_counts.get(key, 0) + 1
+    best_combos = sorted(combo_counts.items(), key=lambda x: x[1], reverse=True)[:3]
+
+    combo_text = "; ".join([f"{s}/{h}/{b}({c}条)" for (s, h, b), c in best_combos])
+
+    # 调用LLM
+    wf_cfg = None
+    try:
+        from app.workflow.models import WorkflowConfig
+        from sqlalchemy import select as _s
+        wf_cfg = (await db.execute(
+            _s(WorkflowConfig).where(
+                WorkflowConfig.workflow_name == "material-analyze",
+                WorkflowConfig.enabled == 1
+            ).limit(1)
+        )).scalar_one_or_none()
+    except: pass
+
+    if wf_cfg:
+        cfg = json.loads(wf_cfg.config or "{}")
+        api_key = cfg.get("api_key")
+        base_url = (cfg.get("base_url") or "https://api.deepseek.com/v1").rstrip("/")
+        model = cfg.get("model", "deepseek-v4-flash")
+
+        prompt = f"""你是一个电商短视频策略优化专家。分析以下数据，给剧本模板「{template_name}」输出3条具体可执行的优化建议。
+
+【模板使用情况】
+使用次数：{pub_count}次
+平均播放量：{avg_play}
+模板风格/标签：{template_name}
+
+【参考视频最佳组合（风格/Hook/BGM，引用次数）】
+{combo_text}
+
+【高播放量特征相关性】
+参考已有归因数据中不同特征对播放量的影响
+
+请输出JSON（不要其他文本）：
+{{
+  "summary": "对该模板当前表现的一句话总结",
+  "suggestions": [
+    {{
+      "aspect": "优化方面（Hook/风格/BGM/节奏/结构等）",
+      "suggestion": "具体优化建议",
+      "expected_impact": "预期效果描述"
+    }}
+  ],
+  "priority": "高/中/低（优化优先级）"
+}}"""
+
+        try:
+            payload = {
+                "model": model, "temperature": 0.7,
+                "messages": [
+                    {"role": "system", "content": "你是电商短视频策略优化专家，输出结构化JSON。"},
+                    {"role": "user", "content": prompt},
+                ],
+                "response_format": {"type": "json_object"},
+            }
+            async with httpx.AsyncClient(timeout=60) as client:
+                resp = await client.post(f"{base_url}/chat/completions", json=payload,
+                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"})
+                if resp.status_code == 200:
+                    c = resp.json()["choices"][0]["message"]["content"]
+                    return {"source": "ai", "template": template_name, **json.loads(c)}
+        except Exception as e:
+            print(f"[optimize] LLM failed: {e}")
+
+    # fallback
+    suggestions = []
+    if pub_count == 0:
+        suggestions.append({"aspect": "模板未使用", "suggestion": f"该模板尚未用于生成视频，建议先使用一次获取数据", "expected_impact": "获取基线数据"})
+    if best_combos:
+        s, h, b = best_combos[0][0]
+        suggestions.append({"aspect": "风格/Hook", "suggestion": f"参考高引用组合：{s}风格+{h}Hook+{b}BGM，建议在模板中融入这些元素", "expected_impact": "提升播放量潜力"})
+    suggestions.append({"aspect": "持续优化", "suggestion": "每导出3-5个视频后重新评估模板效果", "expected_impact": "数据驱动的迭代优化"})
+
+    return {
+        "source": "data", "template": template_name,
+        "summary": f"模板「{template_name}」已使用{pub_count}次，平均播放量{avg_play}。建议根据归因数据优化。",
+        "suggestions": suggestions,
+        "priority": "中",
+    }
+
+
 @router.post("/templates/ai-generate")
 async def ai_generate_template(
     db: AsyncSession = Depends(get_db),
