@@ -66,7 +66,7 @@ export default function MaterialUpload() {
         </Form.Item>
 
         <Form.Item name="category" label="分类" initialValue="其他"
-          style={{ display: detectedType === 'audio' ? 'none' : undefined }}>
+          style={{ display: (detectedType === 'audio' || mtype === 'audio') ? 'none' : undefined }}>
           <Select onChange={(v) => setCategory(v)} options={CATEGORIES.map(c => ({ value: c, label: c }))} />
         </Form.Item>
 
