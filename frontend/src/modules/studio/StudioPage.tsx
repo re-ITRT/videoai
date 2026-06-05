@@ -33,7 +33,6 @@ export default function StudioPage() {
   const [generating, setGenerating] = useState<string | null>(null)
   const [scriptEditorOpen, setScriptEditorOpen] = useState(false)
   const [aiScriptEditorOpen, setAiScriptEditorOpen] = useState(false)
-  const [asrResult, setAsrResult] = useState<any>(null)
   const [asrLoadingId, setAsrLoadingId] = useState<number | null>(null)
   const [subbedUrl, setSubbedUrl] = useState('')
   const [exporting, setExporting] = useState(false)
@@ -243,20 +242,6 @@ export default function StudioPage() {
     const patch: any = { clip_collections: cols }
     if (stateRef.current.selected_clip_collection_id === id) patch.selected_clip_collection_id = null
     try { await saveState(patch) } catch {}
-  }
-
-  const deleteFinalVideo = async (id: number) => {
-    try { await request.post('/studio/delete-clip', { clip_id: id }) } catch { return message.error('删除失败') }
-    const videos = (stateRef.current.final_videos || []).filter((v: any) => v.id !== id)
-    saveState({ final_videos: videos })
-  }
-
-  const clearFinalVideos = async () => {
-    const ids = (stateRef.current.final_videos || []).map((v: any) => v.id)
-    for (const id of ids) {
-      try { await request.post('/studio/delete-clip', { clip_id: id }) } catch {}
-    }
-    saveState({ final_videos: [] })
   }
 
   const runAsr = async (id: number, url: string) => {
