@@ -37,6 +37,8 @@ export default function StudioPage() {
   void asrLoadingId; void setAsrLoadingId;
   const [asrResult, setAsrResult] = useState<any>(null)
   void asrResult;
+  const [editedSegments, setEditedSegments] = useState<string[]>([])
+  const [burningSub, setBurningSub] = useState(false)
   const [exporting, setExporting] = useState(false)
   void exporting;
   const [subbedUrl, setSubbedUrl] = useState('')
@@ -451,16 +453,46 @@ export default function StudioPage() {
                   )}
                   {asrResult?.segments?.length > 0 && (
                     <div>
-                      <div style={{ fontWeight: 600, marginBottom: 8 }}>🎤 ASR 识别结果（自动纠错）</div>
+                      <div style={{ fontWeight: 600, marginBottom: 8 }}>🎤 ASR 识别结果（点击文本可编辑）</div>
                       <div style={{ maxHeight: 350, overflow: 'auto', fontSize: 12 }}>
                         {asrResult.segments.map((seg: any, i: number) => (
-                          <div key={i} style={{ padding: '6px 0', borderBottom: '1px solid #f0f0f0', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                            <Tag style={{ fontSize: 10, flexShrink: 0, margin: 0 }}>{seg.start}-{seg.end}s</Tag>
-                            <span style={{ color: '#333' }}>{seg.text}</span>
+                          <div key={i} style={{ padding: '6px 0', borderBottom: '1px solid #f0f0f0' }}>
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 2 }}>
+                              <Tag style={{ fontSize: 10, flexShrink: 0, margin: 0 }}>{seg.start}-{seg.end}s</Tag>
+                            </div>
+                            <Input.TextArea
+                              value={editedSegments?.[i] ?? seg.text}
+                              onChange={e => {
+                                const newEdits = [...(editedSegments || [])]
+                                newEdits[i] = e.target.value
+                                setEditedSegments(newEdits)
+                              }}
+                              rows={1}
+                              style={{ fontSize: 12, width: '100%' }}
+                            />
                           </div>
                         ))}
                       </div>
-                      {subbedUrl && <div style={{ marginTop: 12, color: '#52c41a' }}>✅ 字幕已烧录</div>}
+                      <Space style={{ marginTop: 12 }}>
+                        <Button type="primary" size="small" onClick={() => {
+                          const fv = stateRef.current.final_videos?.[0]
+                          if (!fv) return
+                          const segments = asrResult.segments.map((s: any, i: number) => ({
+                            ...s,
+                            text: editedSegments?.[i] ?? s.text
+                          }))
+                          setBurningSub(true)
+                          request.post('/studio/burn-subtitles', { video_url: fv.url, segments, session_id: sessionIdRef.current }, { timeout: 600000 })
+                            .then((res: any) => {
+                              if (res?.url) setSubbedUrl(res.url)
+                              message.success('字幕已烧录')
+                            })
+                            .catch(() => message.error('烧录失败'))
+                            .finally(() => setBurningSub(false))
+                        }} loading={burningSub}>🔥 烧录字幕</Button>
+                        <Button size="small" onClick={() => setEditedSegments(asrResult.segments.map((s: any) => s.text))}>重置</Button>
+                      </Space>
+                      {subbedUrl && <div style={{ marginTop: 8, color: '#52c41a' }}>✅ 字幕视频已生成</div>}
                     </div>
                   )}
                 </Card>
