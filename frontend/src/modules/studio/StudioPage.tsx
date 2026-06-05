@@ -375,6 +375,7 @@ export default function StudioPage() {
                     </div>
                   )}
                 </Card>
+                <GenBtn label="生成视频" onClick={genVideo} />
               </div>
             )}
             {step === 4 && (
@@ -398,7 +399,6 @@ export default function StudioPage() {
                   )}
                 </Card>
                 <Space style={{ marginTop: 8 }}>
-                  <GenBtn label="生成视频" onClick={genVideo} />
                   {selectedClipColl && <GenBtn label="合成视频" onClick={composeVid} />}
                 </Space>
               </div>
