@@ -392,9 +392,6 @@ export default function StudioPage() {
                       )} />
                       {(!state.clip_collections || state.clip_collections.length === 0) && <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>点击下方按钮开始生成</div>}
                       {selectedClipColl && <Collapse ghost size="small" items={[{key:'clips',label:<span>查看片段 ({selectedClipColl.clips?.length||0})</span>,children:<div style={{maxHeight:200,overflow:'auto'}}>{selectedClipColl.clips?.map((clip:any)=>(<div key={clip.id} style={{padding:'4px 0',borderBottom:'1px solid #f0f0f0'}}><a href={clip.url} target="_blank" rel="noreferrer">场景 {clip.scene_id}</a></div>))}</div>}]} />}
-                      {state.final_videos?.length > 0 && <div style={{marginTop:12}}><div style={{fontWeight:500,marginBottom:4,color:'#52c41a'}}>✅ 最终视频 <Button size="small" type="link" danger onClick={clearFinalVideos}>清空</Button></div>
-                        <List size="small" dataSource={state.final_videos} renderItem={(v:any)=>(<List.Item actions={[<span key="del" onClick={e=>{e.stopPropagation();deleteFinalVideo(v.id)}}><DeleteOutlined style={{color:'#ff4d4f'}}/></span>]}><a href={v.url} target="_blank" rel="noreferrer"><PlayCircleOutlined style={{marginRight:4}}/>视频 {v.id}</a></List.Item>)}/></div>}
-                      {asrResult && <div style={{marginTop:12}}><div style={{fontWeight:500,marginBottom:4}}>🎤 ASR 完成 {subbedUrl && <Tag color="green">字幕已烧录</Tag>}</div><div style={{maxHeight:120,overflow:'auto',fontSize:12,color:'#666'}}>{asrResult.segments?.slice(0,3).map((s:any,i:number)=><div key={i}>{s.start}-{s.end}s {s.text}</div>)}{asrResult.segments?.length>3&&<div style={{color:'#999'}}>...共{asrResult.segments.length}段</div>}</div></div>}
                     </div>
                   )}
                 </Card>
