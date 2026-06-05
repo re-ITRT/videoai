@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Card, Form, Select, Input, Button, Upload, message } from 'antd'
+import { Card, Form, Select, Input, Button, Upload, message, Tag } from 'antd'
 import { InboxOutlined } from '@ant-design/icons'
 import { uploadMaterial } from '../../utils/api'
 import { useNavigate } from 'react-router-dom'
@@ -14,20 +14,29 @@ export default function MaterialUpload() {
   const [uploading, setUploading] = useState(false)
   const [mtype, setMtype] = useState<string>('image')
   const [category, setCategory] = useState<string>('其他')
+  const [detectedType, setDetectedType] = useState<string>('')
+
+  // 根据文件后缀自动检测类型
+  const detectType = (filename: string) => {
+    const ext = filename.split('.').pop()?.toLowerCase() || ''
+    if (['mp3', 'wav', 'm4a', 'ogg', 'flac', 'aac'].includes(ext)) return 'audio'
+    if (['mp4', 'webm', 'mov', 'avi', 'mkv'].includes(ext)) return 'video'
+    return 'image'
+  }
 
   const onFinish = async (values: any) => {
     if (fileList.length === 0) { message.warning('请选择文件'); return }
     if (uploading) return
 
     setUploading(true)
+    const fileObj = (fileList[0] as any).originFileObj || fileList[0]
+    const autoType = detectType(fileObj.name || '')
     const fd = new FormData()
-    fd.append('material_type', mtype)
-    fd.append('input_type', mtype)
+    fd.append('material_type', autoType)
+    fd.append('input_type', autoType)
     fd.append('category', values.category || '其他')
     if (values.brief_description) fd.append('text_content', values.brief_description)
     if (values.product_name && values.product_name.trim()) fd.append('product_name', values.product_name)
-    if (!fileList[0]) { message.warning('请选择文件'); setUploading(false); return }
-    const fileObj = (fileList[0] as any).originFileObj || fileList[0]
     fd.append('file', fileObj)
 
     try {
@@ -45,12 +54,15 @@ export default function MaterialUpload() {
   return (
     <Card title="上传素材">
       <Form form={form} onFinish={onFinish} layout="vertical" style={{ maxWidth: 600 }}>
-        <Form.Item name="material_type" label="素材类型" rules={[{ required: true }]} initialValue="image">
+        <Form.Item name="material_type" label="素材类型" initialValue="image">
           <Select onChange={(v) => setMtype(v)} options={[
             { value: 'image', label: '图片' },
             { value: 'video', label: '视频' },
             { value: 'audio', label: 'BGM/音频' },
           ]} />
+          <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
+            自动检测：{detectedType ? <Tag color={detectedType === 'audio' ? 'purple' : detectedType === 'video' ? 'blue' : 'green'}>{detectedType === 'audio' ? '🎵 BGM' : detectedType}</Tag> : '选择文件后自动识别'}
+          </div>
         </Form.Item>
 
         <Form.Item name="category" label="分类" rules={[{ required: true }]} initialValue="其他">
@@ -72,7 +84,7 @@ export default function MaterialUpload() {
         <Form.Item label="选择文件">
           <Upload.Dragger
             fileList={fileList}
-            beforeUpload={(f) => { setFileList([f]); return false }}
+            beforeUpload={(f) => { setFileList([f]); setDetectedType(detectType(f.name)); return false }}
             onRemove={() => setFileList([])}
             maxCount={1}
             accept={mtype === 'image' ? 'image/*' : mtype === 'video' ? 'video/*' : 'audio/*'}
