@@ -35,8 +35,8 @@ export default function StudioPage() {
   const [aiScriptEditorOpen, setAiScriptEditorOpen] = useState(false)
   const [asrLoadingId, setAsrLoadingId] = useState<number | null>(null)
   void asrLoadingId; void setAsrLoadingId;
-  const [asrResult, setAsrResult] = useState<any>(null)
-  void asrResult;
+  const [asrResults, setAsrResults] = useState<Record<number, any>>({})
+  const [selectedAsrVideo, setSelectedAsrVideo] = useState<number | null>(null)
   const [editedSegments, setEditedSegments] = useState<string[]>([])
   const [burningSub, setBurningSub] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -125,11 +125,12 @@ export default function StudioPage() {
 
   const runAsr = async (id: number, url: string) => {
     setAsrLoadingId(id)
-    setAsrResult(null)
     try {
       const res: any = await request.post('/studio/asr', { video_url: url, session_id: sessionId }, { timeout: 600000 })
       if (res.error) { message.error(res.error); return }
-      setAsrResult(res)
+      setAsrResults(prev => ({...prev, [id]: res}))
+      setSelectedAsrVideo(id)
+      setEditedSegments(res.segments?.map((s: any) => s.text) || [])
     } catch { message.error('ASR 请求失败') }
     setAsrLoadingId(null)
   }
@@ -244,7 +245,7 @@ export default function StudioPage() {
         try {
           const asrRes: any = await request.post('/studio/asr', { video_url: vid.url, session_id: sessionIdRef.current }, { timeout: 600000 })
           if (asrRes?.segments?.length) {
-            setAsrResult(asrRes)
+            setAsrResults(prev => ({...prev, [vid.id]: asrRes}))
             message.info('自动生成字幕...')
             const burnRes: any = await request.post('/studio/burn-subtitles', { video_url: vid.url, segments: asrRes.segments, session_id: sessionIdRef.current }, { timeout: 600000 })
             if (burnRes?.url) {
@@ -444,55 +445,57 @@ export default function StudioPage() {
             {step === 5 && (
               <div>
                 <Card title="ASR 校准" size="small" style={{ minHeight: 400 }}>
-                  <div style={{ color: '#999', marginBottom: 12 }}>合成视频后自动运行 ASR，结果展示在此</div>
-                  {state.final_videos?.length > 0 && !asrResult && (
-                    <Button icon={<PlayCircleOutlined />} onClick={() => {
-                      const v = stateRef.current.final_videos?.[0]
-                      if (v) runAsr(v.id, v.url)
-                    }}>运行 ASR</Button>
+                  {/* 视频列表 */}
+                  {(stateRef.current.final_videos || []).length === 0 ? (
+                    <div style={{ color: '#999', marginBottom: 12 }}>合成视频后在此校准 ASR 字幕</div>
+                  ) : (
+                    <List size="small" dataSource={stateRef.current.final_videos} renderItem={(v: any) => {
+                      const hasAsr = asrResults[v.id]
+                      return (
+                        <List.Item onClick={() => {
+                          setSelectedAsrVideo(v.id)
+                          if (!hasAsr) runAsr(v.id, v.url)
+                          else setEditedSegments(asrResults[v.id]?.segments?.map((s: any) => s.text) || [])
+                        }}
+                          style={{ cursor: 'pointer', background: selectedAsrVideo === v.id ? '#e6f4ff' : undefined }}
+                          actions={[
+                            !hasAsr ? <Button key="go" size="small" type="link" loading={asrLoadingId === v.id}>ASR中...</Button>
+                              : <Tag key="done" color="green">已识别</Tag>
+                          ]}>
+                          <Space><PlayCircleOutlined /><span>视频 {v.id}</span></Space>
+                        </List.Item>
+                      )
+                    }} />
                   )}
-                  {asrResult?.segments?.length > 0 && (
-                    <div>
+                  {/* ASR 结果 */}
+                  {selectedAsrVideo && asrResults[selectedAsrVideo]?.segments?.length > 0 && (
+                    <div style={{ marginTop: 16 }}>
                       <div style={{ fontWeight: 600, marginBottom: 8 }}>🎤 ASR 识别结果（点击文本可编辑）</div>
-                      <div style={{ maxHeight: 350, overflow: 'auto', fontSize: 12 }}>
-                        {asrResult.segments.map((seg: any, i: number) => (
+                      <div style={{ maxHeight: 300, overflow: 'auto', fontSize: 12 }}>
+                        {asrResults[selectedAsrVideo].segments.map((seg: any, i: number) => (
                           <div key={i} style={{ padding: '6px 0', borderBottom: '1px solid #f0f0f0' }}>
-                            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 2 }}>
-                              <Tag style={{ fontSize: 10, flexShrink: 0, margin: 0 }}>{seg.start}-{seg.end}s</Tag>
-                            </div>
-                            <Input.TextArea
-                              value={editedSegments?.[i] ?? seg.text}
-                              onChange={e => {
-                                const newEdits = [...(editedSegments || [])]
-                                newEdits[i] = e.target.value
-                                setEditedSegments(newEdits)
-                              }}
-                              rows={1}
-                              style={{ fontSize: 12, width: '100%' }}
-                            />
+                            <Tag style={{ fontSize: 10, marginBottom: 2 }}>{seg.start}-{seg.end}s</Tag>
+                            <Input.TextArea value={editedSegments?.[i] ?? seg.text}
+                              onChange={e => { const ne = [...(editedSegments || [])]; ne[i] = e.target.value; setEditedSegments(ne) }}
+                              rows={1} style={{ fontSize: 12, width: '100%' }} />
                           </div>
                         ))}
                       </div>
                       <Space style={{ marginTop: 12 }}>
-                        <Button type="primary" size="small" onClick={() => {
-                          const fv = stateRef.current.final_videos?.[0]
+                        <Button type="primary" size="small" loading={burningSub} onClick={async () => {
+                          const fv = stateRef.current.final_videos?.find((x: any) => x.id === selectedAsrVideo)
                           if (!fv) return
-                          const segments = asrResult.segments.map((s: any, i: number) => ({
-                            ...s,
-                            text: editedSegments?.[i] ?? s.text
-                          }))
+                          const segments = asrResults[selectedAsrVideo].segments.map((s: any, i: number) => ({ ...s, text: editedSegments?.[i] ?? s.text }))
                           setBurningSub(true)
-                          request.post('/studio/burn-subtitles', { video_url: fv.url, segments, session_id: sessionIdRef.current }, { timeout: 600000 })
-                            .then((res: any) => {
-                              if (res?.url) setSubbedUrl(res.url)
-                              message.success('字幕已烧录')
-                            })
-                            .catch(() => message.error('烧录失败'))
-                            .finally(() => setBurningSub(false))
-                        }} loading={burningSub}>🔥 烧录字幕</Button>
-                        <Button size="small" onClick={() => setEditedSegments(asrResult.segments.map((s: any) => s.text))}>重置</Button>
+                          try {
+                            const res: any = await request.post('/studio/burn-subtitles', { video_url: fv.url, segments, session_id: sessionIdRef.current }, { timeout: 600000 })
+                            if (res?.url) setSubbedUrl(res.url)
+                            message.success('字幕已烧录')
+                          } catch { message.error('烧录失败') }
+                          setBurningSub(false)
+                        }}>🔥 烧录字幕</Button>
+                        <Button size="small" onClick={() => setEditedSegments(asrResults[selectedAsrVideo]?.segments?.map((s: any) => s.text) || [])}>重置</Button>
                       </Space>
-                      {subbedUrl && <div style={{ marginTop: 8, color: '#52c41a' }}>✅ 字幕视频已生成</div>}
                     </div>
                   )}
                 </Card>
