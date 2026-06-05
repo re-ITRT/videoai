@@ -381,84 +381,102 @@ export default function StudioPage() {
               )} />
               {state.collections.length === 0 && <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>选素材后点击生成</div>}
             </StepBox></div>}
-            {step === 3 && <div><StepBox title="剧本生成" extra={<Select placeholder="模板" size="small" style={{ width: 120 }} value={state.selected_template}
-              onChange={v => saveState({ selected_template: v })}
-              options={templates.map(t => ({ value: t, label: t }))} />} style={{ minHeight: 400 }}>
-              <div style={{ color: '#999' }}>选产品+素材集合+模板后点击生成</div>
-              {state.last_script?.script?.title && (
-                <div style={{ marginTop: 12, padding: 12, background: '#f6ffed', borderRadius: 4 }}>
-                  ✅ 剧本: <strong>{state.last_script.script.title}</strong>
-                  <div style={{ color: '#666' }}>{state.last_script.script.scenes?.length || 0} 个场景</div>
-                  <Space style={{ marginTop: 4 }}>
-                    <Button size="small" icon={<EditOutlined />} onClick={() => setScriptEditorOpen(true)}>编辑</Button>
-                    <Button size="small" icon={<RobotOutlined />} onClick={() => setAiScriptEditorOpen(true)}>AI编辑</Button>
-                    <Button size="small" danger icon={<DeleteOutlined />} onClick={e => { e.stopPropagation(); deleteScript() }} />
+            {step === 3 && (
+              <div>
+                <StepBox title="剧本生成" extra={<Select placeholder="模板" size="small" style={{ width: 120 }} value={state.selected_template}
+                  onChange={v => saveState({ selected_template: v })}
+                  options={templates.map(t => ({ value: t, label: t }))} />} style={{ minHeight: 400 }}>
+                  <div style={{ color: '#999' }}>选产品+素材集合+模板后点击生成</div>
+                  {state.last_script?.script?.title && (
+                    <div style={{ marginTop: 12, padding: 12, background: '#f6ffed', borderRadius: 4 }}>
+                      ✅ 剧本: <strong>{state.last_script.script.title}</strong>
+                      <div style={{ color: '#666' }}>{state.last_script.script.scenes?.length || 0} 个场景</div>
+                      <Space style={{ marginTop: 4 }}>
+                        <Button size="small" icon={<EditOutlined />} onClick={() => setScriptEditorOpen(true)}>编辑</Button>
+                        <Button size="small" icon={<RobotOutlined />} onClick={() => setAiScriptEditorOpen(true)}>AI编辑</Button>
+                        <Button size="small" danger icon={<DeleteOutlined />} onClick={e => { e.stopPropagation(); deleteScript() }} />
+                      </Space>
+                    </div>
+                  )}
+                </StepBox>
+                <GenBtn label="生成剧本" onClick={genScript} />
+              </div>
+            )}
+            {step === 4 && (
+              <div>
+                <StepBox title="视频生成" extra={state.clip_collections?.length > 0 ? <Tag color="green">{state.clip_collections.length} 次运行</Tag> : undefined} style={{ minHeight: 400 }}>
+                  {!state.last_script?.script?.title ? <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>生成剧本后点击生成</div> : <>
+                    <List size="small" dataSource={state.clip_collections} renderItem={(c: any) => (
+                      <List.Item onClick={() => saveState({ selected_clip_collection_id: c.id })}
+                        style={{ cursor: 'pointer', background: state.selected_clip_collection_id === c.id ? '#e6f4ff' : undefined }}
+                        actions={[<span key="del" onClick={e => { e.stopPropagation(); deleteClipCollection(c.id) }}><DeleteOutlined style={{ color: '#ff4d4f' }} /></span>]}>
+                        <Space><VideoCameraOutlined /><span>{c.name} ({c.clips?.length || 0} 片段)</span></Space>
+                      </List.Item>
+                    )} />
+                    {(!state.clip_collections || state.clip_collections.length === 0) && <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>点击下方按钮开始生成</div>}
+                    {selectedClipColl && <Collapse ghost size="small" items={[{key:'clips',label:<span>查看片段 ({selectedClipColl.clips?.length||0})</span>,children:<div style={{maxHeight:200,overflow:'auto'}}>{selectedClipColl.clips?.map((clip:any)=>(
+                      <div key={clip.id} style={{padding:'4px 0',borderBottom:'1px solid #f0f0f0',fontSize:13}}><a href={clip.url} target="_blank" rel="noreferrer">场景 {clip.scene_id}</a></div>
+                    ))}</div>}]}/>}
+                    {state.final_videos?.length > 0 && <div style={{marginTop:12}}>
+                      <div style={{fontWeight:500,marginBottom:4,color:'#52c41a'}}>✅ 最终视频 <Button size="small" type="link" danger onClick={clearFinalVideos}>清空</Button></div>
+                      <List size="small" dataSource={state.final_videos} renderItem={(v:any)=>(
+                        <List.Item actions={[<span key="del" onClick={e=>{e.stopPropagation();deleteFinalVideo(v.id)}}><DeleteOutlined style={{color:'#ff4d4f'}}/></span>]}>
+                          <a href={v.url} target="_blank" rel="noreferrer"><PlayCircleOutlined style={{marginRight:4}}/>视频 {v.id}</a>
+                        </List.Item>
+                      )}/>
+                    </div>}
+                    {asrResult && <div style={{marginTop:12}}>
+                      <div style={{fontWeight:500,marginBottom:4}}>🎤 ASR 完成 {subbedUrl && <Tag color="green">字幕已烧录</Tag>}</div>
+                      <div style={{maxHeight:120,overflow:'auto',fontSize:12,color:'#666'}}>
+                        {asrResult.segments?.slice(0,3).map((s:any,i:number)=><div key={i}>{s.start}-{s.end}s {s.text}</div>)}
+                        {asrResult.segments?.length>3&&<div style={{color:'#999'}}>...共{asrResult.segments.length}段</div>}
+                      </div>
+                    </div>}
+                  </>}
+                  <Space style={{marginTop:12}}>
+                    <GenBtn label="生成视频" onClick={genVideo} />
+                    {selectedClipColl && <GenBtn label="合成视频" onClick={composeVid} />}
                   </Space>
-                </div>
-              )}
-            </StepBox><GenBtn label="生成剧本" onClick={genScript} /></div>}
-            {step === 4 && <div><StepBox title="视频生成" extra={state.clip_collections?.length > 0 ? <Tag color="green">{state.clip_collections.length} 次运行</Tag> : undefined} style={{ minHeight: 400 }}>
-              {!state.last_script?.script?.title ? <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>生成剧本后点击生成</div> : <>
-                <List size="small" dataSource={state.clip_collections} renderItem={(c: any) => (
-                  <List.Item onClick={() => saveState({ selected_clip_collection_id: c.id })}
-                    style={{ cursor: 'pointer', background: state.selected_clip_collection_id === c.id ? '#e6f4ff' : undefined }}
-                    actions={[<span key="del" onClick={e => { e.stopPropagation(); deleteClipCollection(c.id) }}><DeleteOutlined style={{ color: '#ff4d4f' }} /></span>]}>
-                    <Space><VideoCameraOutlined /><span>{c.name} ({c.clips?.length || 0} 片段)</span></Space>
-                  </List.Item>
-                )} />
-                {(!state.clip_collections || state.clip_collections.length === 0) && <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>点击下方按钮开始生成</div>}
-                {selectedClipColl && <Collapse ghost size="small" items={[{key:'clips',label:<span>查看片段 ({selectedClipColl.clips?.length||0})</span>,children:<div style={{maxHeight:200,overflow:'auto'}}>{selectedClipColl.clips?.map((clip:any)=>(
-                  <div key={clip.id} style={{padding:'4px 0',borderBottom:'1px solid #f0f0f0',fontSize:13}}><a href={clip.url} target="_blank" rel="noreferrer">场景 {clip.scene_id}</a></div>
-                ))}</div>}]}/>}
-                {state.final_videos?.length > 0 && <div style={{marginTop:12}}>
-                  <div style={{fontWeight:500,marginBottom:4,color:'#52c41a'}}>✅ 最终视频 <Button size="small" type="link" danger onClick={clearFinalVideos}>清空</Button></div>
-                  <List size="small" dataSource={state.final_videos} renderItem={(v:any)=>(
-                    <List.Item actions={[<span key="del" onClick={e=>{e.stopPropagation();deleteFinalVideo(v.id)}}><DeleteOutlined style={{color:'#ff4d4f'}}/></span>]}>
-                      <a href={v.url} target="_blank" rel="noreferrer"><PlayCircleOutlined style={{marginRight:4}}/>视频 {v.id}</a>
-                    </List.Item>
-                  )}/>
-                </div>}
-                {asrResult && <div style={{marginTop:12}}>
-                  <div style={{fontWeight:500,marginBottom:4}}>🎤 ASR 完成 {subbedUrl && <Tag color="green">字幕已烧录</Tag>}</div>
-                  <div style={{maxHeight:120,overflow:'auto',fontSize:12,color:'#666'}}>
-                    {asrResult.segments?.slice(0,3).map((s:any,i:number)=><div key={i}>{s.start}-{s.end}s {s.text}</div>)}
-                    {asrResult.segments?.length>3&&<div style={{color:'#999'}}>...共{asrResult.segments.length}段</div>}
-                  </div>
-                </div>}
-              </>}
-              <Space style={{marginTop:12}}>
-                <GenBtn label="生成视频" onClick={genVideo} />
-                {selectedClipColl && <GenBtn label="合成视频" onClick={composeVid} />}
-              </Space>
-            </StepBox></div>}
-            {step === 5 && <div><StepBox title="BGM 选择" extra={<Button size="small" icon={<CustomerServiceOutlined />} onClick={loadBgmMaterials}>刷新</Button>} style={{ minHeight: 400 }}>
-              {bgmMaterials.length === 0 ? <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>暂无音频素材</div> : (
-                <List size="small" dataSource={bgmMaterials} renderItem={(m: any) => (
-                  <List.Item onClick={() => setSelectedBgmId(selectedBgmId === m.id ? null : m.id)}
-                    style={{ cursor: 'pointer', background: selectedBgmId === m.id ? '#fff7e6' : undefined }}>
-                    <Space><SoundOutlined style={{ color: '#fa8c16', fontSize: 20 }} />
-                      <div><div style={{ fontWeight: 500 }}>{m.name || '未命名'}</div><div style={{ color: '#999', fontSize: 11 }}>{m.tags?.join(', ') || ''}</div>
-                      {m.image_url && <audio src={m.image_url} controls style={{ width: 200, height: 28, marginTop: 4 }} />}</div>
-                    </Space>
-                  </List.Item>
-                )} />
-              )}
-            </StepBox>{selectedBgmId && <Tag color="orange" style={{ marginTop: 8 }}>已选 BGM</Tag>}</div>}
-            {step === 6 && <div><StepBox title="导出" style={{ minHeight: 400 }}>
-              {subbedUrl ? <Space direction="vertical" style={{ width: '100%' }}>
-                <div style={{color:'#52c41a',marginBottom:8}}>✅ 字幕视频已就绪</div>
-                <a href={subbedUrl} target="_blank" rel="noreferrer"><Button icon={<PlayCircleOutlined />} block>查看视频</Button></a>
-                <Button type="primary" icon={<VideoCameraOutlined />} loading={exporting} onClick={doExport} block>导出</Button>
-              </Space> : <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>合成视频后自动生成</div>}
-              {state.final_videos?.length > 0 && !subbedUrl && <div style={{marginTop:12}}>
-                <List size="small" dataSource={state.final_videos} renderItem={(v:any)=>(
-                  <List.Item actions={[<Button key="asr" size="small" type="link" loading={v.id===asrLoadingId} onClick={()=>runAsr(v.id,v.url)}>ASR</Button>]}>
-                    <a href={v.url} target="_blank" rel="noreferrer"><PlayCircleOutlined style={{marginRight:4}}/>视频 {v.id}</a>
-                  </List.Item>
-                )}/>
-                {asrResult?.segments?.length>0 && <Button size="small" style={{marginTop:4}} loading={burning} onClick={burnSubtitles}>生成字幕</Button>}
-              </div>}
-            </StepBox></div>}
+                </StepBox>
+              </div>
+            )}
+            {step === 5 && (
+              <div>
+                <StepBox title="BGM 选择" extra={<Button size="small" icon={<CustomerServiceOutlined />} onClick={loadBgmMaterials}>刷新</Button>} style={{ minHeight: 400 }}>
+                  {bgmMaterials.length === 0 ? <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>暂无音频素材</div> : (
+                    <List size="small" dataSource={bgmMaterials} renderItem={(m: any) => (
+                      <List.Item onClick={() => setSelectedBgmId(selectedBgmId === m.id ? null : m.id)}
+                        style={{ cursor: 'pointer', background: selectedBgmId === m.id ? '#fff7e6' : undefined }}>
+                        <Space><SoundOutlined style={{ color: '#fa8c16', fontSize: 20 }} />
+                          <div><div style={{ fontWeight: 500 }}>{m.name || '未命名'}</div><div style={{ color: '#999', fontSize: 11 }}>{m.tags?.join(', ') || ''}</div>
+                          {m.image_url && <audio src={m.image_url} controls style={{ width: 200, height: 28, marginTop: 4 }} />}</div>
+                        </Space>
+                      </List.Item>
+                    )} />
+                  )}
+                </StepBox>
+                {selectedBgmId && <Tag color="orange" style={{ marginTop: 8 }}>已选 BGM</Tag>}
+              </div>
+            )}
+            {step === 6 && (
+              <div>
+                <StepBox title="导出" style={{ minHeight: 400 }}>
+                  {subbedUrl ? <Space direction="vertical" style={{ width: '100%' }}>
+                    <div style={{color:'#52c41a',marginBottom:8}}>✅ 字幕视频已就绪</div>
+                    <a href={subbedUrl} target="_blank" rel="noreferrer"><Button icon={<PlayCircleOutlined />} block>查看视频</Button></a>
+                    <Button type="primary" icon={<VideoCameraOutlined />} loading={exporting} onClick={doExport} block>导出</Button>
+                  </Space> : <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>合成视频后自动生成</div>}
+                  {state.final_videos?.length > 0 && !subbedUrl && <div style={{marginTop:12}}>
+                    <List size="small" dataSource={state.final_videos} renderItem={(v:any)=>(
+                      <List.Item actions={[<Button key="asr" size="small" type="link" loading={v.id===asrLoadingId} onClick={()=>runAsr(v.id,v.url)}>ASR</Button>]}>
+                        <a href={v.url} target="_blank" rel="noreferrer"><PlayCircleOutlined style={{marginRight:4}}/>视频 {v.id}</a>
+                      </List.Item>
+                    )}/>
+                    {asrResult?.segments?.length>0 && <Button size="small" style={{marginTop:4}} loading={burning} onClick={burnSubtitles}>生成字幕</Button>}
+                  </div>}
+                </StepBox>
+              </div>
+            )}
             {/* 步骤切换按钮 */}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16 }}>
               <Button disabled={step === 0} onClick={() => setStep(s => s - 1)}>← 上一步</Button>
