@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Select, Button, Card, Input, Modal, Space, message, List, Collapse, Popconfirm, Slider, Tag, Menu } from 'antd'
-import { PlusOutlined, RightOutlined, PlayCircleOutlined, EditOutlined, DeleteOutlined, VideoCameraOutlined, RobotOutlined, SoundOutlined, CustomerServiceOutlined, AppstoreOutlined, FileTextOutlined } from '@ant-design/icons'
+import { PlusOutlined, PlayCircleOutlined, EditOutlined, DeleteOutlined, VideoCameraOutlined, RobotOutlined, SoundOutlined, CustomerServiceOutlined, AppstoreOutlined, FileTextOutlined } from '@ant-design/icons'
 import request from '../../utils/request'
 import ScriptEditor from '../agent/ScriptEditor'
 import AiScriptEditor from '../agent/AiScriptEditor'
@@ -271,21 +271,6 @@ export default function StudioPage() {
   }
 
   // @ts-ignore
-  const burnSubtitles = async () => {
-    if (!asrResult?.segments?.length) return
-    const vid = state.final_videos?.[0]
-    if (!vid) return message.warning('没有视频')
-    setBurning(true)
-    setSubbedUrl('')
-    try {
-      const res: any = await request.post('/studio/burn-subtitles', { video_url: vid.url, segments: asrResult.segments, session_id: sessionId }, { timeout: 600000 })
-      if (res.error) { message.error(res.error); return }
-      setSubbedUrl(res.url)
-      message.success('字幕视频已生成')
-    } catch { message.error('烧录失败') }
-    setBurning(false)
-  }
-
   const doExport = async () => {
     if (!subbedUrl) return
     setExporting(true)
