@@ -61,7 +61,15 @@ async def run_video_generate(api_key: str, params: dict) -> dict:
             prompt += "3. 人物和产品之间的前后关系要明确：谁在前谁在后\n"
             prompt += "4. 避免画面过于空旷或过于拥挤，保持视觉平衡\n"
             prompt += "5. 如果有多个人物/物体，说明它们之间的相对位置（左右/前后/上下）\n"
-            prompt += "6. 背景元素和前景元素要分层，营造景深感"
+            prompt += "6. 背景元素和前景元素要分层，营造景深感\n"
+            # 剧本执行强化
+            prompt += "\n【剧本执行要求】\n"
+            prompt += "1. **严格按照 visual_desc 的描述生成画面**，包括：镜头类型（特写/中景/全景）、主体位置、动作、光线\n"
+            prompt += "2. 旁白配音必须严格按照时间轴朗读对应文本，不能省略或更改台词\n"
+            prompt += "3. 角色说的话必须与 lines 中的 text 完全一致\n"
+            prompt += "4. 每个时间段的画面必须匹配该时间段内的台词内容和语气\n"
+            prompt += "5. 参考图只用于产品外观参考，场景构图必须按照 visual_desc 执行\n"
+            prompt += "6. 确保画面中的人物动作与描述完全一致（如：微笑、拿起、指向等）"
             content_items.append({"type": "text", "text": prompt})
 
             body = {"model": MODEL_EP, "content": content_items, "return_last_frame": False}

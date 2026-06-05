@@ -44,8 +44,8 @@ export default function StudioPage() {
   const [bgmMaterials, setBgmMaterials] = useState<any[]>([])
   const [selectedBgmId, setSelectedBgmId] = useState<number | null>(null)
   const [step, setStep] = useState(0)
-  const stepIcons = [<PlusOutlined />, <VideoCameraOutlined />, <AppstoreOutlined />, <FileTextOutlined />, <PlayCircleOutlined />, <CustomerServiceOutlined />, <VideoCameraOutlined />]
-  const stepLabels = ['产品介绍', '素材选择', '素材集合', '剧本生成', '视频生成', 'BGM选择', '导出']
+  const stepIcons = [<PlusOutlined />, <VideoCameraOutlined />, <AppstoreOutlined />, <FileTextOutlined />, <PlayCircleOutlined />, <SoundOutlined />, <CustomerServiceOutlined />, <VideoCameraOutlined />]
+  const stepLabels = ['产品介绍', '素材选择', '素材集合', '剧本生成', '视频生成', 'ASR校准', 'BGM选择', '导出']
 
   // 加载 Session 列表
   useEffect(() => {
@@ -119,6 +119,17 @@ export default function StudioPage() {
     const cols = [...(state.collections || [])]
     cols.push({ id: Date.now(), name: `集合 #${cols.length + 1}`, material_ids: ids })
     saveState({ collections: cols })
+  }
+
+  const runAsr = async (id: number, url: string) => {
+    setAsrLoadingId(id)
+    setAsrResult(null)
+    try {
+      const res: any = await request.post('/studio/asr', { video_url: url, session_id: sessionId }, { timeout: 600000 })
+      if (res.error) { message.error(res.error); return }
+      setAsrResult(res)
+    } catch { message.error('ASR 请求失败') }
+    setAsrLoadingId(null)
   }
 
   const deleteExport = (id: number) => {
@@ -420,20 +431,6 @@ export default function StudioPage() {
                       )} />
                       {(!state.clip_collections || state.clip_collections.length === 0) && <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>点击下方按钮开始生成</div>}
                       {selectedClipColl && <Collapse ghost size="small" items={[{key:'clips',label:<span>查看片段 ({selectedClipColl.clips?.length||0})</span>,children:<div style={{maxHeight:200,overflow:'auto'}}>{selectedClipColl.clips?.map((clip:any)=>(<div key={clip.id} style={{padding:'4px 0',borderBottom:'1px solid #f0f0f0'}}><a href={clip.url} target="_blank" rel="noreferrer">场景 {clip.scene_id}</a></div>))}</div>}]} />}
-                      {/* ASR 校错 */}
-                      {asrResult?.segments?.length > 0 && (
-                        <div style={{ marginTop: 16 }}>
-                          <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>🎤 ASR 识别结果（自动纠错）</div>
-                          <div style={{ maxHeight: 250, overflow: 'auto', fontSize: 12 }}>
-                            {asrResult.segments.map((seg: any, i: number) => (
-                              <div key={i} style={{ padding: '6px 0', borderBottom: '1px solid #f0f0f0', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                                <Tag style={{ fontSize: 10, flexShrink: 0, margin: 0 }}>{seg.start}-{seg.end}s</Tag>
-                                <span style={{ color: '#333' }}>{seg.text}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
                     </div>
                   )}
                 </Card>
@@ -443,6 +440,33 @@ export default function StudioPage() {
               </div>
             )}
             {step === 5 && (
+              <div>
+                <Card title="ASR 校准" size="small" style={{ minHeight: 400 }}>
+                  <div style={{ color: '#999', marginBottom: 12 }}>合成视频后自动运行 ASR，结果展示在此</div>
+                  {state.final_videos?.length > 0 && !asrResult && (
+                    <Button icon={<PlayCircleOutlined />} onClick={() => {
+                      const v = stateRef.current.final_videos?.[0]
+                      if (v) runAsr(v.id, v.url)
+                    }}>运行 ASR</Button>
+                  )}
+                  {asrResult?.segments?.length > 0 && (
+                    <div>
+                      <div style={{ fontWeight: 600, marginBottom: 8 }}>🎤 ASR 识别结果（自动纠错）</div>
+                      <div style={{ maxHeight: 350, overflow: 'auto', fontSize: 12 }}>
+                        {asrResult.segments.map((seg: any, i: number) => (
+                          <div key={i} style={{ padding: '6px 0', borderBottom: '1px solid #f0f0f0', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                            <Tag style={{ fontSize: 10, flexShrink: 0, margin: 0 }}>{seg.start}-{seg.end}s</Tag>
+                            <span style={{ color: '#333' }}>{seg.text}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {subbedUrl && <div style={{ marginTop: 12, color: '#52c41a' }}>✅ 字幕已烧录</div>}
+                    </div>
+                  )}
+                </Card>
+              </div>
+            )}
+            {step === 6 && (
               <div>
                 <Card title="BGM 选择" size="small" extra={<Button size="small" icon={<CustomerServiceOutlined />} onClick={loadBgmMaterials}>刷新</Button>} style={{ minHeight: 400 }}>
                   {bgmMaterials.length === 0 ? <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>暂无音频素材</div> : (
@@ -461,7 +485,7 @@ export default function StudioPage() {
                 <div style={{ fontSize: 11, color: '#999', marginTop: 4, textAlign: 'center' }}>选好 BGM 后去导出步骤</div>
               </div>
             )}
-            {step === 6 && (
+            {step === 7 && (
               <div>
                 <Card title="导出" size="small" style={{ minHeight: 400 }}>
                   {/* 当前视频 */}
@@ -516,7 +540,7 @@ export default function StudioPage() {
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16 }}>
               <Button disabled={step === 0} onClick={() => setStep(s => s - 1)}>← 上一步</Button>
-              <Button disabled={step === 6} type="primary" onClick={() => setStep(s => s + 1)}>下一步 →</Button>
+              <Button disabled={step === 7} type="primary" onClick={() => setStep(s => s + 1)}>下一步 →</Button>
             </div>
           </div>
         </div>
