@@ -522,6 +522,95 @@ async def ai_generate_template(
         print(f"[ai-generate] LLM failed: {e}")
 
     return _build_fallback_templates(best_refs)
+
+
+@router.post("/templates/optimize-prompt")
+async def optimize_template_prompt(
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+):
+    """根据归因分析优化指定模板的 Prompt（system.md）"""
+    template_name = body.get("template_name", "")
+    current_content = body.get("content", "")
+    from app.script.models import ReferenceVideo
+    from app.published.models import PublishedVideo
+    from sqlalchemy import select as _sel
+    import json, httpx
+
+    refs = (await db.execute(_sel(ReferenceVideo).limit(100))).scalars().all()
+    pubs = (await db.execute(_sel(PublishedVideo).limit(50))).scalars().all()
+
+    combo_counts = {}
+    for r in refs:
+        af = r.audio_features or {}
+        bgm = "轻快" if (af.get("lightness_score") or 0) >= 55 else "稳重"
+        key = (r.style or "?", (r.hook_method or "")[:8], bgm)
+        combo_counts[key] = combo_counts.get(key, 0) + 1
+    best_combos = sorted(combo_counts.items(), key=lambda x: x[1], reverse=True)[:3]
+    combo_text = "; ".join([f"{s}/{h}/{b}" for (s, h, b), _ in best_combos])
+
+    tpl_pubs = [p for p in pubs if (p.script_template or "") == template_name]
+    pub_count = len(tpl_pubs)
+    avg_play = round(sum(p.play_count or 2000 for p in tpl_pubs) / pub_count) if pub_count else 0
+
+    wf_cfg = None
+    try:
+        from app.workflow.models import WorkflowConfig
+        from sqlalchemy import select as _s
+        wf_cfg = (await db.execute(
+            _s(WorkflowConfig).where(
+                WorkflowConfig.workflow_name == "material-analyze",
+                WorkflowConfig.enabled == 1
+            ).limit(1)
+        )).scalar_one_or_none()
+    except: pass
+
+    if wf_cfg:
+        cfg = json.loads(wf_cfg.config or "{}")
+        api_key = cfg.get("api_key")
+        base_url = (cfg.get("base_url") or "https://api.deepseek.com/v1").rstrip("/")
+        model = cfg.get("model", "deepseek-v4-flash")
+
+        prompt = f"""你是一个电商短视频Prompt优化专家。根据以下数据和分析，优化该剧本模板的system.md。
+
+【当前模板名称】
+{template_name}
+
+【当前Prompt内容】
+{current_content[:2000]}
+
+【归因分析数据】
+高播放量组合：{combo_text}
+模板使用次数：{pub_count}次，平均播放量：{avg_play}
+
+优化要求：
+1. 保留原始Prompt的核心结构和意图
+2. 根据归因数据调整策略方向（风格、Hook手法、节奏等）
+3. 融入高播放量组合的要素
+4. 输出优化后的完整system.md内容
+
+请只输出优化后的Prompt内容，不要解释。"""
+
+        try:
+            payload = {
+                "model": model, "temperature": 0.6,
+                "messages": [
+                    {"role": "system", "content": "你是电商短视频Prompt优化专家。只输出优化后的Prompt内容。"},
+                    {"role": "user", "content": prompt},
+                ],
+            }
+            async with httpx.AsyncClient(timeout=120) as client:
+                resp = await client.post(f"{base_url}/chat/completions", json=payload,
+                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"})
+                if resp.status_code == 200:
+                    optimized = resp.json()["choices"][0]["message"]["content"].strip()
+                    return {"source": "ai", "optimized_content": optimized}
+        except Exception as e:
+            print(f"[optimize-prompt] LLM failed: {e}")
+
+    return {"source": "data", "optimized_content": current_content, "message": "LLM不可用，返回原始内容"}
+
+
 def _build_fallback_templates(best: list) -> dict:
     """LLM不可用时，基于数据硬编码模板"""
     templates = []

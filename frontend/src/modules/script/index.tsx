@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Table, Button, Card, message, Space, Modal, Input, Tabs, Tag, Spin, Descriptions, Progress, Typography } from 'antd'
+import { Table, Button, Card, message, Space, Modal, Input, Tabs, Tag, Spin, Descriptions, Progress, Typography, Divider } from 'antd'
 import { PlusOutlined, EditOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import request from '../../utils/request'
 
@@ -54,6 +54,8 @@ export default function ScriptTemplates() {
   const [optLoading, setOptLoading] = useState<string | null>(null)
   const [optResult, setOptResult] = useState<any>(null)
   const [optVisible, setOptVisible] = useState(false)
+  const [optPrompting, setOptPrompting] = useState(false)
+  const [optPromptResult, setOptPromptResult] = useState<string | null>(null)
 
   const load = async () => {
     setLoading(true)
@@ -122,6 +124,37 @@ export default function ScriptTemplates() {
       setOptVisible(true)
     } catch { message.error('获取优化建议失败') }
     setOptLoading(null)
+  }
+
+  // 立即优化 Prompt
+  const handleOptimizePrompt = async () => {
+    if (!optResult?.template) return
+    setOptPrompting(true)
+    setOptPromptResult(null)
+    try {
+      const tpl: any = await request.get(`/workflows/prompts/${optResult.template}`)
+      const sysContent = tpl.files?.['system.md'] || ''
+      const res: any = await request.post('/template/templates/optimize-prompt', {
+        template_name: optResult.template,
+        content: sysContent,
+      })
+      if (res.optimized_content) {
+        setOptPromptResult(res.optimized_content)
+      } else {
+        message.warning('优化失败，返回原始内容')
+      }
+    } catch { message.error('Prompt 优化请求失败') }
+    setOptPrompting(false)
+  }
+
+  // 保存优化后的 Prompt
+  const saveOptimizedPrompt = async () => {
+    if (!optPromptResult || !optResult?.template) return
+    try {
+      await request.put(`/workflows/prompts/${optResult.template}/system.md`, { content: optPromptResult })
+      message.success('优化后的 Prompt 已保存')
+      setOptPromptResult(null)
+    } catch { message.error('保存失败') }
   }
 
   // 应用AI模板（保存为剧本模板）
@@ -282,6 +315,27 @@ export default function ScriptTemplates() {
               </Tag>
               <Tag color="default" style={{ marginLeft: 4 }}>来源: {optResult.source === 'ai' ? 'AI分析' : '归因数据'}</Tag>
             </div>
+            {/* 立即优化按钮 */}
+            <div style={{ textAlign: 'center', margin: '12px 0' }}>
+              <Button type="primary" icon={<ThunderboltOutlined />} loading={optPrompting}
+                onClick={handleOptimizePrompt} block>
+                立即优化 Prompt
+              </Button>
+            </div>
+            {/* 优化后的 Prompt 预览 */}
+            {optPromptResult && (
+              <div>
+                <Divider style={{ margin: '8px 0' }} />
+                <Text strong style={{ fontSize: 13 }}>优化后的 Prompt：</Text>
+                <div style={{ marginTop: 4, padding: 8, background: '#f6ffed', borderRadius: 4, border: '1px solid #b7eb8f', maxHeight: 300, overflow: 'auto', fontSize: 12, whiteSpace: 'pre-wrap' }}>
+                  {optPromptResult}
+                </div>
+                <Space style={{ marginTop: 8, width: '100%', justifyContent: 'center' }}>
+                  <Button type="primary" onClick={saveOptimizedPrompt}>保存到模板</Button>
+                  <Button onClick={() => setOptPromptResult(null)}>取消</Button>
+                </Space>
+              </div>
+            )}
           </div>
         )}
       </Modal>
