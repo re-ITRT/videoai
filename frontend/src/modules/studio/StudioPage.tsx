@@ -19,7 +19,7 @@ export default function StudioPage() {
     products: [], selected_product_id: null, threshold: 30,
     selected_material_ids: [], collections: [], selected_template: '',
     clip_collections: [], selected_clip_collection_id: null,
-    final_videos: [], scripts: [], selected_script_id: null, exports: [], selected_export_id: null,
+    final_videos: [], scripts: [], selected_script_id: null, exports: [], selected_export_id: null, asrResults: {},
   })
   const stateRef = useRef(state)
   stateRef.current = state
@@ -35,7 +35,7 @@ export default function StudioPage() {
   const [aiScriptEditorOpen, setAiScriptEditorOpen] = useState(false)
   const [asrLoadingId, setAsrLoadingId] = useState<number | null>(null)
   void asrLoadingId; void setAsrLoadingId;
-  const [asrResults, setAsrResults] = useState<Record<number, any>>({})
+  const [asrResults, setAsrResults] = useState<Record<number, any>>(state.asrResults || {})
   const [selectedAsrVideo, setSelectedAsrVideo] = useState<number | null>(null)
   const [editedSegments, setEditedSegments] = useState<string[]>([])
   const [burningSub, setBurningSub] = useState(false)
@@ -62,6 +62,7 @@ export default function StudioPage() {
     request.get(`/studio/state/${sessionId}`).then((r: any) => {
       if (r && typeof r === 'object' && !r.detail) {
         setState((prev: any) => ({ ...prev, ...r }))
+        if (r.asrResults) setAsrResults(r.asrResults)
         setMaterials(r.cached_materials || [])
       }
     }).catch(() => {})
@@ -134,7 +135,9 @@ export default function StudioPage() {
     try {
       const res: any = await request.post('/studio/asr', { video_url: url, session_id: sessionId }, { timeout: 600000 })
       if (res.error) { message.error(res.error); return }
-      setAsrResults(prev => ({...prev, [id]: res}))
+      const newResults = {...(stateRef.current.asrResults || {}), [id]: res}
+      setAsrResults(newResults)
+      saveState({ asrResults: newResults })
       setSelectedAsrVideo(id)
       setEditedSegments(res.segments?.map((s: any) => s.text) || [])
     } catch { message.error('ASR 请求失败') }
@@ -251,7 +254,7 @@ export default function StudioPage() {
         try {
           const asrRes: any = await request.post('/studio/asr', { video_url: vid.url, session_id: sessionIdRef.current }, { timeout: 600000 })
           if (asrRes?.segments?.length) {
-            setAsrResults(prev => ({...prev, [vid.id]: asrRes}))
+            setAsrResults(prev => { const nr = {...prev, [vid.id]: asrRes}; saveState({ asrResults: nr }); return nr })
             message.info('自动生成字幕...')
             const burnRes: any = await request.post('/studio/burn-subtitles', { video_url: vid.url, segments: asrRes.segments, session_id: sessionIdRef.current }, { timeout: 600000 })
             if (burnRes?.url) {
@@ -467,7 +470,7 @@ export default function StudioPage() {
                           actions={[
                             !hasAsr ? <Button key="go" size="small" type="link" loading={asrLoadingId === v.id}>ASR中...</Button>
                               : <Tag key="done" color="green">已识别</Tag>,
-                            <DeleteOutlined key="del" style={{ color: '#ff4d4f', fontSize: 12 }}
+                            <DeleteOutlined key="del" style={{ color: asrLoadingId === v.id ? '#d9d9d9' : '#ff4d4f', fontSize: 12 }}
                               onClick={e => { e.stopPropagation(); deleteFinalVideo(v.id) }} />
                           ]}>
                           <Space><PlayCircleOutlined /><span>视频 {v.id}</span></Space>
