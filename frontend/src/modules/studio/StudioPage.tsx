@@ -52,10 +52,7 @@ export default function StudioPage() {
   // 切换 Session 时加载状态
   useEffect(() => {
     if (!sessionId) return
-    // 用 raw fetch 避免触发全局错误提示
-    fetch(`/api/v1/agent/sessions/state/${sessionId}`, {
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-    }).then(r => r.json()).then((r: any) => {
+    request.get(`/studio/state/${sessionId}`).then((r: any) => {
       if (r && typeof r === 'object' && !r.detail) {
         setState((prev: any) => ({ ...prev, ...r }))
         setMaterials(r.cached_materials || [])
@@ -77,7 +74,7 @@ export default function StudioPage() {
     const st = { ...stateRef.current, ...patch }
     setState(st)
     if (sessionIdRef.current) {
-      try { await request.post('/agent/sessions/state', { session_id: sessionIdRef.current, state: st }) } catch {}
+      try { await request.put(`/studio/state/${sessionIdRef.current}`, st) } catch {}
     }
   }
 
@@ -85,7 +82,7 @@ export default function StudioPage() {
   const loadSession = async (sid: number) => {
     setSessionId(sid)
     try {
-      const r: any = await request.get(`/agent/sessions/state/${sid}`)
+      const r: any = await request.get(`/studio/state/${sid}`)
       if (r && typeof r === 'object') {
         setState({ ...state, ...r })
         setMaterials(r.cached_materials || [])
