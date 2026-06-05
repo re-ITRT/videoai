@@ -35,6 +35,8 @@ export default function StudioPage() {
   const [aiScriptEditorOpen, setAiScriptEditorOpen] = useState(false)
   const [asrLoadingId, setAsrLoadingId] = useState<number | null>(null)
   const [asrResult, setAsrResult] = useState<any>(null)
+  // Keep reference to asrResult for composeVid callback
+  void asrResult;
   const [subbedUrl, setSubbedUrl] = useState('')
   const [exporting, setExporting] = useState(false)
   // BGM
