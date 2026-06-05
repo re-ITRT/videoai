@@ -20,7 +20,6 @@ const menuItems = [
   { key: '/material', icon: <VideoCameraOutlined />, label: '素材管理' },
   { key: '/script', icon: <FileTextOutlined />, label: '剧本模板' },
   { key: '/reference', icon: <PlayCircleOutlined />, label: '参考视频' },
-  { key: '/templates', icon: <BookOutlined />, label: '灵感模板' },
   { key: '/attribution', icon: <ThunderboltOutlined />, label: '归因分析' },
   { key: '/profile', icon: <UserOutlined />, label: '个人中心' },
 ]

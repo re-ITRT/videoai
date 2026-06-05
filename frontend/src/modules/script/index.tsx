@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
-import { Table, Button, Card, message, Space, Modal, Input, Tabs, Tag } from 'antd'
-import { PlusOutlined, EditOutlined } from '@ant-design/icons'
+import { Table, Button, Card, message, Space, Modal, Input, Tabs, Tag, Spin, Descriptions, Progress, Typography } from 'antd'
+import { PlusOutlined, EditOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import request from '../../utils/request'
 
 const { TextArea } = Input
+const { Text } = Typography
 
 /** 把 system.md 按 # 标题拆成 { "角色定义": "...", "任务目标": "..." } */
 function parseSections(text: string): Record<string, string> {
@@ -42,6 +43,12 @@ export default function ScriptTemplates() {
   const [createVisible, setCreateVisible] = useState(false)
   const [createName, setCreateName] = useState('')
   const [creating, setCreating] = useState(false)
+
+  // AI 生成
+  const [aiGenerating, setAiGenerating] = useState(false)
+  const [aiResultVisible, setAiResultVisible] = useState(false)
+  const [aiTemplates, setAiTemplates] = useState<any[]>([])
+  const [aiSource, setAiSource] = useState('')
 
   const load = async () => {
     setLoading(true)
@@ -88,6 +95,54 @@ export default function ScriptTemplates() {
     setCreating(false)
   }
 
+  // AI 智能生成
+  const handleAiGenerate = async () => {
+    setAiGenerating(true)
+    try {
+      const res: any = await request.post('/template/templates/ai-generate', {})
+      setAiTemplates(res.templates || [])
+      setAiSource(res.source || 'data')
+      setAiResultVisible(true)
+      if (!res.templates?.length) message.warning('AI 未能生成模板')
+    } catch { message.error('AI 生成失败') }
+    setAiGenerating(false)
+  }
+
+  // 应用AI模板（保存为剧本模板）
+  const applyAiTemplate = async (tpl: any) => {
+    const name = tpl.name || `AI推荐-${Date.now()}`
+    try {
+      // 构造 system.md 内容
+      const strategyLines = [
+        `# 策略描述`,
+        tpl.strategy || '',
+        ``,
+        `# 因子组合`,
+        ...Object.entries(tpl.factors || {}).map(([k, v]: any) => `- ${v?.type || k}：${v?.description || ''}`),
+        ``,
+        `# 适用品类`,
+        tpl.category || '通用',
+        ``,
+        `# 推荐标签`,
+        (tpl.tags || []).join('、'),
+        ``,
+        `# 归因评分`,
+        `attribution_score: ${tpl.attribution_score || 0}`,
+      ].join('\n')
+
+      await request.post('/workflows/templates', {
+        name,
+        description: tpl.strategy?.slice(0, 100) || name,
+        prompt_preview: `${tpl.strategy?.slice(0, 200)}...`,
+      })
+      await request.put(`/workflows/prompts/${name}/system.md`, { content: strategyLines })
+      message.success(`模板「${name}」已创建`)
+      load()
+    } catch (e: any) {
+      message.error(e?.response?.data?.detail || '应用失败')
+    }
+  }
+
   const columns = [
     { title: '模板名称', dataIndex: 'name', render: (v: string) =>
       v === 'default' ? <span>{v} <Tag color="blue">默认</Tag></span>
@@ -108,13 +163,20 @@ export default function ScriptTemplates() {
   const sectionKeys = Object.keys(sysSections)
 
   return (
-    <Card title="剧本模板" extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateVisible(true)}>新建模板</Button>}>
+    <Card title="剧本模板" extra={
+      <Space>
+        <Button icon={<ThunderboltOutlined />} loading={aiGenerating} onClick={handleAiGenerate}>AI 智能生成</Button>
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateVisible(true)}>新建模板</Button>
+      </Space>
+    }>
       <Table dataSource={templates} columns={columns} rowKey="name" loading={loading} />
 
+      {/* 新建模板 */}
       <Modal title="新建模板" open={createVisible} onCancel={() => setCreateVisible(false)} onOk={handleCreate} confirmLoading={creating}>
         <Input placeholder="输入模板名称" value={createName} onChange={e => setCreateName(e.target.value)} onPressEnter={handleCreate} />
       </Modal>
 
+      {/* 编辑模板 */}
       <Modal title={`编辑模板 - ${editName}`} open={editVisible} onCancel={() => setEditVisible(false)}
         width={700} footer={null} destroyOnClose>
         {sectionKeys.length > 0 && (
@@ -129,6 +191,52 @@ export default function ScriptTemplates() {
           }))} />
         )}
         <Button type="primary" style={{ marginTop: 12 }} onClick={handleSave} loading={saving}>保存模板</Button>
+      </Modal>
+
+      {/* AI 生成结果弹窗 */}
+      <Modal title="🤖 AI 智能生成的模板" open={aiResultVisible} onCancel={() => setAiResultVisible(false)}
+        width={800} footer={null} destroyOnClose>
+        <Spin spinning={aiTemplates.length === 0}>
+          {aiTemplates.map((tpl: any, i: number) => (
+            <Card key={i} size="small" title={
+              <Space>
+                <Tag color="blue">#{i + 1}</Tag>
+                <strong>{tpl.name}</strong>
+                <Tag color="green">推荐度: {tpl.attribution_score}/100</Tag>
+              </Space>
+            } extra={<Button size="small" type="primary" onClick={() => applyAiTemplate(tpl)}>应用此模板</Button>}
+              style={{ marginBottom: 12 }}>
+              <Descriptions column={1} size="small" style={{ fontSize: 12 }}>
+                <Descriptions.Item label="📐 策略描述">{tpl.strategy}</Descriptions.Item>
+                <Descriptions.Item label="🏷️ 适用品类">
+                  <Tag color="purple">{tpl.category || '通用'}</Tag>
+                </Descriptions.Item>
+                <Descriptions.Item label="🏷️ 标签">
+                  <Space wrap size={[4, 4]}>{(tpl.tags || []).map((t: string) => <Tag key={t}>{t}</Tag>)}</Space>
+                </Descriptions.Item>
+                <Descriptions.Item label="🎯 归因评分">
+                  <Progress percent={tpl.attribution_score || 0} size="small" strokeColor="#52c41a" />
+                </Descriptions.Item>
+              </Descriptions>
+              <details style={{ marginTop: 8 }}>
+                <summary style={{ cursor: 'pointer', fontSize: 12, color: '#1677ff' }}>展开因子详情</summary>
+                <div style={{ marginTop: 8 }}>
+                  {Object.entries(tpl.factors || {}).map(([k, v]: any) => (
+                    <div key={k} style={{ marginBottom: 4, fontSize: 12 }}>
+                      <Tag color="geekblue">{v?.type || k}</Tag>
+                      <span style={{ color: '#666' }}>{v?.description || ''}</span>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            </Card>
+          ))}
+          {aiTemplates.length > 0 && (
+            <div style={{ textAlign: 'center', marginTop: 8 }}>
+              <Text type="secondary" style={{ fontSize: 11 }}>数据来源: {aiSource === 'ai' ? 'AI 分析' : '归因数据'}</Text>
+            </div>
+          )}
+        </Spin>
       </Modal>
     </Card>
   )
