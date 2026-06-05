@@ -34,6 +34,7 @@ export default function StudioPage() {
   const [scriptEditorOpen, setScriptEditorOpen] = useState(false)
   const [aiScriptEditorOpen, setAiScriptEditorOpen] = useState(false)
   const [asrLoadingId, setAsrLoadingId] = useState<number | null>(null)
+  void asrLoadingId; void setAsrLoadingId;
   const [asrResult, setAsrResult] = useState<any>(null)
   void asrResult;
   const [exporting, setExporting] = useState(false)
