@@ -121,20 +121,6 @@ export default function StudioPage() {
     saveState({ collections: cols })
   }
 
-  const correctAsr = async () => {
-    if (!asrResult?.segments?.length) return
-    const fv = stateRef.current.final_videos
-    const vid = fv?.[0]
-    if (!vid) return
-    try {
-      const res: any = await request.post('/studio/asr', { video_url: vid.url, session_id: sessionIdRef.current }, { timeout: 600000 })
-      if (res?.segments?.length) {
-        setAsrResult(res)
-        message.success('AI 纠错完成')
-      }
-    } catch { message.error('AI 纠错失败') }
-  }
-
   const deleteExport = (id: number) => {
     const exports = (stateRef.current.exports || []).filter((e: any) => e.id !== id)
     const sel = stateRef.current.selected_export_id === id ? null : stateRef.current.selected_export_id
@@ -182,7 +168,7 @@ export default function StudioPage() {
     if (!selScript) { generatingRef.current = false; return message.warning('请选择剧本') }
     setGenerating('生成视频')
     try {
-      const script_name = `script_${selScript.id}`
+      const script_name = `script_${sid}`
       // Save the script to session file
       await request.post('/studio/generate-script', { product_content: '', template: state.selected_template, materials: [], session_id: sid, save_only: true, script: selScript.script }).catch(() => {})
       const submitRes: any = await request.post('/studio/generate-video', { session_id: sid, script_name }, { timeout: 300000 })
@@ -437,10 +423,7 @@ export default function StudioPage() {
                       {/* ASR 校错 */}
                       {asrResult?.segments?.length > 0 && (
                         <div style={{ marginTop: 16 }}>
-                          <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
-                            🎤 ASR 识别结果
-                            <Button size="small" icon={<RobotOutlined />} onClick={correctAsr}>AI 纠错</Button>
-                          </div>
+                          <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>🎤 ASR 识别结果（自动纠错）</div>
                           <div style={{ maxHeight: 250, overflow: 'auto', fontSize: 12 }}>
                             {asrResult.segments.map((seg: any, i: number) => (
                               <div key={i} style={{ padding: '6px 0', borderBottom: '1px solid #f0f0f0', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
