@@ -429,7 +429,7 @@ export default function StudioPage() {
                     )} />
                   )}
                 </Card>
-                {selectedBgmId && <Tag color="orange" style={{ marginTop: 8 }}>已选 BGM</Tag>}
+                {selectedBgmId && <Tag color="orange" style={{ marginTop: 8 }}>已选 BGM（导出时自动附加）</Tag>}
               </div>
             )}
             {step === 6 && (
