@@ -519,6 +519,21 @@ export default function StudioPage() {
             {step === 6 && (
               <div>
                 <Card title="BGM 选择" size="small" extra={<Button size="small" icon={<CustomerServiceOutlined />} onClick={loadBgmMaterials}>刷新</Button>} style={{ minHeight: 400 }}>
+                  {/* 字幕视频列表 */}
+                  {(stateRef.current.final_videos || []).length === 0 ? (
+                    <div style={{ color: '#999', marginBottom: 12 }}>先在 ASR 步骤烧录字幕</div>
+                  ) : (
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ fontWeight: 500, fontSize: 12, marginBottom: 4 }}>选择字幕视频：</div>
+                      <List size="small" dataSource={stateRef.current.final_videos} renderItem={(v: any) => (
+                        <List.Item onClick={() => setSubbedUrl(v.url)}
+                          style={{ cursor: 'pointer', background: subbedUrl === v.url ? '#e6f4ff' : undefined }}>
+                          <Space><PlayCircleOutlined /><span style={{ fontSize: 13 }}>视频 {v.id}</span></Space>
+                        </List.Item>
+                      )} />
+                    </div>
+                  )}
+                  <div style={{ fontWeight: 500, fontSize: 12, marginBottom: 4 }}>选择 BGM：</div>
                   {bgmMaterials.length === 0 ? <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>暂无音频素材</div> : (
                     <List size="small" dataSource={bgmMaterials} renderItem={(m: any) => (
                       <List.Item onClick={() => setSelectedBgmId(selectedBgmId === m.id ? null : m.id)}
@@ -531,8 +546,29 @@ export default function StudioPage() {
                     )} />
                   )}
                 </Card>
-                {selectedBgmId && <Tag color="orange" style={{ marginTop: 8 }}>已选 BGM（到导出步骤时自动附带）</Tag>}
-                <div style={{ fontSize: 11, color: '#999', marginTop: 4, textAlign: 'center' }}>选好 BGM 后去导出步骤</div>
+                {selectedBgmId && subbedUrl && (
+                  <div style={{ textAlign: 'center', marginTop: 8 }}>
+                    <Button type="primary" icon={<SoundOutlined />} loading={burningSub} onClick={async () => {
+                      const bgm = bgmMaterials.find((m: any) => m.id === selectedBgmId)
+                      if (!bgm || !subbedUrl) return
+                      setBurningSub(true)
+                      try {
+                        const res: any = await request.post('/studio/burn-subtitles', {
+                          video_url: subbedUrl, segments: [],
+                          session_id: sessionIdRef.current, bgm_url: bgm.image_url
+                        }, { timeout: 600000 })
+                        if (res?.url) {
+                          const exp = { id: Date.now(), video_url: res.url, title: state.session_name || '导出视频', bgm_name: bgm.name || '', created_at: new Date().toISOString() }
+                          const exports = [...(stateRef.current.exports || []), exp]
+                          saveState({ exports, selected_export_id: exp.id })
+                          message.success('合成完成！已添加到导出列表')
+                        }
+                      } catch { message.error('合成失败') }
+                      setBurningSub(false)
+                    }}>🎵 合成带 BGM 视频</Button>
+                  </div>
+                )}
+                {selectedBgmId && !subbedUrl && <Tag color="orange" style={{ marginTop: 8 }}>请先选择一个字幕视频</Tag>}
               </div>
             )}
             {step === 7 && (
