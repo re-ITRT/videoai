@@ -5,7 +5,6 @@ import {
   VideoCameraOutlined,
   FileTextOutlined,
   PlayCircleOutlined,
-  BookOutlined,
   UserOutlined,
   TeamOutlined,
   LogoutOutlined,
