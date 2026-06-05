@@ -61,7 +61,7 @@ export default function MaterialUpload() {
         beforeUpload={(f) => { setFileList(prev => [...prev, f]); return false }}
         onRemove={(f) => setFileList(prev => prev.filter(x => x.uid !== f.uid))}
         showUploadList={false}
-        accept="image/*,video/*,audio/*">
+        accept="*">
         <p className="ant-upload-drag-icon"><InboxOutlined /></p>
         <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
         <p className="ant-upload-hint">支持批量选择，自动检测类型，文件名作为素材名称</p>
