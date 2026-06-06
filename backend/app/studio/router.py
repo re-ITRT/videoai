@@ -695,8 +695,8 @@ async def studio_burn_subtitles(body: dict, db: AsyncSession = Depends(get_db), 
 
     video_url = body.get("video_url", "")
     segments = body.get("segments", [])
-    if not video_url or not segments:
-        raise HTTPException(400, "video_url and segments required")
+    if not video_url:
+        raise HTTPException(400, "video_url required")
 
     tmpdir = tempfile.mkdtemp()
     try:
@@ -728,25 +728,25 @@ async def studio_burn_subtitles(body: dict, db: AsyncSession = Depends(get_db), 
                 with open(vid_path, "wb") as f:
                     f.write(resp.content)
 
-        # 生成 SRT 字幕文件
-        srt_path = os.path.join(tmpdir, "subs.srt")
-        with open(srt_path, "w", encoding="utf-8") as f:
-            for i, seg in enumerate(segments, 1):
-                s = seg.get("start", 0)
-                e = seg.get("end", 0)
-                text = seg.get("text", "")
-                def fmt(t):
-                    h = int(t // 3600)
-                    m = int((t % 3600) // 60)
-                    sec = t % 60
-                    return f"{h:02d}:{m:02d}:{sec:06.3f}"
-                f.write(f"{i}\n{fmt(s)} --> {fmt(e)}\n{text}\n\n")
+        # 生成 SRT 字幕文件（如果有 segments）
+        srt_path = None
+        if segments:
+            srt_path = os.path.join(tmpdir, "subs.srt")
+            with open(srt_path, "w", encoding="utf-8") as f:
+                for i, seg in enumerate(segments, 1):
+                    s = seg.get("start", 0)
+                    e = seg.get("end", 0)
+                    text = seg.get("text", "")
+                    def fmt(t):
+                        h = int(t // 3600)
+                        m = int((t % 3600) // 60)
+                        sec = t % 60
+                        return f"{h:02d}:{m:02d}:{sec:06.3f}"
+                    f.write(f"{i}\n{fmt(s)} --> {fmt(e)}\n{text}\n\n")
 
-        # FFmpeg 烧录字幕
-        out_name = f"subbed_{uuid.uuid4().hex[:8]}.mp4"
-        out_path = os.path.join(tmpdir, out_name)
-        # BGM 混音（如果传了 bgm_url）
+        # BGM 下载
         bgm_url = body.get("bgm_url", "")
+        bgm_path = None
         if bgm_url:
             bgm_path = os.path.join(tmpdir, "bgm.mp3")
             try:
@@ -758,11 +758,12 @@ async def studio_burn_subtitles(body: dict, db: AsyncSession = Depends(get_db), 
             except Exception as e:
                 print(f"[burn] BGM download failed: {e}")
                 bgm_path = None
-        else:
-            bgm_path = None
 
-        if bgm_path and os.path.exists(bgm_path):
-            # 混音：BGM 音量 15%，原声保持 100%
+        out_name = f"subbed_{uuid.uuid4().hex[:8]}.mp4"
+        out_path = os.path.join(tmpdir, out_name)
+
+        if srt_path and bgm_path and os.path.exists(bgm_path):
+            # 字幕 + BGM 混音
             result = subprocess.run(
                 ["ffmpeg", "-i", vid_path, "-i", bgm_path,
                  "-filter_complex", "[1:a]volume=0.15[a1];[0:a][a1]amix=inputs=2:duration=first[aout]",
@@ -771,13 +772,23 @@ async def studio_burn_subtitles(body: dict, db: AsyncSession = Depends(get_db), 
                  "-y", out_path],
              capture_output=True, text=True, timeout=120,
          )
-        else:
-            # 无 BGM：直接烧录字幕，保留原音频
+        elif srt_path:
+            # 只有字幕（无 BGM）
             result = subprocess.run(
                 ["ffmpeg", "-i", vid_path, "-vf", f"subtitles={srt_path}:fontsdir=/app/models/fonts:force_style='FontName=WenQuanYi Micro Hei\\,FontSize=18\\,PrimaryColour=&H00FFFFFF\\,OutlineColour=&H00000000\\,BorderStyle=1\\,Outline=1'",
                  "-c:a", "copy", "-y", out_path],
                 capture_output=True, text=True, timeout=120,
             )
+        elif bgm_path and os.path.exists(bgm_path):
+            # 只有 BGM 混音（字幕已烧录好）
+            result = subprocess.run(
+                ["ffmpeg", "-i", vid_path, "-i", bgm_path,
+                 "-filter_complex", "[1:a]volume=0.15[a1];[0:a][a1]amix=inputs=2:duration=first[aout]",
+                 "-map", "0:v", "-map", "[aout]", "-c:v", "copy", "-y", out_path],
+                capture_output=True, text=True, timeout=120,
+            )
+        else:
+            raise HTTPException(400, "至少需要字幕或 BGM 其中之一")
         if result.returncode != 0:
             return {"error": f"字幕烧录失败: {result.stderr[:200]}"}
 
