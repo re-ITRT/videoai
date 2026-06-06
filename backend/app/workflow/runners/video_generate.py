@@ -2,60 +2,9 @@
 import asyncio
 import random
 import httpx
-import os
-import uuid
-from PIL import Image, ImageDraw, ImageFont
 
 VOLCANO_ARK_BASE = "https://ark.cn-beijing.volces.com/api/v3"
 MODEL_EP = "ep-20260514120705-pqv86"  # Doubao-Seedance-1.5-pro
-FONT_PATH = "/usr/share/fonts/truetype/wqy/msyh.ttc"  # 微软雅黑
-
-
-def render_text_overlay(overlay: dict, out_path: str, img_w: int = 720, img_h: int = 1280):
-    """将文字渲染到透明背景 PNG 上"""
-    text = overlay.get("text", "")
-    x_pct = overlay.get("x", 50)
-    y_pct = overlay.get("y", 50)
-    font_size = overlay.get("font_size", 36)
-    color = overlay.get("color", "#FFFFFF")
-    align = overlay.get("align", "center")
-
-    img = Image.new("RGBA", (img_w, img_h), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-
-    try:
-        font = ImageFont.truetype(FONT_PATH, font_size)
-    except Exception:
-        font = ImageFont.load_default()
-
-    # 计算文字尺寸
-    bbox = draw.textbbox((0, 0), text, font=font)
-    tw = bbox[2] - bbox[0]
-    th = bbox[3] - bbox[1]
-
-    # 转成像素坐标
-    cx = int(img_w * x_pct / 100)
-    cy = int(img_h * y_pct / 100)
-
-    if align == "center":
-        x = cx - tw // 2
-    elif align == "right":
-        x = cx - tw
-    else:  # left
-        x = cx
-
-    y = cy - th // 2
-
-    # 解析颜色 #RRGGBB
-    r, g, b = int(color[1:3], 16), int(color[3:5], 16), int(color[5:7], 16)
-
-    # 绘制文字（带黑色描边提高可读性）
-    for ox, oy in [(-1, -1), (-1, 1), (1, -1), (1, 1), (0, 0)]:
-        draw.text((x + ox, y + oy), text, font=font,
-                  fill=(r, g, b, 255) if ox == 0 and oy == 0 else (0, 0, 0, 200))
-
-    img.save(out_path, "PNG")
-
 
 async def run_video_generate(api_key: str, params: dict) -> dict:
     """
@@ -63,15 +12,9 @@ async def run_video_generate(api_key: str, params: dict) -> dict:
     params: {script: {title, style, aspect_ratio, scenes: [...]}, session_id: int}
     返回: {task_ids: [{scene_id, task_id}]}
     """
-    from app.core.signer import generate_signed_url
-
     script = params.get("script", {})
     scenes = script.get("scenes", [])
     aspect_ratio = script.get("aspect_ratio", "9:16")
-    session_id = params.get("session_id", 0)
-    # 文字图输出目录
-    text_dir = os.path.join("/app/uploads/agent_sessions", str(session_id), "text_overlays")
-    os.makedirs(text_dir, exist_ok=True)
 
     headers = {
         "Content-Type": "application/json",
@@ -90,34 +33,14 @@ async def run_video_generate(api_key: str, params: dict) -> dict:
             for ref_img in scene.get("reference_images", []):
                 content_items.append({
                     "type": "image_url",
-                    "role": "reference_image",
                     "image_url": {
                         "url": ref_img.get("url"),
+                        "role": ref_img.get("role", "reference_image"),
                     }
                 })
 
-            # 2. 渲染文字 overlay 图
+            # 2. 文字 overlay 暂不启用（需要 Seedance text_to_video 模式支持）
             text_overlays = scene.get("text_overlays", [])
-            for to_idx, to in enumerate(text_overlays):
-                out_name = f"text_{session_id}_{scene_id}_{to_idx}_{uuid.uuid4().hex[:8]}.png"
-                out_path = os.path.join(text_dir, out_name)
-                try:
-                    render_text_overlay(to, out_path)
-                    # 生成 signed URL
-                    signed = generate_signed_url(
-                        out_path.replace("/app/uploads", "/uploads"),
-                        expire_seconds=86400
-                    )
-                    url = f"http://114.117.242.17:3000{signed}"
-                    content_items.append({
-                        "type": "image_url",
-                        "role": "reference_image",
-                        "image_url": {
-                            "url": url,
-                        }
-                    })
-                except Exception as e:
-                    print(f"[text_overlay] render failed: {e}")
 
             visual_desc = scene.get("visual_desc", "")
             # 暴力清除 visual_desc 中所有涉及文字的描述
@@ -128,8 +51,7 @@ async def run_video_generate(api_key: str, params: dict) -> dict:
             # 构建提示词
             prompt = "【🔴 画面中绝对不允许出现任何文字、字符、汉字、数字、符号、标签、标题、LOGO或文字装饰】只生成纯画面（人物、产品、场景）。如果有文字出现，整个视频作废。\n\n"
             prompt += vd_clean
-            if text_overlays:
-                prompt += "\n\n【已传入文字参考图】文字已作为参考图传入，请按照参考图中文字的位置和样式，在视频中呈现同样的文字效果。"
+
             if lines:
                 prompt += "\n\n【画面时间轴·严格按此顺序】\n"
                 for l in lines:
@@ -166,10 +88,8 @@ async def run_video_generate(api_key: str, params: dict) -> dict:
             prompt += "4. 每个时间段的画面必须匹配该时间段内的台词内容和语气\n"
             prompt += "5. 参考图只用于产品外观参考，场景构图必须按照 visual_desc 执行\n"
             prompt += "6. 确保画面中的人物动作与描述完全一致（如：微笑、拿起、指向等）"
-            if text_overlays:
-                prompt += "\n7. 参考已传入的文字参考图，在画面中相同位置呈现这些文字"
             # 最后重复文字禁令
-            prompt += "\n\n【🔴 重复一遍：画面中绝对不允许有任何文字/汉字/数字/符号出现】除非通过文字参考图传入的文字"
+            prompt += "\n\n【🔴 重复一遍：画面中绝对不允许有任何文字/汉字/数字/符号出现】这是一个死命令。任何文字出现在画面中都将导致视频报废。只允许纯画面。"
             content_items.append({"type": "text", "text": prompt})
 
             print(f"[seedance] scene {scene_id}: items={len(content_items)}")
