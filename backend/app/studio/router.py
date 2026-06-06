@@ -776,14 +776,14 @@ async def studio_burn_subtitles(body: dict, db: AsyncSession = Depends(get_db), 
                 ["ffmpeg", "-i", vid_path, "-i", bgm_path,
                  "-filter_complex", "[1:a]volume=0.15[a1];[0:a][a1]amix=inputs=2:duration=first[aout]",
                  "-map", "0:v", "-map", "[aout]", "-c:v", "copy",
-                 "-vf", f"subtitles={srt_path}:fontsdir=/app/models/fonts:force_style='FontName=Microsoft YaHei\\,FontSize=18\\,PrimaryColour=&H00FFFFFF\\,OutlineColour=&H00000000\\,BorderStyle=1\\,Outline=1'",
+                 "-vf", f"subtitles={srt_path}:fontsdir=/app/models/fonts:force_style='FontName=WenQuanYi Micro Hei\\,FontSize=18\\,PrimaryColour=&H00FFFFFF\\,OutlineColour=&H00000000\\,BorderStyle=1\\,Outline=1'",
                  "-y", out_path],
              capture_output=True, text=True, timeout=120,
          )
         elif srt_path:
             # 只有字幕（无 BGM）
             result = subprocess.run(
-                ["ffmpeg", "-i", vid_path, "-vf", f"subtitles={srt_path}:fontsdir=/app/models/fonts:force_style='FontName=Microsoft YaHei\\,FontSize=18\\,PrimaryColour=&H00FFFFFF\\,OutlineColour=&H00000000\\,BorderStyle=1\\,Outline=1'",
+                ["ffmpeg", "-i", vid_path, "-vf", f"subtitles={srt_path}:fontsdir=/app/models/fonts:force_style='FontName=WenQuanYi Micro Hei\\,FontSize=18\\,PrimaryColour=&H00FFFFFF\\,OutlineColour=&H00000000\\,BorderStyle=1\\,Outline=1'",
                  "-c:a", "copy", "-y", out_path],
                 capture_output=True, text=True, timeout=120,
             )

@@ -39,7 +39,8 @@ async def run_video_generate(api_key: str, params: dict) -> dict:
             visual_desc = scene.get("visual_desc", "")
             lines = scene.get("lines", [])
             # 构建提示词：台词必须严格呈现
-            prompt = visual_desc
+            prompt = "【🔴 画面中绝对不允许出现任何文字、字符、汉字、数字、符号、标签、标题、LOGO或文字装饰】只生成纯画面（人物、产品、场景）。如果有文字出现，整个视频作废。\n\n"
+            prompt += visual_desc
             if lines:
                 prompt += "\n\n【画面时间轴·严格按此顺序】\n"
                 for l in lines:
@@ -54,7 +55,7 @@ async def run_video_generate(api_key: str, params: dict) -> dict:
                         prompt += f"{s}-{e}秒: 画面中的{speaker}说出「{text}」(语气: {tone})\n"
                 prompt += "\n【区分说明】旁白是画外音（有声音但画面无人出镜说话），其他角色须在画面中出现并说出台词。以上顺序不能颠倒。\n"
                 prompt += "\n【重要·严禁事项】\n"
-                prompt += "1. 严禁在视频画面中添加任何文字、字幕、标签、标题、产品名或文字动画——只生成纯画面内容\n"
+                prompt += "1. 【文字零容忍】画面中绝对不能有任何文字/数字/符号/标签/标题/产品名/LOGO/文字动画——哪怕一个汉字、一个数字都不行。只允许纯画面内容。这条优先于所有其他要求\n"
                 prompt += "2. 严禁出现剧本台词中没有的角色说话画面——角色只能说出剧本明确标注的台词，不能自己编词\n"
                 prompt += "3. 旁白必须有声音输出（音频正常朗读），但画面中人物绝对不能出镜/对口型——旁白时段画面只展示场景和人物动作，无人说话\n"
                 prompt += "4. 素材（画面描述/视觉效果）中没有出现的文字/词语，不能在画面中呈现\n"
