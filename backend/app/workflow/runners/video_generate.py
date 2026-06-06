@@ -191,6 +191,8 @@ async def run_video_generate(api_key: str, params: dict) -> dict:
                         wait = (retry + 1) * 10 + random.randint(0, 5)
                         await asyncio.sleep(wait)
                         continue
+                    if resp.status_code != 200:
+                        print(f"[seedance] ERROR {resp.status_code}: {resp.text[:500]}")
                     resp.raise_for_status()
                     result = resp.json()
                     task_id = result.get("id")
