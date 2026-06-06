@@ -127,6 +127,10 @@ async def run_video_generate(api_key: str, params: dict) -> dict:
             prompt += "6. 确保画面中的人物动作与描述完全一致（如：微笑、拿起、指向等）"
             content_items.append({"type": "text", "text": prompt})
 
+            for ci in content_items:
+                if ci.get("type") == "image_url":
+                    iu = ci.get("image_url", {})
+                    print(f"[seedance] img: role={iu.get("role","MISSING")} url={iu.get("url","")[:60]}")
             body = {"model": MODEL_EP, "content": content_items, "return_last_frame": False}
             if aspect_ratio:
                 body["ratio"] = aspect_ratio
