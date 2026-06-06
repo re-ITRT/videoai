@@ -172,6 +172,7 @@ async def run_video_generate(api_key: str, params: dict) -> dict:
             prompt += "\n\n【🔴 重复一遍：画面中绝对不允许有任何文字/汉字/数字/符号出现】除非通过文字参考图传入的文字"
             content_items.append({"type": "text", "text": prompt})
 
+            print(f"[seedance] scene {scene_id}: content_items={len(content_items)}, types={[c.get("type") for c in content_items]}")
             body = {"model": MODEL_EP, "content": content_items, "return_last_frame": False}
             if aspect_ratio:
                 body["ratio"] = aspect_ratio
