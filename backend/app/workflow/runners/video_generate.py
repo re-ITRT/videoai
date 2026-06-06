@@ -37,11 +37,10 @@ async def run_video_generate(api_key: str, params: dict) -> dict:
                     }
                 })
             visual_desc = scene.get("visual_desc", "")
-            # 过滤 visual_desc 中关于文字的描述，防止 Seedance 生成画面文字
-            import re as _re
+            # 暴力清除 visual_desc 中所有涉及文字的描述
             vd_clean = visual_desc
-            for kw in ["文字", "字样", "标注", "字体", "字幕", "标签", "标题", "LOGO", "logo", "特效文字", "文字特效"]:
-                vd_clean = _re.sub(r"[^。，：\w\s]?" + kw + r"[^。，：\w\s]?.*?[。，]", "", vd_clean)
+            for kw in ["文字", "字样", "标注", "字体", "字幕", "标签", "标题", "LOGO", "logo"]:
+                vd_clean = vd_clean.replace(kw, "画面")
             lines = scene.get("lines", [])
             # 构建提示词：台词必须严格呈现
             prompt = "【🔴 画面中绝对不允许出现任何文字、字符、汉字、数字、符号、标签、标题、LOGO或文字装饰】只生成纯画面（人物、产品、场景）。如果有文字出现，整个视频作废。\n\n"
