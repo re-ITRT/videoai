@@ -67,6 +67,15 @@ export default function StudioPage() {
         setMaterials(r.cached_materials || [])
       }
     }).catch(() => {})
+    // 加载合成的最终视频和字幕视频
+    request.get(`/studio/clips/${sessionId}`).then((r: any) => {
+      if (r) {
+        const fv = r.final_videos || []
+        const subbedUrls = r.subbed_videos || []
+        setState((prev: any) => ({ ...prev, final_videos: fv }))
+        if (subbedUrls.length > 0) setSubbedUrl(subbedUrls[0])
+      }
+    }).catch(() => {})
   }, [sessionId])
 
   const loadBgmMaterials = async () => {
