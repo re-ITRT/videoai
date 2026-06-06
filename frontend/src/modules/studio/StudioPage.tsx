@@ -71,9 +71,14 @@ export default function StudioPage() {
     request.get(`/studio/clips/${sessionId}`).then((r: any) => {
       if (r) {
         const fv = r.final_videos || []
+        const allClips = r.clips || []
         const subbedUrls = r.subbed_videos || []
         setState((prev: any) => ({ ...prev, final_videos: fv }))
         if (subbedUrls.length > 0) setSubbedUrl(subbedUrls[0])
+        // 如果 clip_collections 为空但服务器有 clip，重建（合并到一个集合）
+        if ((!stateRef.current.clip_collections || stateRef.current.clip_collections.length === 0) && allClips.length > 0) {
+          setState((prev: any) => ({ ...prev, clip_collections: [{ id: Date.now(), name: '视频运行 #1', clips: allClips, created_at: new Date().toISOString() }], selected_clip_collection_id: Date.now() }))
+        }
       }
     }).catch(() => {})
   }, [sessionId])
