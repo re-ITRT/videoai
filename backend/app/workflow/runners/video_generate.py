@@ -90,9 +90,9 @@ async def run_video_generate(api_key: str, params: dict) -> dict:
             for ref_img in scene.get("reference_images", []):
                 content_items.append({
                     "type": "image_url",
+                    "role": "reference_image",
                     "image_url": {
                         "url": ref_img.get("url"),
-                        "role": ref_img.get("role", "reference_image"),
                     }
                 })
 
@@ -111,9 +111,9 @@ async def run_video_generate(api_key: str, params: dict) -> dict:
                     url = f"http://114.117.242.17:3000{signed}"
                     content_items.append({
                         "type": "image_url",
+                        "role": "reference_image",
                         "image_url": {
                             "url": url,
-                            "role": "reference_image",
                         }
                     })
                 except Exception as e:
@@ -172,7 +172,7 @@ async def run_video_generate(api_key: str, params: dict) -> dict:
             prompt += "\n\n【🔴 重复一遍：画面中绝对不允许有任何文字/汉字/数字/符号出现】除非通过文字参考图传入的文字"
             content_items.append({"type": "text", "text": prompt})
 
-            print(f"[seedance] scene {scene_id}: content_items={len(content_items)}, types={[c.get("type") for c in content_items]}")
+            print(f"[seedance] scene {scene_id}: items={len(content_items)}")
             body = {"model": MODEL_EP, "content": content_items, "return_last_frame": False}
             if aspect_ratio:
                 body["ratio"] = aspect_ratio
