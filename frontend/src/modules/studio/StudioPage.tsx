@@ -267,16 +267,18 @@ export default function StudioPage() {
 
   const loadClips = async () => {
     const sid = sessionIdRef.current
-    if (!sid) return
+    if (!sid) return []
     try {
       const res: any = await request.get(`/studio/clips/${sid}`)
       if (res) {
         const fv = res.final_videos || []
         const subbedUrls = res.subbed_videos || []
         saveState({ final_videos: fv })
-        if (subbedUrls.length > 0) setSubbedUrl(subbedUrls[0])
+        if (subbedUrls.length > 0) setSubbedUrl(subbedUrls[subbedUrls.length - 1].url)
+        return fv
       }
     } catch {}
+    return []
   }
 
   // 合成视频 → 自动 ASR + 字幕烧录
@@ -288,9 +290,8 @@ export default function StudioPage() {
     try {
       await request.post('/studio/compose-video', { session_id: sessionIdRef.current, clip_ids: coll.clips.map((c: any) => c.id) })
       message.success('合成完成')
-      await loadClips()
+      const fv = await loadClips()
       // 合成后自动 ASR + 字幕烧录（用最新的 final_video）
-      const fv = stateRef.current.final_videos
       if (fv?.length > 0) {
         const vid = fv[fv.length - 1]
         message.info('自动进行语音识别...')
