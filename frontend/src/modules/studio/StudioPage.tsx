@@ -29,6 +29,7 @@ export default function StudioPage() {
   const [productModal, setProductModal] = useState(false)
   const [productTitle, setProductTitle] = useState('')
   const [productContent, setProductContent] = useState('')
+  const [productEditId, setProductEditId] = useState<number | null>(null)
   const [templates, setTemplates] = useState<string[]>([])
   const [generating, setGenerating] = useState<string | null>(null)
   const [scriptEditorOpen, setScriptEditorOpen] = useState(false)
@@ -118,8 +119,26 @@ export default function StudioPage() {
 
   const addProduct = async () => {
     if (!productContent.trim()) return message.warning('请输入产品介绍')
-    const products = [...state.products, { id: Date.now(), title: productTitle || productContent.slice(0, 30), content: productContent }]
-    saveState({ products }); setProductModal(false); setProductTitle(''); setProductContent('')
+    let products: any[]
+    if (productEditId) {
+      products = state.products.map((p: any) => p.id === productEditId ? { ...p, title: productTitle || productContent.slice(0, 30), content: productContent } : p)
+    } else {
+      products = [...state.products, { id: Date.now(), title: productTitle || productContent.slice(0, 30), content: productContent }]
+    }
+    saveState({ products }); setProductModal(false); setProductTitle(''); setProductContent(''); setProductEditId(null)
+  }
+
+  const deleteProduct = (id: number) => {
+    const products = state.products.filter((p: any) => p.id !== id)
+    const sel = state.selected_product_id === id ? null : state.selected_product_id
+    saveState({ products, selected_product_id: sel })
+  }
+
+  const editProduct = (p: any) => {
+    setProductTitle(p.title)
+    setProductContent(p.content)
+    setProductEditId(p.id)
+    setProductModal(true)
   }
 
   const createCollection = async () => {
@@ -352,10 +371,14 @@ export default function StudioPage() {
           <div style={{ flex: 1, overflow: 'auto', padding: '0 8px' }}>
             {step === 0 && (
               <div>
-                <Card title="产品介绍" size="small" extra={<Button size="small" icon={<PlusOutlined />} onClick={() => setProductModal(true)} />} style={{ minHeight: 400 }}>
+                <Card title="产品介绍" size="small" extra={<Button size="small" icon={<PlusOutlined />} onClick={() => { setProductEditId(null); setProductTitle(''); setProductContent(''); setProductModal(true) }} />} style={{ minHeight: 400 }}>
                   <List size="small" dataSource={state.products} renderItem={(p: any) => (
                     <List.Item onClick={() => saveState({ selected_product_id: p.id })}
-                      style={{ cursor: 'pointer', background: state.selected_product_id === p.id ? '#e6f4ff' : undefined }}>
+                      style={{ cursor: 'pointer', background: state.selected_product_id === p.id ? '#e6f4ff' : undefined }}
+                      actions={[
+                        <Button key="edit" size="small" type="link" icon={<EditOutlined />} onClick={e => { e.stopPropagation(); editProduct(p) }} />,
+                        <span key="del" onClick={e => { e.stopPropagation(); deleteProduct(p.id) }}><DeleteOutlined style={{ color: '#ff4d4f' }} /></span>
+                      ]}>
                       {p.title || p.content?.slice(0, 30)}
                     </List.Item>
                   )} />
@@ -640,7 +663,7 @@ export default function StudioPage() {
       <Modal title="新建工作流" open={sessionModal} onOk={createSession} onCancel={() => setSessionModal(false)}>
         <Input placeholder="工作流名称" value={sessionTitle} onChange={e => setSessionTitle(e.target.value)} onPressEnter={createSession} />
       </Modal>
-      <Modal title="添加产品介绍" open={productModal} onOk={addProduct} onCancel={() => setProductModal(false)} width={600}>
+      <Modal title={productEditId ? '编辑产品介绍' : '添加产品介绍'} open={productModal} onOk={addProduct} onCancel={() => { setProductModal(false); setProductEditId(null); setProductTitle(''); setProductContent('') }} width={600}>
         <Input placeholder="产品名称（选填）" value={productTitle} onChange={e => setProductTitle(e.target.value)} style={{ marginBottom: 8 }} />
         <TextArea rows={12} placeholder="粘贴完整的产品介绍文案..." value={productContent} onChange={e => setProductContent(e.target.value)} />
       </Modal>
