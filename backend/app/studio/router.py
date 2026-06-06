@@ -367,6 +367,14 @@ async def studio_compose_video(body: dict, db: AsyncSession = Depends(get_db), u
     session_id = body.get("session_id", 0)
     clip_ids = body.get("clip_ids")
 
+    # 清理旧的 final_video 和 subbed_video，避免累积
+    from sqlalchemy import delete as _del
+    await db.execute(_del(SessionFile).where(
+        SessionFile.session_id == session_id,
+        SessionFile.file_type.in_(["final_video", "subbed_video", "asr_subtitles", "asr_duration"]),
+    ))
+    await db.commit()
+
     files = await _gsf(db, session_id)
     clips = [f for f in files if f.file_type == "video_clip"]
     if clip_ids:

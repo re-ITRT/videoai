@@ -74,10 +74,20 @@ export default function StudioPage() {
         const allClips = r.clips || []
         const subbedUrls = r.subbed_videos || []
         setState((prev: any) => ({ ...prev, final_videos: fv }))
-        if (subbedUrls.length > 0) setSubbedUrl(subbedUrls[0])
-        // 如果 clip_collections 为空但服务器有 clip，重建（合并到一个集合）
+        if (subbedUrls.length > 0) setSubbedUrl(subbedUrls[subbedUrls.length - 1].url)
+        // 如果 clip_collections 为空但服务器有 clip，只取最新的4个场景的clip
         if ((!stateRef.current.clip_collections || stateRef.current.clip_collections.length === 0) && allClips.length > 0) {
-          setState((prev: any) => ({ ...prev, clip_collections: [{ id: Date.now(), name: '视频运行 #1', clips: allClips, created_at: new Date().toISOString() }], selected_clip_collection_id: Date.now() }))
+          const sorted = [...allClips].sort((a: any, b: any) => b.id - a.id)
+          const latestSceneIds = new Set<number>()
+          const latestClips: any[] = []
+          for (const clip of sorted) {
+            const sid = Number(clip.scene_id) || 0
+            if (!latestSceneIds.has(sid)) {
+              latestSceneIds.add(sid)
+              latestClips.unshift(clip)
+            }
+          }
+          setState((prev: any) => ({ ...prev, clip_collections: [{ id: Date.now(), name: '视频运行 #1', clips: latestClips, created_at: new Date().toISOString() }], selected_clip_collection_id: Date.now() }))
         }
       }
     }).catch(() => {})
@@ -279,10 +289,10 @@ export default function StudioPage() {
       await request.post('/studio/compose-video', { session_id: sessionIdRef.current, clip_ids: coll.clips.map((c: any) => c.id) })
       message.success('合成完成')
       await loadClips()
-      // 合成后自动 ASR + 字幕烧录
+      // 合成后自动 ASR + 字幕烧录（用最新的 final_video）
       const fv = stateRef.current.final_videos
       if (fv?.length > 0) {
-        const vid = fv[0]
+        const vid = fv[fv.length - 1]
         message.info('自动进行语音识别...')
         try {
           const asrRes: any = await request.post('/studio/asr', { video_url: vid.url, session_id: sessionIdRef.current }, { timeout: 600000 })
