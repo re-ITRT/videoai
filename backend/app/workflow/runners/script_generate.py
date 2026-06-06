@@ -96,4 +96,14 @@ async def run_script_generate(
         raise ValueError("LLM响应中未找到有效的JSON格式剧本")
     script = json.loads(content[json_start:json_end])
 
+    # 强制修正：每条 scene 最后一句台词的 end_sec 不能超过 duration-1
+    for s in script.get("scenes", []):
+        dur = s.get("duration", 5)
+        lines = s.get("lines", [])
+        if lines:
+            last = lines[-1]
+            max_end = dur - 1
+            if last.get("end_sec", 0) > max_end:
+                last["end_sec"] = max_end
+
     return {"script": script}

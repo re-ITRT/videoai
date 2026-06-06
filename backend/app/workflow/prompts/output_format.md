@@ -46,4 +46,4 @@
     - text: 台词内容
     - tone: 语气语调
     - start_sec: 在该场景中开始秒数（从0开始）
-    - end_sec: 在该场景中结束秒数（硬性要求 ≤ duration - 1，如 duration=5 时最大 4.0）
+    - end_sec: 在该场景中结束秒数（🔴 死规定：最后一条 line 的 end_sec ≤ duration - 1，即结束前至少留1秒无声过渡。duration=4→≤3.0，8→≤7.0，12→≤11.0）
