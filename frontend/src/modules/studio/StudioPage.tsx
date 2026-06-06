@@ -7,24 +7,16 @@ import AiScriptEditor from '../agent/AiScriptEditor'
 
 const { TextArea } = Input
 
-// 带倍速控制的视频播放器
-function VideoPlayer({ src, style }: { src: string; style?: any }) {
-  const ref = useRef<any>(null)
+function SpeedBar() {
   const [speed, setSpeed] = useState(1)
   const speeds = [0.5, 1, 1.5, 2]
-  const changeSpeed = (s: number) => {
-    setSpeed(s)
-    if (ref.current) ref.current.playbackRate = s
-  }
   return (
-    <div>
-      <video ref={ref} src={src} controls style={{ width: '100%', maxHeight: 200, borderRadius: 4, ...style }} />
-      <div style={{ marginTop: 4, display: 'flex', gap: 4, justifyContent: 'center' }}>
-        {speeds.map(s => (
-          <Button key={s} size="small" type={speed === s ? 'primary' : 'default'}
-            onClick={() => changeSpeed(s)} style={{ fontSize: 11, lineHeight: '18px', height: 22, padding: '0 6px' }}>{s}x</Button>
-        ))}
-      </div>
+    <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginTop: 4 }}>
+      {speeds.map(s => (
+        <Button key={s} size="small" type={speed === s ? 'primary' : 'default'}
+          onClick={() => { setSpeed(s); document.querySelectorAll('video').forEach(v => { try { v.playbackRate = s } catch {} }) }}
+          style={{ fontSize: 11, lineHeight: '18px', height: 22, padding: '0 6px' }}>{s}x</Button>
+      ))}
     </div>
   )
 }
@@ -506,7 +498,8 @@ export default function StudioPage() {
                         <DeleteOutlined style={{ position: 'absolute', top: 8, right: 8, color: '#ff4d4f', cursor: 'pointer', fontSize: 14 }}
                           onClick={() => saveState({ composed_video: null })} />
                       </div>
-                      <VideoPlayer src={state.composed_video.url} />
+                      <video src={state.composed_video.url} controls style={{ width: '100%', maxHeight: 200, borderRadius: 4 }} />
+                      <SpeedBar />
                     </div>
                   ) : (
                     <div style={{ color: '#999', marginBottom: 12 }}>先在视频生成步骤合成视频</div>
@@ -563,7 +556,8 @@ export default function StudioPage() {
                         <DeleteOutlined style={{ position: 'absolute', top: 8, right: 8, color: '#ff4d4f', cursor: 'pointer', fontSize: 14 }}
                           onClick={() => saveState({ subbed_video: null })} />
                       </div>
-                      <VideoPlayer src={state.subbed_video.url} />
+                      <video src={state.subbed_video.url} controls style={{ width: '100%', maxHeight: 200, borderRadius: 4 }} />
+                      <SpeedBar />
                     </div>
                   )}
                 </Card>
@@ -576,7 +570,8 @@ export default function StudioPage() {
                   {state.subbed_video ? (
                     <div style={{ marginBottom: 16, padding: 12, background: '#e6f7ff', borderRadius: 4 }}>
                       <div style={{ fontWeight: 600, marginBottom: 8, color: '#1890ff' }}>📺 来自 ASR 的字幕视频</div>
-                      <VideoPlayer src={state.subbed_video.url} />
+                      <video src={state.subbed_video.url} controls style={{ width: '100%', maxHeight: 200, borderRadius: 4 }} />
+                      <SpeedBar />
                     </div>
                   ) : (
                     <div style={{ color: '#999', marginBottom: 12 }}>先在 ASR 步骤烧录字幕</div>
@@ -625,7 +620,8 @@ export default function StudioPage() {
                       <DeleteOutlined style={{ position: 'absolute', top: 8, right: 8, color: '#ff4d4f', cursor: 'pointer', fontSize: 14 }}
                         onClick={() => saveState({ bgm_mixed_video: null })} />
                     </div>
-                    <VideoPlayer src={state.bgm_mixed_video.url} />
+                    <video src={state.bgm_mixed_video.url} controls style={{ width: '100%', maxHeight: 200, borderRadius: 4 }} />
+                      <SpeedBar />
                   </div>
                 )}
               </div>
@@ -640,7 +636,8 @@ export default function StudioPage() {
                         <DeleteOutlined style={{ position: 'absolute', top: 8, right: 8, color: '#ff4d4f', cursor: 'pointer', fontSize: 14 }}
                           onClick={() => saveState({ bgm_mixed_video: null })} />
                       </div>
-                      <VideoPlayer src={state.bgm_mixed_video.url} />
+                      <video src={state.bgm_mixed_video.url} controls style={{ width: '100%', maxHeight: 200, borderRadius: 4 }} />
+                      <SpeedBar />
                       <Space direction="vertical" style={{ width: '100%', marginTop: 12 }}>
                         <a href={state.bgm_mixed_video.url} target="_blank" rel="noreferrer">
                           <Button icon={<PlayCircleOutlined />} block>预览视频</Button>

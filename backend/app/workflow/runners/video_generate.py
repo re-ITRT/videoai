@@ -81,6 +81,8 @@ async def run_video_generate(api_key: str, params: dict) -> dict:
             prompt += "4. 每个时间段的画面必须匹配该时间段内的台词内容和语气\n"
             prompt += "5. 参考图只用于产品外观参考，场景构图必须按照 visual_desc 执行\n"
             prompt += "6. 确保画面中的人物动作与描述完全一致（如：微笑、拿起、指向等）"
+            # 最后再加一遍文字禁令（recency effect）
+            prompt += "\n\n【🔴 重复一遍：画面中绝对不允许有任何文字/汉字/数字/符号出现】这是一个死命令。任何文字出现在画面中都将导致视频报废。只允许纯画面。"
             content_items.append({"type": "text", "text": prompt})
 
             body = {"model": MODEL_EP, "content": content_items, "return_last_frame": False}
