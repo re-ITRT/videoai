@@ -320,7 +320,7 @@ export default function StudioPage() {
         script_template: state.selected_template || 'default',
       }
       if (bgm) {
-        payload.bgm_url = bgm.image_url
+        payload.bgm_url = bgm.image_url?.startsWith('http') ? bgm.image_url : `http://114.117.242.17:3000${bgm.image_url}`
         payload.bgm_name = bgm.name || ''
       }
       const res: any = await request.post('/published/export', payload, { timeout: 300000 })
@@ -569,14 +569,17 @@ export default function StudioPage() {
                 </Card>
                 {selectedBgmId && state.subbed_video && (
                   <div style={{ textAlign: 'center', marginTop: 8 }}>
-                    <Button type="primary" icon={<SoundOutlined />} loading={burningSub} onClick={async () => {
+                    <Button type="primary" icon={<SoundOutlined />} loading={burningSub}                      onClick={async () => {
                       const bgm = bgmMaterials.find((m: any) => m.id === selectedBgmId)
-                      if (!bgm || !stateRef.current.subbed_video) return
+                      if (!bgm) { message.warning('BGM 未找到'); return }
+                      if (!stateRef.current.subbed_video) { message.warning('请先在 ASR 步骤烧录字幕'); return }
                       setBurningSub(true)
                       try {
+                        // image_url 可能是相对路径，转成完整 URL
+                        const bgmUrl = bgm.image_url?.startsWith('http') ? bgm.image_url : `http://114.117.242.17:3000${bgm.image_url}`
                         const res: any = await request.post('/studio/burn-subtitles', {
                           video_url: stateRef.current.subbed_video.url, segments: [],
-                          session_id: sessionIdRef.current, bgm_url: bgm.image_url
+                          session_id: sessionIdRef.current, bgm_url: bgmUrl
                         }, { timeout: 600000 })
                         if (res?.url) {
                           saveState({ bgm_mixed_video: { id: Date.now(), url: res.url } })
