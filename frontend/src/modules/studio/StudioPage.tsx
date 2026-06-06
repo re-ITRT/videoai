@@ -20,6 +20,7 @@ export default function StudioPage() {
     selected_material_ids: [], collections: [], selected_template: '',
     clip_collections: [], selected_clip_collection_id: null,
     final_videos: [], scripts: [], selected_script_id: null, exports: [], selected_export_id: null, asrResults: {},
+    composed_video: null, subbed_video: null, bgm_mixed_video: null,
   })
   const stateRef = useRef(state)
   stateRef.current = state
@@ -74,7 +75,14 @@ export default function StudioPage() {
         const allClips = r.clips || []
         const subbedUrls = r.subbed_videos || []
         setState((prev: any) => ({ ...prev, final_videos: fv }))
-        if (subbedUrls.length > 0) setSubbedUrl(subbedUrls[subbedUrls.length - 1].url)
+        // 恢复 pipeline：composed_video = 最新 final_video, subbed_video = 最新 subbed_video
+        const patchState: any = {}
+        if (fv.length > 0) patchState.composed_video = fv[fv.length - 1]
+        if (subbedUrls.length > 0) {
+          patchState.subbed_video = subbedUrls[subbedUrls.length - 1]
+          setSubbedUrl(subbedUrls[subbedUrls.length - 1].url)
+        }
+        if (Object.keys(patchState).length > 0) setState((prev: any) => ({ ...prev, ...patchState }))
         // 如果 clip_collections 为空但服务器有 clip，只取最新的4个场景的clip
         if ((!stateRef.current.clip_collections || stateRef.current.clip_collections.length === 0) && allClips.length > 0) {
           const sorted = [...allClips].sort((a: any, b: any) => b.id - a.id)
@@ -281,32 +289,20 @@ export default function StudioPage() {
     return []
   }
 
-  // 合成视频 → 自动 ASR + 字幕烧录
+  // 合成视频（纯合成，不自动ASR，输出给ASR步骤）
   const composeVid = async () => {
     const st = stateRef.current
     const coll = (st.clip_collections || []).find((c: any) => c.id === st.selected_clip_collection_id)
     if (!coll || !coll.clips?.length) return message.warning('请先选择视频片段集合')
     setGenerating('合成视频')
     try {
-      await request.post('/studio/compose-video', { session_id: sessionIdRef.current, clip_ids: coll.clips.map((c: any) => c.id) })
-      message.success('合成完成')
-      const fv = await loadClips()
-      // 合成后自动 ASR + 字幕烧录（用最新的 final_video）
-      if (fv?.length > 0) {
-        const vid = fv[fv.length - 1]
-        message.info('自动进行语音识别...')
-        try {
-          const asrRes: any = await request.post('/studio/asr', { video_url: vid.url, session_id: sessionIdRef.current }, { timeout: 600000 })
-          if (asrRes?.segments?.length) {
-            setAsrResults(prev => { const nr = {...prev, [vid.id]: asrRes}; saveState({ asrResults: nr }); return nr })
-            message.info('自动生成字幕...')
-            const burnRes: any = await request.post('/studio/burn-subtitles', { video_url: vid.url, segments: asrRes.segments, session_id: sessionIdRef.current }, { timeout: 600000 })
-            if (burnRes?.url) {
-              setSubbedUrl(burnRes.url)
-              message.success('字幕视频已生成')
-            }
-          }
-        } catch { message.warning('ASR 识别失败，可手动重试') }
+      const res: any = await request.post('/studio/compose-video', { session_id: sessionIdRef.current, clip_ids: coll.clips.map((c: any) => c.id) })
+      if (res?.videos?.length > 0) {
+        const vid = res.videos[0]
+        saveState({ composed_video: vid })
+        message.success('合成完成，前往 ASR 校准步骤')
+      } else {
+        message.error('合成失败')
       }
     } catch { message.error('合成失败') }
     setGenerating(null)
@@ -333,13 +329,14 @@ export default function StudioPage() {
   }
 
   const doExport = async () => {
-    if (!subbedUrl) return
+    const mv = stateRef.current.bgm_mixed_video
+    if (!mv) return message.warning('请先在 BGM 步骤合成视频')
     setExporting(true)
     try {
       const bgmId = selectedBgmId
       const bgm = bgmId ? bgmMaterials.find((m: any) => m.id === bgmId) : null
       const payload: any = {
-        video_url: subbedUrl,
+        video_url: mv.url,
         title: state.session_name || '导出视频',
         session_id: sessionId,
         script_template: state.selected_template || 'default',
@@ -502,63 +499,65 @@ export default function StudioPage() {
             {step === 5 && (
               <div>
                 <Card title="ASR 校准" size="small" style={{ minHeight: 400 }}>
-                  {/* 视频列表 */}
-                  {(stateRef.current.final_videos || []).length === 0 ? (
-                    <div style={{ color: '#999', marginBottom: 12 }}>合成视频后在此校准 ASR 字幕</div>
+                  {/* 来自步骤4的合成视频 */}
+                  {state.composed_video ? (
+                    <div style={{ marginBottom: 16, padding: 12, background: '#f6ffed', borderRadius: 4 }}>
+                      <div style={{ fontWeight: 600, marginBottom: 8 }}>📹 来自视频生成的合成视频</div>
+                      <video src={state.composed_video.url} controls style={{ width: '100%', maxHeight: 200, borderRadius: 4 }} />
+                    </div>
                   ) : (
-                    <List size="small" dataSource={stateRef.current.final_videos} renderItem={(v: any) => {
-                      const hasAsr = asrResults[v.id]
-                      return (
-                        <List.Item onClick={() => {
-                          setSelectedAsrVideo(v.id)
-                          if (!hasAsr) runAsr(v.id, v.url)
-                          else setEditedSegments(asrResults[v.id]?.segments?.map((s: any) => s.text) || [])
-                        }}
-                          style={{ cursor: 'pointer', background: selectedAsrVideo === v.id ? '#e6f4ff' : undefined }}
-                          actions={[
-                            !hasAsr ? <Button key="go" size="small" type="link" loading={asrLoadingId === v.id}>ASR中...</Button>
-                              : <Tag key="done" color="green">已识别</Tag>,
-                            <DeleteOutlined key="del" style={{ color: asrLoadingId === v.id ? '#d9d9d9' : '#ff4d4f', fontSize: 12 }}
-                              onClick={e => { e.stopPropagation(); deleteFinalVideo(v.id) }} />
-                          ]}>
-                          <Space><PlayCircleOutlined /><span>视频 {v.id}</span></Space>
-                        </List.Item>
-                      )
-                    }} />
+                    <div style={{ color: '#999', marginBottom: 12 }}>先在视频生成步骤合成视频</div>
                   )}
-                  {/* ASR 结果 */}
+                  {/* ASR 操作 */}
+                  {state.composed_video && (
+                    <div style={{ marginBottom: 12 }}>
+                      <Space>
+                        <Button size="small" loading={asrLoadingId === state.composed_video.id}
+                          onClick={async () => {
+                            await runAsr(state.composed_video.id, state.composed_video.url)
+                            setSelectedAsrVideo(state.composed_video.id)
+                          }}>🎤 语音识别</Button>
+                      </Space>
+                    </div>
+                  )}
+                  {/* ASR 结果编辑 */}
                   {selectedAsrVideo && asrResults[selectedAsrVideo]?.segments?.length > 0 && (
-                    <div style={{ marginTop: 16 }}>
+                    <div>
                       <div style={{ fontWeight: 600, marginBottom: 8 }}>🎤 ASR 识别结果（点击文本可编辑）</div>
-                      <div style={{ maxHeight: 300, overflow: 'auto', fontSize: 12 }}>
+                      <div style={{ maxHeight: 200, overflow: 'auto', fontSize: 12 }}>
                         {asrResults[selectedAsrVideo].segments.map((seg: any, i: number) => (
-                          <div key={i} style={{ padding: '6px 0', borderBottom: '1px solid #f0f0f0' }}>
-                            <Tag style={{ fontSize: 10, marginBottom: 2 }}>{seg.start}-{seg.end}s</Tag>
+                          <div key={i} style={{ padding: '4px 0', borderBottom: '1px solid #f0f0f0' }}>
+                            <Tag style={{ fontSize: 10 }}>{seg.start}-{seg.end}s</Tag>
                             <Input.TextArea value={editedSegments?.[i] ?? seg.text}
                               onChange={e => { const ne = [...(editedSegments || [])]; ne[i] = e.target.value; setEditedSegments(ne) }}
-                              rows={1} style={{ fontSize: 12, width: '100%' }} />
+                              rows={1} style={{ fontSize: 12 }} />
                           </div>
                         ))}
                       </div>
                       <Space style={{ marginTop: 12 }}>
                         <Button type="primary" size="small" loading={burningSub} onClick={async () => {
-                          const fv = stateRef.current.final_videos?.find((x: any) => x.id === selectedAsrVideo)
-                          if (!fv) return
+                          const vid = stateRef.current.composed_video
+                          if (!vid) return
                           const segments = asrResults[selectedAsrVideo].segments.map((s: any, i: number) => ({ ...s, text: editedSegments?.[i] ?? s.text }))
                           setBurningSub(true)
                           try {
-                            const bgmId = selectedBgmId
-                            const bgm = bgmId ? bgmMaterials.find((m: any) => m.id === bgmId) : null
-                            const payload: any = { video_url: fv.url, segments, session_id: sessionIdRef.current }
-                            if (bgm) payload.bgm_url = bgm.image_url
-                            const res: any = await request.post('/studio/burn-subtitles', payload, { timeout: 600000 })
-                            if (res?.url) setSubbedUrl(res.url)
-                            message.success('字幕已烧录')
+                            const res: any = await request.post('/studio/burn-subtitles', { video_url: vid.url, segments, session_id: sessionIdRef.current }, { timeout: 600000 })
+                            if (res?.url) {
+                              saveState({ subbed_video: { id: Date.now(), url: res.url } })
+                              message.success('字幕已烧录，前往 BGM 步骤')
+                            }
                           } catch { message.error('烧录失败') }
                           setBurningSub(false)
-                        }}>🔥 烧录字幕</Button>
+                        }}>🔥 烧录字幕 → 传给 BGM</Button>
                         <Button size="small" onClick={() => setEditedSegments(asrResults[selectedAsrVideo]?.segments?.map((s: any) => s.text) || [])}>重置</Button>
                       </Space>
+                    </div>
+                  )}
+                  {/* 预览已烧录的字幕视频 */}
+                  {state.subbed_video && (
+                    <div style={{ marginTop: 16, padding: 12, background: '#e6f7ff', borderRadius: 4 }}>
+                      <div style={{ fontWeight: 600, marginBottom: 8, color: '#1890ff' }}>✅ 字幕视频已就绪 → 传给 BGM</div>
+                      <video src={state.subbed_video.url} controls style={{ width: '100%', maxHeight: 200, borderRadius: 4 }} />
                     </div>
                   )}
                 </Card>
@@ -567,20 +566,16 @@ export default function StudioPage() {
             {step === 6 && (
               <div>
                 <Card title="BGM 选择" size="small" extra={<Button size="small" icon={<CustomerServiceOutlined />} onClick={loadBgmMaterials}>刷新</Button>} style={{ minHeight: 400 }}>
-                  {/* 字幕视频列表 */}
-                  {(stateRef.current.final_videos || []).length === 0 ? (
-                    <div style={{ color: '#999', marginBottom: 12 }}>先在 ASR 步骤烧录字幕</div>
-                  ) : (
-                    <div style={{ marginBottom: 12 }}>
-                      <div style={{ fontWeight: 500, fontSize: 12, marginBottom: 4 }}>选择字幕视频：</div>
-                      <List size="small" dataSource={stateRef.current.final_videos} renderItem={(v: any) => (
-                        <List.Item onClick={() => setSubbedUrl(v.url)}
-                          style={{ cursor: 'pointer', background: subbedUrl === v.url ? '#e6f4ff' : undefined }}>
-                          <Space><PlayCircleOutlined /><span style={{ fontSize: 13 }}>视频 {v.id}</span></Space>
-                        </List.Item>
-                      )} />
+                  {/* 来自 ASR 的字幕视频 */}
+                  {state.subbed_video ? (
+                    <div style={{ marginBottom: 16, padding: 12, background: '#e6f7ff', borderRadius: 4 }}>
+                      <div style={{ fontWeight: 600, marginBottom: 8, color: '#1890ff' }}>📺 来自 ASR 的字幕视频</div>
+                      <video src={state.subbed_video.url} controls style={{ width: '100%', maxHeight: 200, borderRadius: 4 }} />
                     </div>
+                  ) : (
+                    <div style={{ color: '#999', marginBottom: 12 }}>先在 ASR 步骤烧录字幕</div>
                   )}
+                  {/* BGM 列表 */}
                   <div style={{ fontWeight: 500, fontSize: 12, marginBottom: 4 }}>选择 BGM：</div>
                   {bgmMaterials.length === 0 ? <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>暂无音频素材</div> : (
                     <List size="small" dataSource={bgmMaterials} renderItem={(m: any) => (
@@ -594,47 +589,54 @@ export default function StudioPage() {
                     )} />
                   )}
                 </Card>
-                {selectedBgmId && subbedUrl && (
+                {selectedBgmId && state.subbed_video && (
                   <div style={{ textAlign: 'center', marginTop: 8 }}>
                     <Button type="primary" icon={<SoundOutlined />} loading={burningSub} onClick={async () => {
                       const bgm = bgmMaterials.find((m: any) => m.id === selectedBgmId)
-                      if (!bgm || !subbedUrl) return
+                      if (!bgm || !stateRef.current.subbed_video) return
                       setBurningSub(true)
                       try {
                         const res: any = await request.post('/studio/burn-subtitles', {
-                          video_url: subbedUrl, segments: [],
+                          video_url: stateRef.current.subbed_video.url, segments: [],
                           session_id: sessionIdRef.current, bgm_url: bgm.image_url
                         }, { timeout: 600000 })
                         if (res?.url) {
-                          const exp = { id: Date.now(), video_url: res.url, title: state.session_name || '导出视频', bgm_name: bgm.name || '', created_at: new Date().toISOString() }
-                          const exports = [...(stateRef.current.exports || []), exp]
-                          saveState({ exports, selected_export_id: exp.id })
-                          message.success('合成完成！已添加到导出列表')
+                          saveState({ bgm_mixed_video: { id: Date.now(), url: res.url } })
+                          message.success('BGM 合成完成！前往导出步骤')
                         }
                       } catch { message.error('合成失败') }
                       setBurningSub(false)
-                    }}>🎵 合成带 BGM 视频</Button>
+                    }}>🎵 合成 BGM → 传给导出</Button>
                   </div>
                 )}
-                {selectedBgmId && !subbedUrl && <Tag color="orange" style={{ marginTop: 8 }}>请先选择一个字幕视频</Tag>}
+                {/* 预览 BGM 混合结果 */}
+                {state.bgm_mixed_video && (
+                  <div style={{ marginTop: 16, padding: 12, background: '#f6ffed', borderRadius: 4 }}>
+                    <div style={{ fontWeight: 600, marginBottom: 8, color: '#52c41a' }}>✅ BGM 混合完成 → 前往导出</div>
+                    <video src={state.bgm_mixed_video.url} controls style={{ width: '100%', maxHeight: 200, borderRadius: 4 }} />
+                  </div>
+                )}
               </div>
             )}
             {step === 7 && (
               <div>
                 <Card title="导出" size="small" style={{ minHeight: 400 }}>
-                  {/* 当前视频 */}
-                  {subbedUrl && (
+                  {/* 来自 BGM 的混合视频 */}
+                  {state.bgm_mixed_video ? (
                     <div style={{ marginBottom: 16, padding: 12, background: '#f6ffed', borderRadius: 4 }}>
-                      <div style={{ fontWeight: 600, marginBottom: 8, color: '#52c41a' }}>✅ 当前视频已就绪</div>
-                      <Space direction="vertical" style={{ width: '100%' }}>
-                        <a href={subbedUrl} target="_blank" rel="noreferrer" style={{ width: '100%' }}>
-                          <Button icon={<PlayCircleOutlined />} block>查看视频</Button>
+                      <div style={{ fontWeight: 600, marginBottom: 8, color: '#52c41a' }}>✅ 来自 BGM 的最终视频</div>
+                      <video src={state.bgm_mixed_video.url} controls style={{ width: '100%', maxHeight: 200, borderRadius: 4 }} />
+                      <Space direction="vertical" style={{ width: '100%', marginTop: 12 }}>
+                        <a href={state.bgm_mixed_video.url} target="_blank" rel="noreferrer">
+                          <Button icon={<PlayCircleOutlined />} block>预览视频</Button>
                         </a>
                         <Button type="primary" icon={<VideoCameraOutlined />} loading={exporting} onClick={doExport} block>
                           {selectedBgmId ? '导出（含BGM）' : '导出'}
                         </Button>
                       </Space>
                     </div>
+                  ) : (
+                    <div style={{ color: '#999', marginBottom: 16, padding: 20, textAlign: 'center' }}>先在 BGM 步骤合成最终视频</div>
                   )}
                   {/* 已导出的列表 */}
                   {(state.exports || []).length > 0 && (
