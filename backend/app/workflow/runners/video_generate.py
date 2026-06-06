@@ -65,9 +65,9 @@ async def run_video_generate(api_key: str, params: dict) -> dict:
             for ref_img in scene.get("reference_images", []):
                 content_items.append({
                     "type": "image_url",
+                    "role": "reference_image",
                     "image_url": {
                         "url": ref_img.get("url"),
-                        "role": ref_img.get("role", "reference_image"),
                     }
                 })
 
@@ -85,9 +85,9 @@ async def run_video_generate(api_key: str, params: dict) -> dict:
                     url = f"http://114.117.242.17:3000{signed}"
                     content_items.append({
                         "type": "image_url",
+                        "role": "reference_image",
                         "image_url": {
                             "url": url,
-                            "role": "reference_image",
                         }
                     })
                 except Exception as e:
@@ -127,10 +127,7 @@ async def run_video_generate(api_key: str, params: dict) -> dict:
             prompt += "6. 确保画面中的人物动作与描述完全一致（如：微笑、拿起、指向等）"
             content_items.append({"type": "text", "text": prompt})
 
-            for ci in content_items:
-                if ci.get("type") == "image_url":
-                    iu = ci.get("image_url", {})
-                    print(f"[seedance] img: role={iu.get("role","MISSING")} url={iu.get("url","")[:60]}")
+# image debug removed
             body = {"model": MODEL_EP, "content": content_items, "return_last_frame": False}
             if aspect_ratio:
                 body["ratio"] = aspect_ratio
