@@ -479,8 +479,11 @@ export default function StudioPage() {
                 <Card title="ASR 校准" size="small" style={{ minHeight: 400 }}>
                   {/* 来自步骤4的合成视频 */}
                   {state.composed_video ? (
-                    <div style={{ marginBottom: 16, padding: 12, background: '#f6ffed', borderRadius: 4 }}>
-                      <div style={{ fontWeight: 600, marginBottom: 8 }}>📹 来自视频生成的合成视频</div>
+                    <div style={{ marginBottom: 16, padding: 12, background: '#f6ffed', borderRadius: 4, position: 'relative' }}>
+                      <div style={{ fontWeight: 600, marginBottom: 8 }}>📹 来自视频生成的合成视频
+                        <DeleteOutlined style={{ position: 'absolute', top: 8, right: 8, color: '#ff4d4f', cursor: 'pointer', fontSize: 14 }}
+                          onClick={() => saveState({ composed_video: null })} />
+                      </div>
                       <video src={state.composed_video.url} controls style={{ width: '100%', maxHeight: 200, borderRadius: 4 }} />
                     </div>
                   ) : (
@@ -533,8 +536,11 @@ export default function StudioPage() {
                   )}
                   {/* 预览已烧录的字幕视频 */}
                   {state.subbed_video && (
-                    <div style={{ marginTop: 16, padding: 12, background: '#e6f7ff', borderRadius: 4 }}>
-                      <div style={{ fontWeight: 600, marginBottom: 8, color: '#1890ff' }}>✅ 字幕视频已就绪 → 传给 BGM</div>
+                    <div style={{ marginTop: 16, padding: 12, background: '#e6f7ff', borderRadius: 4, position: 'relative' }}>
+                      <div style={{ fontWeight: 600, marginBottom: 8, color: '#1890ff' }}>✅ 字幕视频已就绪 → 传给 BGM
+                        <DeleteOutlined style={{ position: 'absolute', top: 8, right: 8, color: '#ff4d4f', cursor: 'pointer', fontSize: 14 }}
+                          onClick={() => saveState({ subbed_video: null })} />
+                      </div>
                       <video src={state.subbed_video.url} controls style={{ width: '100%', maxHeight: 200, borderRadius: 4 }} />
                     </div>
                   )}
@@ -592,8 +598,11 @@ export default function StudioPage() {
                 )}
                 {/* 预览 BGM 混合结果 */}
                 {state.bgm_mixed_video && (
-                  <div style={{ marginTop: 16, padding: 12, background: '#f6ffed', borderRadius: 4 }}>
-                    <div style={{ fontWeight: 600, marginBottom: 8, color: '#52c41a' }}>✅ BGM 混合完成 → 前往导出</div>
+                  <div style={{ marginTop: 16, padding: 12, background: '#f6ffed', borderRadius: 4, position: 'relative' }}>
+                    <div style={{ fontWeight: 600, marginBottom: 8, color: '#52c41a' }}>✅ BGM 混合完成 → 前往导出
+                      <DeleteOutlined style={{ position: 'absolute', top: 8, right: 8, color: '#ff4d4f', cursor: 'pointer', fontSize: 14 }}
+                        onClick={() => saveState({ bgm_mixed_video: null })} />
+                    </div>
                     <video src={state.bgm_mixed_video.url} controls style={{ width: '100%', maxHeight: 200, borderRadius: 4 }} />
                   </div>
                 )}
@@ -604,8 +613,11 @@ export default function StudioPage() {
                 <Card title="导出" size="small" style={{ minHeight: 400 }}>
                   {/* 来自 BGM 的混合视频 */}
                   {state.bgm_mixed_video ? (
-                    <div style={{ marginBottom: 16, padding: 12, background: '#f6ffed', borderRadius: 4 }}>
-                      <div style={{ fontWeight: 600, marginBottom: 8, color: '#52c41a' }}>✅ 来自 BGM 的最终视频</div>
+                    <div style={{ marginBottom: 16, padding: 12, background: '#f6ffed', borderRadius: 4, position: 'relative' }}>
+                      <div style={{ fontWeight: 600, marginBottom: 8, color: '#52c41a' }}>✅ 来自 BGM 的最终视频
+                        <DeleteOutlined style={{ position: 'absolute', top: 8, right: 8, color: '#ff4d4f', cursor: 'pointer', fontSize: 14 }}
+                          onClick={() => saveState({ bgm_mixed_video: null })} />
+                      </div>
                       <video src={state.bgm_mixed_video.url} controls style={{ width: '100%', maxHeight: 200, borderRadius: 4 }} />
                       <Space direction="vertical" style={{ width: '100%', marginTop: 12 }}>
                         <a href={state.bgm_mixed_video.url} target="_blank" rel="noreferrer">
