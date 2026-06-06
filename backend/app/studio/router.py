@@ -222,6 +222,7 @@ async def studio_generate_video(body: dict, db: AsyncSession = Depends(get_db), 
     aspect_ratio = body.get("aspect_ratio", "9:16")
     params = {
         "workflow_type": "generate",
+        "session_id": session_id,
         "script": {
             "title": title or script_body.get("title", f"视频_{session_id}"),
             "style": style or "电商带货",
@@ -233,6 +234,7 @@ async def studio_generate_video(body: dict, db: AsyncSession = Depends(get_db), 
                 "visual_desc": s.get("visual_desc", ""),
                 "duration": s.get("duration", 5),
                 "lines": s.get("lines", []),
+                "text_overlays": s.get("text_overlays", []),
                 "reference_images": s.get("reference_images", []),
             } for i, s in enumerate(scenes)],
         },
