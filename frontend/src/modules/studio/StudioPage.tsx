@@ -131,12 +131,6 @@ export default function StudioPage() {
     } catch {}
   }
 
-  const deleteFinalVideo = async (id: number) => {
-    try { await request.post('/studio/delete-clip', { clip_id: id }) } catch { return message.error('删除失败') }
-    const videos = (stateRef.current.final_videos || []).filter((v: any) => v.id !== id)
-    saveState({ final_videos: videos })
-  }
-
   const deleteSession = async (sid: number) => {
     try { await request.delete(`/agent/sessions/${sid}`); setSessions(s => s.filter(x => x.id !== sid)); if (sessionId === sid) setSessionId(null) } catch {}
   }
@@ -271,22 +265,6 @@ export default function StudioPage() {
     } catch { message.error('生成失败') }
     setGenerating(null)
     generatingRef.current = false
-  }
-
-  const loadClips = async () => {
-    const sid = sessionIdRef.current
-    if (!sid) return []
-    try {
-      const res: any = await request.get(`/studio/clips/${sid}`)
-      if (res) {
-        const fv = res.final_videos || []
-        const subbedUrls = res.subbed_videos || []
-        saveState({ final_videos: fv })
-        if (subbedUrls.length > 0) setSubbedUrl(subbedUrls[subbedUrls.length - 1].url)
-        return fv
-      }
-    } catch {}
-    return []
   }
 
   // 合成视频（纯合成，不自动ASR，输出给ASR步骤）
