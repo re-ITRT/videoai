@@ -47,7 +47,7 @@
     - tone: 语气语调
     - start_sec: 在该场景中开始秒数（从0开始）
     - end_sec: 在该场景中结束秒数（🔴 死规定：最后一条 line 的 end_sec ≤ duration - 1，即结束前至少留1秒无声过渡。duration=4→≤3.0，8→≤7.0，12→≤11.0）
-    - text: 台词内容（🔴 死规定：字数 ≤ (end_sec - start_sec) × 4，即每秒最多4个字）
+    - text: 台词内容（🔴 死规定：字数 ≤ (end_sec - start_sec) × 3，即每秒最多3个字）
   - text_overlays: 画面文字列表（选填），所有需要在画面中展示的文字写在这里，不要写在 visual_desc 里
     - text: 文字内容
     - x: 水平位置百分比（0=最左，50=居中，100=最右，默认50）
