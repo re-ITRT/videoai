@@ -168,6 +168,10 @@ async def run_video_generate(api_key: str, params: dict) -> dict:
                 prompt += "\n7. 已传入参考图（图中可能包含文字），请在视频中呈现同样的效果"
             content_items.append({"type": "text", "text": prompt})
 
+            import json as _json
+            print(f"[seedance] scene {scene_id}: FULL_JSON({len(content_items)} items)")
+            # 只打印前2000字符避免刷屏
+            print(_json.dumps(body, indent=2, ensure_ascii=False)[:2000])
             body = {"model": MODEL_EP, "content": content_items, "return_last_frame": False}
             if aspect_ratio:
                 body["ratio"] = aspect_ratio
