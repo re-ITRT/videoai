@@ -170,7 +170,8 @@ async def run_video_generate(api_key: str, params: dict) -> dict:
 
             body = {"model": MODEL_EP, "content": content_items, "return_last_frame": False}
             import json as _json
-            print(f"[seedance] scene {scene_id}: FULL_JSON({len(content_items)} items, ref_imgs={sum(1 for c in content_items if c.get("type")=="image_url")})")
+            ref_count = sum(1 for c in content_items if c.get("type") == "image_url")
+            print(f"[seedance] scene {scene_id}: FULL_JSON({len(content_items)} items, ref_imgs={ref_count})")
             print(_json.dumps(body, indent=2, ensure_ascii=False)[:2000])
             if aspect_ratio:
                 body["ratio"] = aspect_ratio
