@@ -11,33 +11,6 @@ MODEL_EP = "ep-20260514120705-pqv86"  # Doubao-Seedance-1.5-pro
 FONT_PATH = "/usr/share/fonts/truetype/wqy/msyh.ttc"  # 微软雅黑（fontconfig 已注册）
 
 
-def render_text_overlay(overlay: dict, out_path: str, img_w: int = 720, img_h: int = 1280):
-    """将文字渲染到透明背景 PNG（白色文字+黑色描边，适合作为 Seedance 参考图）"""
-    text = overlay.get("text", "")
-    x_pct = overlay.get("x", 50)
-    y_pct = overlay.get("y", 50)
-    font_size = overlay.get("font_size", 36)
-    color = overlay.get("color", "#FFFFFF")
-    align = overlay.get("align", "center")
-
-    img = Image.new("RGBA", (img_w, img_h), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-    font = ImageFont.truetype(FONT_PATH, font_size)
-
-    bbox = draw.textbbox((0, 0), text, font=font)
-    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
-    cx, cy = int(img_w * x_pct / 100), int(img_h * y_pct / 100)
-    x = cx - tw // 2 if align == "center" else cx - tw if align == "right" else cx
-    y = cy - th // 2
-
-    r, g, b = int(color[1:3], 16), int(color[3:5], 16), int(color[5:7], 16)
-    # 黑色描边（加粗提高可读性）
-    offsets = [(-2,-2),(-2,2),(2,-2),(2,2),(-1,-1),(-1,1),(1,-1),(1,1),(0,0)]
-    for ox, oy in offsets:
-        draw.text((x+ox, y+oy), text, font=font,
-                  fill=(r,g,b,255) if ox==0 and oy==0 else (0,0,0,200))
-    img.save(out_path, "PNG")
-
 
 async def run_video_generate(api_key: str, params: dict) -> dict:
     """
@@ -65,98 +38,92 @@ async def run_video_generate(api_key: str, params: dict) -> dict:
             scene_id = scene.get("scene_id", i + 1)
 
             content_items = []
+            ref_images = scene.get("reference_images", [])
+            text_overlays = scene.get("text_overlays", [])
+            has_text = len(text_overlays) > 0
+            has_ref = len(ref_images) > 0
 
-            # 1. 素材参考图
-            for ref_img in scene.get("reference_images", []):
+            # 只有文字没有图 → 创建一张纯文字图
+            # 有图有文字 → 网格排列参考图 + 底部文字条
+            # 有图无文字 → 网格排列参考图
+            # 无图无文字 → 不传图片
+            if has_ref or has_text:
+                import httpx as _hx
+                from PIL import Image as _PImg, ImageDraw as _PDraw, ImageFont as _PFont
+                import io as _io
+
+                # 下载所有参考图
+                ref_imgs = []
+                if has_ref:
+                    async with _hx.AsyncClient(timeout=30) as _dl:
+                        for ri in ref_images[:4]:  # 最多4张
+                            url = ri.get("url", "")
+                            if url:
+                                try:
+                                    resp = await _dl.get(url, timeout=10)
+                                    if resp.status_code == 200:
+                                        img = _PImg.open(_io.BytesIO(resp.content)).convert("RGB")
+                                        ref_imgs.append(img)
+                                except:
+                                    pass
+
+                n = len(ref_imgs)
+                # 网格布局
+                cell_w, cell_h = 360, 640  # 单格尺寸
+                if n <= 1:
+                    cols, rows = 1, 1
+                    gw, gh = cell_w, cell_h
+                elif n == 2:
+                    cols, rows = 2, 1
+                    gw, gh = cell_w * 2, cell_h
+                elif n <= 4:
+                    cols, rows = 2, 2
+                    gw, gh = cell_w * 2, cell_h * 2
+
+                # 文字条高度
+                text_bar_h = 0
+                if has_text:
+                    text_bar_h = 30 + len(text_overlays) * 36
+
+                canvas = _PImg.new("RGB", (gw, gh + text_bar_h), (30, 30, 30))
+                # 贴参考图
+                for idx2, img in enumerate(ref_imgs[:4]):
+                    cx = (idx2 % cols) * cell_w
+                    cy = (idx2 // cols) * cell_h
+                    thumb = img.resize((cell_w, cell_h), _PImg.LANCZOS)
+                    canvas.paste(thumb, (cx, cy))
+
+                # 贴文字
+                if has_text:
+                    draw = _PDraw.Draw(canvas)
+                    font = _PFont.truetype(FONT_PATH, 28)
+                    y_pos = gh + 10
+                    for to in text_overlays:
+                        txt = to.get("text", "")
+                        bbox = draw.textbbox((0, 0), txt, font=font)
+                        tw = bbox[2] - bbox[0]
+                        x_pos = (gw - tw) // 2
+                        r_c, g_c, b_c = 255, 255, 255
+                        for ox, oy in [(-1,-1),(-1,1),(1,-1),(1,1),(0,0)]:
+                            draw.text((x_pos+ox, y_pos+oy), txt, font=font,
+                                      fill=(r_c,g_c,b_c,255) if ox==0 and oy==0 else (0,0,0,200))
+                        y_pos += 32
+
+                # 保存合成图
+                comp_name = f"grid_{session_id}_{scene_id}_{uuid.uuid4().hex[:8]}.jpg"
+                comp_path = os.path.join(text_dir, comp_name)
+                canvas.save(comp_path, "JPEG", quality=92)
+                signed = generate_signed_url(
+                    comp_path.replace("/app/uploads", "/uploads"),
+                    expire_seconds=86400
+                )
                 content_items.append({
                     "type": "image_url",
                     "image_url": {
-                        "url": ref_img.get("url"),
-                        "role": ref_img.get("role", "reference_image"),
+                        "url": f"http://114.117.242.17:3000{signed}",
+                        "role": "reference_image",
                     }
                 })
-
-            # 2. 文字 overlay 渲染到素材参考图上（合并为一张图，避免多图触发 role 校验问题）
-            text_overlays = scene.get("text_overlays", [])
-            if text_overlays:
-                ref_images = scene.get("reference_images", [])
-                # 取第一张参考图作为底图，在上面叠加文字
-                import httpx as _hx
-                first_ref = ref_images[0]["url"] if ref_images else None
-                if first_ref:
-                    # 下载参考图，文字拼接到底部（不遮挡画面）
-                    try:
-                        async with _hx.AsyncClient(timeout=15) as _c:
-                            _r = await _c.get(first_ref)
-                            if _r.status_code == 200:
-                                from PIL import Image as _PImg, ImageDraw as _PDraw, ImageFont as _PFont
-                                import io as _io
-                                ref_img = _PImg.open(_io.BytesIO(_r.content)).convert("RGB")
-                                rw, rh = ref_img.size
-                                # 底部拼接文字区（占高度20%）
-                                text_h = max(120, rh // 5)
-                                canvas = _PImg.new("RGB", (rw, rh + text_h), (30, 30, 30))
-                                canvas.paste(ref_img, (0, 0))
-                                draw = _PDraw.Draw(canvas)
-                                font = _PFont.truetype(FONT_PATH, max(24, text_h // 4))
-                                y_off = rh + 10
-                                for to in text_overlays:
-                                    text = to.get("text","")
-                                    color = to.get("color","#FFFFFF")
-                                    align = to.get("align","center")
-                                    bbox = draw.textbbox((0,0), text, font=font)
-                                    tw, th = bbox[2]-bbox[0], bbox[3]-bbox[1]
-                                    cx = rw // 2
-                                    x = cx-tw//2 if align=="center" else 10 if align=="left" else rw-tw-10
-                                    r_c, g_c, b_c = int(color[1:3],16), int(color[3:5],16), int(color[5:7],16)
-                                    for ox,oy in [(-1,-1),(-1,1),(1,-1),(1,1),(0,0)]:
-                                        draw.text((x+ox, y_off+oy), text, font=font, fill=(r_c,g_c,b_c,255) if ox==0 and oy==0 else (0,0,0,200))
-                                    y_off += text_h // len(text_overlays)
-                                splice_path = os.path.join(text_dir, f"splice_{scene_id}_{uuid.uuid4().hex[:8]}.jpg")
-                                canvas.save(splice_path, "JPEG", quality=92)
-                                signed = generate_signed_url(
-                                    splice_path.replace("/app/uploads", "/uploads"),
-                                    expire_seconds=86400
-                                )
-                                content_items[0]["image_url"]["url"] = f"http://114.117.242.17:3000{signed}"
-                    except Exception as e:
-                        print(f"[text_overlay] splice failed: {e}")
-                else:
-                    # 无参考图：纯色背景 + 底部文字
-                    try:
-                        from PIL import Image as _PImg2, ImageDraw as _PDraw2, ImageFont as _PFont2
-                        canvas = _PImg2.new("RGB", (720, 1280), (240, 240, 240))
-                        draw = _PDraw2.Draw(canvas)
-                        font = _PFont2.truetype(FONT_PATH, 36)
-                        y_off = 1280 - 200
-                        for to in text_overlays:
-                            text = to.get("text","")
-                            color = to.get("color","#FFFFFF")
-                            align = to.get("align","center")
-                            bbox = draw.textbbox((0,0), text, font=font)
-                            tw, th = bbox[2]-bbox[0], bbox[3]-bbox[1]
-                            cx = 360
-                            x = cx-tw//2 if align=="center" else 10 if align=="left" else 720-tw-10
-                            r_c,g_c,b_c = int(color[1:3],16), int(color[3:5],16), int(color[5:7],16)
-                            for ox,oy in [(-1,-1),(-1,1),(1,-1),(1,1),(0,0)]:
-                                draw.text((x+ox,y_off+oy), text, font=font, fill=(r_c,g_c,b_c,255) if ox==0 and oy==0 else (0,0,0,200))
-                            y_off += 50
-                        solo_path = os.path.join(text_dir, f"solo_{scene_id}_{uuid.uuid4().hex[:8]}.jpg")
-                        canvas.save(solo_path, "JPEG", quality=92)
-                        signed = generate_signed_url(
-                            solo_path.replace("/app/uploads", "/uploads"),
-                            expire_seconds=86400
-                        )
-                        content_items.append({
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"http://114.117.242.17:3000{signed}",
-                                "role": "reference_image",
-                            }
-                        })
-                    except Exception as e:
-                        print(f"[text_overlay] solo render failed: {e}")
-
             # 3. 构建文字 prompt
             visual_desc = scene.get("visual_desc", "")
             lines = scene.get("lines", [])
@@ -194,7 +161,7 @@ async def run_video_generate(api_key: str, params: dict) -> dict:
             prompt += "5. 参考图只用于产品外观参考，场景构图必须按照 visual_desc 执行\n"
             prompt += "6. 确保画面中的人物动作与描述完全一致（如：微笑、拿起、指向等）"
             if text_overlays:
-                prompt += "\n7. 参考图中已包含需要的文字，请在视频中相同位置呈现这些文字"
+                prompt += "\n7. 已传入参考图（图中可能包含文字），请在视频中呈现同样的效果"
             content_items.append({"type": "text", "text": prompt})
 
             body = {"model": MODEL_EP, "content": content_items, "return_last_frame": False}
