@@ -526,17 +526,38 @@ async def get_session_clips(session_id: int, db: AsyncSession = Depends(get_db),
 
 @router.post("/delete-clip")
 async def studio_delete_clip(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    """删除指定 SessionFile（视频片段或最终视频）"""
+    """删除指定 SessionFile（视频片段或最终视频），同时删除物理文件"""
     from app.agent.models import SessionFile
     from sqlalchemy import select as _s
+    import os as _os
     clip_id = body.get("clip_id")
-    if not clip_id:
-        raise HTTPException(400, "clip_id required")
-    r = await db.execute(_s(SessionFile).where(SessionFile.id == clip_id))
-    sf = r.scalar_one_or_none()
-    if not sf:
-        return {"ok": False, "error": "not found"}
-    await db.delete(sf)
+    file_url = body.get("file_url", "")
+    if clip_id:
+        r = await db.execute(_s(SessionFile).where(SessionFile.id == clip_id))
+        sf = r.scalar_one_or_none()
+        if sf:
+            # 删物理文件
+            if sf.file_url:
+                idx = sf.file_url.find("/uploads/")
+                if idx >= 0:
+                    fpath = "/app" + sf.file_url[idx:]
+                    if _os.path.exists(fpath):
+                        _os.remove(fpath)
+            await db.delete(sf)
+    if file_url and not clip_id:
+        # 直接按 URL 删除
+        from sqlalchemy import delete as _del
+        idx = file_url.find("/uploads/")
+        if idx >= 0:
+            fpath = "/app" + file_url[idx:]
+            if _os.path.exists(fpath):
+                _os.remove(fpath)
+        # 也删 DB 记录
+        urls = [file_url]
+        if not file_url.startswith("http"):
+            urls = [f"http://114.117.242.17:3000{file_url}", file_url]
+        for u in urls:
+            await db.execute(_del(SessionFile).where(SessionFile.file_url == u))
     await db.commit()
     return {"ok": True}
 
