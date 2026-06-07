@@ -97,19 +97,26 @@ export default function StudioPage() {
           setSubbedUrl(subbedUrls[subbedUrls.length - 1].url)
         }
         if (Object.keys(patchState).length > 0) setState((prev: any) => ({ ...prev, ...patchState }))
-        // 如果 clip_collections 为空但服务器有 clip，只取最新的4个场景的clip
+        // 如果 clip_collections 为空但服务器有 clip，只取最新一轮生成的（按ID最大的连续批次取）
         if ((!stateRef.current.clip_collections || stateRef.current.clip_collections.length === 0) && allClips.length > 0) {
           const sorted = [...allClips].sort((a: any, b: any) => b.id - a.id)
-          const latestSceneIds = new Set<number>()
-          const latestClips: any[] = []
+          // 找ID最大的连续批次：从最新clip开始，找到第一个大于1的ID间隔的下方
+          const maxId = sorted[0]?.id || 0
+          let batchMinId = maxId
+          for (let i = 1; i < sorted.length; i++) {
+            if (maxId - sorted[i].id > 5) break  // 间隔超过5说明不是同一批
+            batchMinId = Math.min(batchMinId, sorted[i].id)
+          }
+          // 取这批中scene_id不重复的最新clip
+          const sceneMap = new Map<number, any>()
           for (const clip of sorted) {
-            const sid = Number(clip.scene_id) || 0
-            if (!latestSceneIds.has(sid)) {
-              latestSceneIds.add(sid)
-              latestClips.unshift(clip)
+            if (clip.id >= batchMinId) {
+              const sid = Number(clip.scene_id) || 0
+              if (!sceneMap.has(sid)) sceneMap.set(sid, clip)
             }
           }
-          setState((prev: any) => ({ ...prev, clip_collections: [{ id: Date.now(), name: '视频运行 #1', clips: latestClips, created_at: new Date().toISOString() }], selected_clip_collection_id: Date.now() }))
+          const latestClips = Array.from(sceneMap.values()).sort((a: any, b: any) => (a.scene_id || 0) - (b.scene_id || 0))
+          if (latestClips.length > 0) setState((prev: any) => ({ ...prev, clip_collections: [{ id: Date.now(), name: '视频运行 #1', clips: latestClips, created_at: new Date().toISOString() }], selected_clip_collection_id: Date.now() }))
         }
       }
     }).catch(() => {})
