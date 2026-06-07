@@ -84,68 +84,65 @@ async def run_video_generate(api_key: str, params: dict) -> dict:
                 import httpx as _hx
                 first_ref = ref_images[0]["url"] if ref_images else None
                 if first_ref:
-                    # 下载参考图
+                    # 下载参考图，文字拼接到底部（不遮挡画面）
                     try:
                         async with _hx.AsyncClient(timeout=15) as _c:
                             _r = await _c.get(first_ref)
                             if _r.status_code == 200:
-                                bg_path = os.path.join(text_dir, f"bg_{scene_id}.jpg")
-                                with open(bg_path, "wb") as _f:
-                                    _f.write(_r.content)
-                                # 在底图上叠文字
                                 from PIL import Image as _PImg, ImageDraw as _PDraw, ImageFont as _PFont
-                                bg = _PImg.open(bg_path).convert("RGBA")
-                                txt_layer = _PImg.new("RGBA", bg.size, (0,0,0,0))
-                                draw = _PDraw.Draw(txt_layer)
-                                font = _PFont.truetype(FONT_PATH, 36)
+                                import io as _io
+                                ref_img = _PImg.open(_io.BytesIO(_r.content)).convert("RGB")
+                                rw, rh = ref_img.size
+                                # 底部拼接文字区（占高度20%）
+                                text_h = max(120, rh // 5)
+                                canvas = _PImg.new("RGB", (rw, rh + text_h), (30, 30, 30))
+                                canvas.paste(ref_img, (0, 0))
+                                draw = _PDraw.Draw(canvas)
+                                font = _PFont.truetype(FONT_PATH, max(24, text_h // 4))
+                                y_off = rh + 10
                                 for to in text_overlays:
                                     text = to.get("text","")
-                                    x_pct = to.get("x",50)
-                                    y_pct = to.get("y",50)
-                                    align = to.get("align","center")
                                     color = to.get("color","#FFFFFF")
+                                    align = to.get("align","center")
                                     bbox = draw.textbbox((0,0), text, font=font)
                                     tw, th = bbox[2]-bbox[0], bbox[3]-bbox[1]
-                                    cx, cy = int(bg.width*x_pct/100), int(bg.height*y_pct/100)
-                                    x = cx-tw//2 if align=="center" else cx-tw if align=="right" else cx
-                                    y = cy-th//2
-                                    r,g,b = int(color[1:3],16), int(color[3:5],16), int(color[5:7],16)
-                                    for ox,oy in [(-2,-2),(-2,2),(2,-2),(2,2),(0,0)]:
-                                        draw.text((x+ox,y+oy), text, font=font, fill=(r,g,b,255) if ox==0 and oy==0 else (0,0,0,200))
-                                combined = _PImg.alpha_composite(bg, txt_layer).convert("RGB")
-                                combined_path = os.path.join(text_dir, f"combined_{scene_id}_{uuid.uuid4().hex[:8]}.jpg")
-                                combined.save(combined_path, "JPEG", quality=92)
-                                # 替换第一张参考图为带文字的版本
+                                    cx = rw // 2
+                                    x = cx-tw//2 if align=="center" else 10 if align=="left" else rw-tw-10
+                                    r_c, g_c, b_c = int(color[1:3],16), int(color[3:5],16), int(color[5:7],16)
+                                    for ox,oy in [(-1,-1),(-1,1),(1,-1),(1,1),(0,0)]:
+                                        draw.text((x+ox, y_off+oy), text, font=font, fill=(r_c,g_c,b_c,255) if ox==0 and oy==0 else (0,0,0,200))
+                                    y_off += text_h // len(text_overlays)
+                                splice_path = os.path.join(text_dir, f"splice_{scene_id}_{uuid.uuid4().hex[:8]}.jpg")
+                                canvas.save(splice_path, "JPEG", quality=92)
                                 signed = generate_signed_url(
-                                    combined_path.replace("/app/uploads", "/uploads"),
+                                    splice_path.replace("/app/uploads", "/uploads"),
                                     expire_seconds=86400
                                 )
                                 content_items[0]["image_url"]["url"] = f"http://114.117.242.17:3000{signed}"
                     except Exception as e:
-                        print(f"[text_overlay] merge failed: {e}")
+                        print(f"[text_overlay] splice failed: {e}")
                 else:
-                    # 无参考图：在纯色背景上渲染文字，作为独立的参考图
+                    # 无参考图：纯色背景 + 底部文字
                     try:
                         from PIL import Image as _PImg2, ImageDraw as _PDraw2, ImageFont as _PFont2
-                        bg = _PImg2.new("RGBA", (720, 1280), (240, 240, 240, 255))
-                        draw = _PDraw2.Draw(bg)
+                        canvas = _PImg2.new("RGB", (720, 1280), (240, 240, 240))
+                        draw = _PDraw2.Draw(canvas)
                         font = _PFont2.truetype(FONT_PATH, 36)
+                        y_off = 1280 - 200
                         for to in text_overlays:
                             text = to.get("text","")
-                            x_pct = to.get("x",50)
-                            y_pct = to.get("y",50)
-                            align = to.get("align","center")
                             color = to.get("color","#FFFFFF")
+                            align = to.get("align","center")
                             bbox = draw.textbbox((0,0), text, font=font)
                             tw, th = bbox[2]-bbox[0], bbox[3]-bbox[1]
-                            cx, cy = int(720*x_pct/100), int(1280*y_pct/100)
-                            x = cx-tw//2 if align=="center" else cx-tw if align=="right" else cx
-                            y = cy-th//2
-                            r,g,b = int(color[1:3],16), int(color[3:5],16), int(color[5:7],16)
-                            for ox,oy in [(-2,-2),(-2,2),(2,-2),(2,2),(0,0)]:
-                                draw.text((x+ox,y+oy), text, font=font, fill=(r,g,b,255) if ox==0 and oy==0 else (0,0,0,200))
+                            cx = 360
+                            x = cx-tw//2 if align=="center" else 10 if align=="left" else 720-tw-10
+                            r_c,g_c,b_c = int(color[1:3],16), int(color[3:5],16), int(color[5:7],16)
+                            for ox,oy in [(-1,-1),(-1,1),(1,-1),(1,1),(0,0)]:
+                                draw.text((x+ox,y_off+oy), text, font=font, fill=(r_c,g_c,b_c,255) if ox==0 and oy==0 else (0,0,0,200))
+                            y_off += 50
                         solo_path = os.path.join(text_dir, f"solo_{scene_id}_{uuid.uuid4().hex[:8]}.jpg")
-                        bg.save(solo_path, "JPEG", quality=92)
+                        canvas.save(solo_path, "JPEG", quality=92)
                         signed = generate_signed_url(
                             solo_path.replace("/app/uploads", "/uploads"),
                             expire_seconds=86400
