@@ -203,9 +203,59 @@ async def studio_generate_video(body: dict, db: AsyncSession = Depends(get_db), 
                 scene_mids = set(coll.get("material_ids", []))
     material_urls = {}
     if scene_mids:
+        import subprocess as _sp, tempfile as _tf, os as _os, shutil as _shutil, uuid as _uuid, httpx as _httpx
+        from app.agent.models import ensure_session_dir
+        frame_dir = _os.path.join(ensure_session_dir(session_id)["root"], "video_frames")
+        _os.makedirs(frame_dir, exist_ok=True)
         r = await db.execute(_s(Material).where(Material.id.in_(scene_mids)))
         for m in r.scalars().all():
-            if m.image_url:
+            if not m.image_url:
+                continue
+            # 视频素材：截取2-3帧作为参考图
+            is_vid = m.material_type == 'video' or any(ext in (m.image_url or '') for ext in ['.mp4', '.webm', '.mov'])
+            if is_vid and m.image_url:
+                # 下载视频到临时目录
+                vid_path = _os.path.join(frame_dir, f"tmp_{m.id}.mp4")
+                try:
+                    async with _httpx.AsyncClient(timeout=60) as _cli:
+                        vu = m.image_url if m.image_url.startswith('http') else f"http://114.117.242.17:3000{m.image_url}"
+                        vr = await _cli.get(vu)
+                        if vr.status_code == 200:
+                            with open(vid_path, 'wb') as _f:
+                                _f.write(vr.content)
+                            # 获取视频时长
+                            dur_r = _sp.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+                                             '-of', 'default=noprint_wrappers=1:nokey=1', vid_path],
+                                            capture_output=True, text=True, timeout=10)
+                            dur = float(dur_r.stdout.strip() or 5)
+                            # 取3帧：0%、50%、90%位置
+                            frames = []
+                            for pct in [0.05, 0.5, 0.9]:
+                                ts = dur * pct
+                                out_name = f"frame_{m.id}_{_uuid.uuid4().hex[:8]}.jpg"
+                                out_path = _os.path.join(frame_dir, out_name)
+                                _sp.run(['ffmpeg', '-y', '-ss', str(ts), '-i', vid_path,
+                                         '-vframes', '1', '-q:v', '2', out_path],
+                                        capture_output=True, timeout=15)
+                                if _os.path.exists(out_path):
+                                    signed = generate_signed_url(
+                                        out_path.replace("/app/uploads", "/uploads"),
+                                        expire_seconds=86400)
+                                    url = f"http://114.117.242.17:3000{signed}"
+                                    frames.append(url)
+                            if frames:
+                                for fu in frames:
+                                    mid_key = f"{m.id}_frame_{len(frames)}"
+                                    material_urls[f"{m.id}_frames"] = material_urls.get(f"{m.id}_frames", [])
+                                    material_urls[f"{m.id}_frames"].append(fu)
+                            _os.remove(vid_path)
+                except Exception as _e:
+                    print(f"[generate-video] video frame extract failed for {m.id}: {_e}")
+                # 也保留原 image_url 作为兜底
+                if m.image_url:
+                    signed = generate_signed_url(m.image_url, expire_seconds=86400)
+                    material_urls[m.id] = f"http://114.117.242.17:3000{signed}"
+            elif m.image_url:
                 signed = generate_signed_url(m.image_url, expire_seconds=86400)
                 material_urls[m.id] = f"http://114.117.242.17:3000{signed}"
 
