@@ -89,14 +89,7 @@ export default function StudioPage() {
         const allClips = r.clips || []
         const subbedUrls = r.subbed_videos || []
         setState((prev: any) => ({ ...prev, final_videos: fv }))
-        // 恢复 pipeline：composed_video = 最新 final_video, subbed_video = 最新 subbed_video
-        const patchState: any = {}
-        if (fv.length > 0) patchState.composed_video = fv[fv.length - 1]
-        if (subbedUrls.length > 0) {
-          patchState.subbed_video = subbedUrls[subbedUrls.length - 1]
-          setSubbedUrl(subbedUrls[subbedUrls.length - 1].url)
-        }
-        if (Object.keys(patchState).length > 0) setState((prev: any) => ({ ...prev, ...patchState }))
+        // 不自动恢复 pipeline（用户删了就是删了），只从 workflow_state.json 加载
         // 如果 clip_collections 为空但服务器有 clip，只取最新一轮生成的（按ID最大的连续批次取）
         if ((!stateRef.current.clip_collections || stateRef.current.clip_collections.length === 0) && allClips.length > 0) {
           const sorted = [...allClips].sort((a: any, b: any) => b.id - a.id)
