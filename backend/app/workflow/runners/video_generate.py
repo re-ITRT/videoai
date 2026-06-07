@@ -34,7 +34,6 @@ async def run_video_generate(api_key: str, params: dict) -> dict:
                     "type": "image_url",
                     "image_url": {
                         "url": ref_img.get("url"),
-                        "role": ref_img.get("role", "reference_image"),
                     }
                 })
 
