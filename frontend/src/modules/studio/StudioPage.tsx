@@ -86,31 +86,8 @@ export default function StudioPage() {
     request.get(`/studio/clips/${sessionId}`).then((r: any) => {
       if (r) {
         const fv = r.final_videos || []
-        const allClips = r.clips || []
-        const subbedUrls = r.subbed_videos || []
         setState((prev: any) => ({ ...prev, final_videos: fv }))
-        // 不自动恢复 pipeline（用户删了就是删了），只从 workflow_state.json 加载
-        // 如果 clip_collections 为空但服务器有 clip，只取最新一轮生成的（按ID最大的连续批次取）
-        if ((!stateRef.current.clip_collections || stateRef.current.clip_collections.length === 0) && allClips.length > 0) {
-          const sorted = [...allClips].sort((a: any, b: any) => b.id - a.id)
-          // 找ID最大的连续批次：从最新clip开始，找到第一个大于1的ID间隔的下方
-          const maxId = sorted[0]?.id || 0
-          let batchMinId = maxId
-          for (let i = 1; i < sorted.length; i++) {
-            if (maxId - sorted[i].id > 5) break  // 间隔超过5说明不是同一批
-            batchMinId = Math.min(batchMinId, sorted[i].id)
-          }
-          // 取这批中scene_id不重复的最新clip
-          const sceneMap = new Map<number, any>()
-          for (const clip of sorted) {
-            if (clip.id >= batchMinId) {
-              const sid = Number(clip.scene_id) || 0
-              if (!sceneMap.has(sid)) sceneMap.set(sid, clip)
-            }
-          }
-          const latestClips = Array.from(sceneMap.values()).sort((a: any, b: any) => (a.scene_id || 0) - (b.scene_id || 0))
-          if (latestClips.length > 0) setState((prev: any) => ({ ...prev, clip_collections: [{ id: Date.now(), name: '视频运行 #1', clips: latestClips, created_at: new Date().toISOString() }], selected_clip_collection_id: Date.now() }))
-        }
+        // 不自动从服务器重建 clip_collections（用户删了就删了）
       }
     }).catch(() => {})
   }, [sessionId])
