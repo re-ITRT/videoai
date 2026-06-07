@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Table, Button, Tag, Slider, Card, message, Modal, Descriptions, Spin } from 'antd'
+import { Table, Button, Tag, Card, message, Modal, Descriptions, Spin, Select } from 'antd'
 import { DeleteOutlined, EyeOutlined } from '@ant-design/icons'
 import { getMaterials, deleteMaterial } from '../../utils/api'
 import type { Material } from './types'
@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom'
 export default function MaterialList() {
   const [materials, setMaterials] = useState<Material[]>([])
   const [loading, setLoading] = useState(false)
-  const [threshold, setThreshold] = useState(0.6)
+  const [filterType, setFilterType] = useState<string>('all')
   const [embedModal, setEmbedModal] = useState<{ visible: boolean; data: any; loading: boolean }>({ visible: false, data: null, loading: false })
   const navigate = useNavigate()
 
@@ -74,10 +74,14 @@ export default function MaterialList() {
   return (
     <Card title="素材管理" extra={<Button type="primary" onClick={() => navigate('/material/upload')}>上传素材</Button>}>
       <div style={{ marginBottom: 16 }}>
-        <span>相似度阈值: {threshold}</span>
-        <Slider min={0.3} max={0.95} step={0.05} value={threshold} onChange={setThreshold} style={{ width: 300 }} />
+        <Select value={filterType} onChange={setFilterType} style={{ width: 140 }} options={[
+          { value: 'all', label: '全部' },
+          { value: 'image', label: '🖼 图片' },
+          { value: 'video', label: '🎬 视频' },
+          { value: 'audio', label: '🎵 音频/BGM' },
+        ]} />
       </div>
-      <Table dataSource={materials} columns={columns} rowKey="id" loading={loading} />
+      <Table dataSource={filterType === 'all' ? materials : materials.filter(m => m.material_type === filterType)} columns={columns} rowKey="id" loading={loading} />
 
       <Modal title="嵌入信息" open={embedModal.visible} onCancel={() => setEmbedModal({ visible: false, data: null, loading: false })} footer={null} width={700}>
         {embedModal.loading ? <Spin /> : embedModal.data ? (
