@@ -261,10 +261,16 @@ async def studio_generate_video(body: dict, db: AsyncSession = Depends(get_db), 
 
     # 3. 构建 reference_images
     for s in scenes:
-        s["reference_images"] = [
-            {"url": material_urls[mid], "role": "reference_image"}
-            for mid in s.get("materials", []) if mid in material_urls
-        ]
+        refs = []
+        for mid in s.get("materials", []):
+            if mid in material_urls:
+                refs.append({"url": material_urls[mid], "role": "reference_image"})
+            # 视频帧
+            fk = f"{mid}_frames"
+            if fk in material_urls:
+                for fu in material_urls[fk]:
+                    refs.append({"url": fu, "role": "reference_image"})
+        s["reference_images"] = refs
         if "lines" not in s:
             s["lines"] = []
 
