@@ -1,5 +1,28 @@
 # CI/CD
 
+## 一键安装（新服务器）
+
+```bash
+bash <(curl -sL https://gitee.com/MaoZhiqin/video-ai/raw/master/ci/setup.sh)
+```
+
+或下载后执行：
+
+```bash
+git clone https://gitee.com/MaoZhiqin/video-ai.git
+cd video-ai
+bash ci/setup.sh
+```
+
+`setup.sh` 会自动：
+1. 安装 Docker + Docker Compose + Git（如未安装）
+2. 克隆项目代码
+3. 生成 `.env` 环境变量
+4. 启动全部 Docker 服务（PostgreSQL+pgvector, Redis, MinIO, Backend, Frontend）
+5. 等待数据库就绪 → 初始化种子数据（admin 用户、默认模板配置）
+6. 安装 git hooks（`git pull` 后自动测试+部署）
+7. 运行测试验证
+
 ## 部署流程
 
 ```mermaid
@@ -13,37 +36,18 @@ flowchart LR
     F --> H[docker restart]
 ```
 
-## 服务器初始化
-
-首次部署需要在服务器上运行一次：
+## 服务器日常
 
 ```bash
-# 1. 进入项目目录
-cd /home/ubuntu/video-ai
-
-# 2. 安装 git hooks
-bash ci/install-hook.sh
-
-# 3. 测试 hook 是否生效
-git pull origin master  # 会自动跑测试+部署
-```
-
-## 手动部署
-
-```bash
-# 服务器上执行
+# 拉取最新代码（自动部署）
 cd /home/ubuntu/video-ai && git pull origin master
+
+# 仅跑测试
+docker exec -w /app video-ai-backend-1 python3 -m pytest tests/studio/ tests/core/ tests/auth/ tests/material/ tests/script/ tests/published/ tests/metrics/ tests/test_coverage_boost.py tests/creation/ -x -q
+
+# 查看服务状态
+docker ps
+
+# 查看日志
+docker logs -f video-ai-backend-1
 ```
-
-`post-merge` hook 会自动：
-1. 检测变更的文件（`git diff HEAD@{1} --name-only`）
-2. 将变更的后端文件 `docker cp` 到容器
-3. 运行 pytest
-4. master 分支：测试通过后自动 `docker restart`
-
-## 仅跑测试（不部署）
-
-```bash
-docker exec -w /app video-ai-backend-1 python3 -m pytest tests/ -x -q
-```
-# CI/CD deploy test
