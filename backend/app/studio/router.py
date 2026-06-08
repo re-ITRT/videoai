@@ -92,6 +92,22 @@ async def save_workflow_state(session_id: int, body: dict, user: User = Depends(
     return {"ok": True}
 
 
+@router.post("/sign-url")
+async def sign_file_url(body: dict, user = Depends(get_current_user)):
+    """给一个文件路径签发临时访问URL"""
+    from app.core.signer import generate_signed_url
+    path = body.get("path", "")
+    if not path:
+        raise HTTPException(400, "path required")
+    # 去掉http前缀
+    if path.startswith("http"):
+        idx = path.find("/uploads/")
+        if idx >= 0:
+            path = path[idx:]
+    signed = generate_signed_url(path, expire_seconds=3600)
+    full_url = f"http://114.117.242.17:3000{signed}"
+    return {"url": full_url}
+
 @router.get("/video-url/{clip_id}")
 async def get_signed_video_url(clip_id: int, db: AsyncSession = Depends(get_db), user = Depends(get_current_user)):
     """根据 clip_id 返回临时签名 URL（前端不暴露 mp4 直链）"""
