@@ -392,8 +392,15 @@ class TestDeleteClip:
 # ── POST /materials/search ─────────────────────────────────
 
 class TestMaterialsSearch:
+    async def _clear_materials(self, db_session):
+        from app.material.models import Material
+        from sqlalchemy import delete
+        await db_session.execute(delete(Material))
+        await db_session.commit()
+
     @pytest.mark.asyncio
     async def test_search_no_tags(self, db_session, dummy_user):
+        await self._clear_materials(db_session)
         from app.studio.router import search_studio_materials
         # 先插入一些素材
         m1 = Material(user_id="1", name="mat1", image_url="/u/1.jpg", tags='["tag1"]', material_type="product", input_type="image")
@@ -405,6 +412,7 @@ class TestMaterialsSearch:
 
     @pytest.mark.asyncio
     async def test_search_with_tag_filter(self, db_session, dummy_user):
+        await self._clear_materials(db_session)
         from app.studio.router import search_studio_materials
         m1 = Material(user_id="1", name="mat1", image_url="/u/1.jpg", tags='["tag1"]', material_type="product", input_type="image")
         m2 = Material(user_id="1", name="mat2", image_url="/u/2.jpg", tags='["tag2"]', material_type="general", input_type="image")
@@ -416,6 +424,7 @@ class TestMaterialsSearch:
 
     @pytest.mark.asyncio
     async def test_search_other_user_not_visible(self, db_session, dummy_user):
+        await self._clear_materials(db_session)
         from app.studio.router import search_studio_materials
         m = Material(user_id="99", name="not_mine", image_url="/u/n.jpg", tags="[]", material_type="product", input_type="image")
         db_session.add(m)
