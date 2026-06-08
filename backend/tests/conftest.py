@@ -36,7 +36,11 @@ import builtins
 _original_open = builtins.open
 def _patched_open(path, mode='r', *args, **kwargs):
     if isinstance(path, str) and path.startswith("/app"):
-        path = path.replace("/app", _app_tmpdir, 1)
+        redirected = path.replace("/app", _app_tmpdir, 1)
+        if 'w' in mode or 'a' in mode or os.path.exists(redirected):
+            return _original_open(redirected, mode, *args, **kwargs)
+        # 写操作或重定向文件存在时用重定向路径；读操作且重定向文件不存在时用原始路径
+        return _original_open(path, mode, *args, **kwargs)
     return _original_open(path, mode, *args, **kwargs)
 builtins.open = _patched_open
 
