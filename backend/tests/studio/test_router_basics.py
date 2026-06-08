@@ -109,21 +109,21 @@ class TestGetTrace:
 
 class TestGetState:
     @pytest.mark.asyncio
-    async def test_get_state_returns_default_when_no_file(self):
+    async def test_get_state_returns_default_when_no_file(self, dummy_user):
         from app.studio.router import get_workflow_state
         with patch("app.studio.router.get_state_path", return_value=FAKE_STATE_PATH), \
              patch("os.path.exists", return_value=False), \
              patch("app.studio.router.DEFAULT_STATE", {"products": [], "collections": []}):
-            result = await get_workflow_state(SESSION_ID, dummy_user())
+            result = await get_workflow_state(SESSION_ID, dummy_user)
             assert result == {"products": [], "collections": []}
 
     @pytest.mark.asyncio
-    async def test_get_state_returns_file_content(self):
+    async def test_get_state_returns_file_content(self, dummy_user):
         from app.studio.router import get_workflow_state
         with patch("app.studio.router.get_state_path", return_value=FAKE_STATE_PATH), \
              patch("os.path.exists", return_value=True), \
              patch("builtins.open", mock_open(read_data=json.dumps({"products": [{"id": 1}]}))):
-            result = await get_workflow_state(SESSION_ID, dummy_user())
+            result = await get_workflow_state(SESSION_ID, dummy_user)
             assert result["products"] == [{"id": 1}]
 
 
@@ -131,7 +131,7 @@ class TestGetState:
 
 class TestSaveState:
     @pytest.mark.asyncio
-    async def test_save_state_writes_file(self):
+    async def test_save_state_writes_file(self, dummy_user):
         from app.studio.router import save_workflow_state
         body = {"products": [{"id": 1}], "selected_product_id": None}
         with patch("app.studio.router.get_state_path", return_value=FAKE_STATE_PATH), \
@@ -396,8 +396,8 @@ class TestMaterialsSearch:
     async def test_search_no_tags(self, db_session, dummy_user):
         from app.studio.router import search_studio_materials
         # 先插入一些素材
-        m1 = Material(user_id="1", name="mat1", image_url="/u/1.jpg", tags='["tag1"]')
-        m2 = Material(user_id="1", name="mat2", image_url="/u/2.jpg", tags='["tag2"]')
+        m1 = Material(user_id="1", name="mat1", image_url="/u/1.jpg", tags='["tag1"]', material_type="product")
+        m2 = Material(user_id="1", name="mat2", image_url="/u/2.jpg", tags='["tag2"]', material_type="general")
         db_session.add_all([m1, m2])
         await db_session.flush()
         result = await search_studio_materials({"threshold": 30, "tags": []}, db_session, dummy_user)
@@ -406,8 +406,8 @@ class TestMaterialsSearch:
     @pytest.mark.asyncio
     async def test_search_with_tag_filter(self, db_session, dummy_user):
         from app.studio.router import search_studio_materials
-        m1 = Material(user_id="1", name="mat1", image_url="/u/1.jpg", tags='["tag1"]')
-        m2 = Material(user_id="1", name="mat2", image_url="/u/2.jpg", tags='["tag2"]')
+        m1 = Material(user_id="1", name="mat1", image_url="/u/1.jpg", tags='["tag1"]', material_type="product")
+        m2 = Material(user_id="1", name="mat2", image_url="/u/2.jpg", tags='["tag2"]', material_type="general")
         db_session.add_all([m1, m2])
         await db_session.flush()
         result = await search_studio_materials({"threshold": 30, "tags": ["tag1"]}, db_session, dummy_user)
@@ -415,13 +415,12 @@ class TestMaterialsSearch:
         assert result["materials"][0]["image_url"] == "/u/1.jpg"
 
     @pytest.mark.asyncio
-    async def test_search_other_user_not_visible(self, db_session):
+    async def test_search_other_user_not_visible(self, db_session, dummy_user):
         from app.studio.router import search_studio_materials
-        other_user = User(id=99, username="other_user", hashed_password="h", is_active=True, role="user")
-        m = Material(user_id="99", name="not_mine", image_url="/u/n.jpg", tags="[]")
+        m = Material(user_id="99", name="not_mine", image_url="/u/n.jpg", tags="[]", material_type="product")
         db_session.add(m)
         await db_session.flush()
-        result = await search_studio_materials({"threshold": 30, "tags": []}, db_session, dummy_user())
+        result = await search_studio_materials({"threshold": 30, "tags": []}, db_session, dummy_user)
         assert result["total"] == 0
 
 
