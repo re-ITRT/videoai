@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Table, Button, Card, message, Space, Modal, Input, Tabs, Tag, Spin, Descriptions, Progress, Typography, Divider, Select, Slider } from 'antd'
+import { Table, Button, Card, message, Space, Modal, Input, Tabs, Tag, Spin, Descriptions, Progress, Typography, Divider, Slider } from 'antd'
 import { PlusOutlined, EditOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import request from '../../utils/request'
 
@@ -38,7 +38,6 @@ export default function ScriptTemplates() {
   const [loading, setLoading] = useState(false)
   const [editVisible, setEditVisible] = useState(false)
   const [editName, setEditName] = useState('')
-  const [editBgmPref, setEditBgmPref] = useState('')
   const [editBgmTarget, setEditBgmTarget] = useState(50)
   const [sysSections, setSysSections] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
