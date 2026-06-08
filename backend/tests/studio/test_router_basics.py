@@ -255,7 +255,7 @@ class TestSaveScript:
         script = {"scenes": [{"scene_id": 1}]}
         fake_scripts_dir = f"{FAKE_ROOT}/scripts"
         fake_path = f"{fake_scripts_dir}/script_{SESSION_ID}.json"
-        with patch("app.agent.models.ensure_session_dir",
+        with patch("app.studio.router.ensure_session_dir",
                    return_value={"root": FAKE_ROOT, "scripts": fake_scripts_dir}), \
              patch("builtins.open", mock_open()) as m:
             _save_script(SESSION_ID, script)

@@ -119,15 +119,17 @@ async def publish_video(
                 finally:
                     shutil.rmtree(tmpdir, ignore_errors=True)
 
+    # Guard against non-dict analyze_result
+    analysis_report = analyze_result if isinstance(analyze_result, dict) else {}
     pv = PublishedVideo(
         user_id=user.id,
         title=title,
         video_url=video_url,
         cover_url=body.get("cover_url", ""),
-        analysis_report=analyze_result if isinstance(analyze_result, dict) else {},
-        hook_method=analyze_result.get("hook_method", ""),
-        selling_points=analyze_result.get("selling_points", []),
-        style=analyze_result.get("style", ""),
+        analysis_report=analysis_report,
+        hook_method=analysis_report.get("hook_method", ""),
+        selling_points=analysis_report.get("selling_points", []),
+        style=analysis_report.get("style", ""),
         tags=tags,
         scenes=scenes,
         rhythm=rhythm,

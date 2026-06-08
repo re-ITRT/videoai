@@ -24,7 +24,7 @@ class TestGenerateVideo:
     async def test_script_not_found_404(self, db_session, dummy_user):
         from app.studio.router import studio_generate_video
         with patch("os.path.exists", return_value=False), \
-             patch("app.agent.models.ensure_session_dir",
+             patch("app.studio.router.ensure_session_dir",
                    return_value={"root": FAKE_ROOT, "scripts": FAKE_SCRIPTS}):
             with pytest.raises(HTTPException) as exc:
                 await studio_generate_video({"session_id": SESSION_ID}, db_session, dummy_user)
@@ -37,7 +37,7 @@ class TestGenerateVideo:
         empty_script = json.dumps({"script": {"scenes": []}})
         with patch("os.path.exists", return_value=True), \
              patch("builtins.open", mock_open(read_data=empty_script)), \
-             patch("app.agent.models.ensure_session_dir",
+             patch("app.studio.router.ensure_session_dir",
                    return_value={"root": FAKE_ROOT, "scripts": FAKE_SCRIPTS}):
             with pytest.raises(HTTPException) as exc:
                 await studio_generate_video({"session_id": SESSION_ID}, db_session, dummy_user)
@@ -56,7 +56,7 @@ class TestGenerateVideo:
         })
         with patch("os.path.exists", return_value=True), \
              patch("builtins.open", mock_open(read_data=script)), \
-             patch("app.agent.models.ensure_session_dir",
+             patch("app.studio.router.ensure_session_dir",
                    return_value={"root": FAKE_ROOT, "scripts": FAKE_SCRIPTS}), \
              patch("app.workers.workflow.call_workflow", new_callable=AsyncMock) as cwf:
             cwf.return_value = {"result": {"task_ids": []}}
@@ -84,7 +84,7 @@ class TestGenerateVideo:
         })
         with patch("os.path.exists", return_value=True), \
              patch("builtins.open", mock_open(read_data=script)), \
-             patch("app.agent.models.ensure_session_dir",
+             patch("app.studio.router.ensure_session_dir",
                    return_value={"root": FAKE_ROOT, "scripts": FAKE_SCRIPTS}), \
              patch("app.workflow.runners.video_generate.run_video_generate",
                    new_callable=AsyncMock, side_effect=Exception("Seedance error")):
@@ -129,7 +129,7 @@ class TestGenerateVideo:
         with patch("app.studio.router.add_trace", new_callable=AsyncMock), \
              patch("os.path.exists", return_value=True), \
              patch("os.makedirs"), \
-             patch("app.agent.models.ensure_session_dir",
+             patch("app.studio.router.ensure_session_dir",
                    return_value={"root": FAKE_ROOT, "scripts": FAKE_SCRIPTS}), \
              patch("builtins.open", mock_state_open), \
              patch("app.workflow.runners.video_generate.run_video_generate",
