@@ -8,18 +8,18 @@ import AiScriptEditor from '../agent/AiScriptEditor'
 const { TextArea } = Input
 
 // 通过后端签名获取视频URL（前端不暴露mp4直链）
-function SignedVideo({ clipId, style }: { clipId: number; style?: any }) {
-  const [src, setSrc] = useState('')
-  const [loading, setLoading] = useState(true)
+function VideoProxy({ url, style }: { url: string; style?: any }) {
+  // 提取路径传给 video-proxy 端点（不暴露 mp4 直链）
+  const [proxySrc, setProxySrc] = useState('')
   useEffect(() => {
-    let cancelled = false
-    request.get(`/studio/video-url/${clipId}`).then((r: any) => {
-      if (!cancelled && r?.url) { setSrc(r.url); setLoading(false) }
-    }).catch(() => setLoading(false))
-    return () => { cancelled = true }
-  }, [clipId])
-  if (loading) return <div style={{ width: '100%', height: 200, background: '#f5f5f5', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', ...(style || {}) }}><Spin /></div>
-  return <video src={src} controls style={{ width: '100%', maxHeight: 200, borderRadius: 4, ...(style || {}) }} />
+    if (!url) return
+    // 提取 /uploads/ 后面的路径
+    const idx = url.indexOf('/uploads/')
+    const path = idx >= 0 ? url.substring(idx) : url
+    setProxySrc(`/api/v1/studio/video-proxy?path=${encodeURIComponent(path)}`)
+  }, [url])
+  if (!proxySrc) return <div style={{ width: '100%', height: 200, background: '#f5f5f5', borderRadius: 4, ...(style || {}) }} />
+  return <video src={proxySrc} controls style={{ width: '100%', maxHeight: 200, borderRadius: 4, ...(style || {}) }} />
 }
 
 function SpeedBar() {

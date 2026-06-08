@@ -1,4 +1,18 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { Spin } from 'antd'
+import request from '../../utils/request'
+
+function VideoProxy({ url }: { url: string }) {
+  const [proxySrc, setProxySrc] = useState('')
+  useEffect(() => {
+    if (!url) return
+    const idx = url.indexOf('/uploads/')
+    const path = idx >= 0 ? url.substring(idx) : url
+    setProxySrc(`/api/v1/studio/video-proxy?path=${encodeURIComponent(path)}`)
+  }, [url])
+  if (!proxySrc) return <div style={{ width: '100%', height: '100%', background: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#ccc' }}>加载中</div>
+  return <video src={proxySrc} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+}
 import { Card, Row, Col, Statistic, Skeleton, Tabs, Tag, Empty, Spin, Button, message, Modal, Space, Typography, Divider, Descriptions } from 'antd'
 import { VideoCameraOutlined, FileTextOutlined, ThunderboltOutlined, AppstoreOutlined, PlayCircleOutlined, EyeOutlined, DeleteOutlined, RiseOutlined } from '@ant-design/icons'
 import request from '../utils/request'
@@ -36,13 +50,6 @@ export default function Dashboard() {
     try {
       const res: any = await request.get('/published/videos', { params: { limit: 50 } })
       const items = (res?.items || []).map((v: any) => ({ ...v, _video_url: v.video_url }))
-      // 刷新视频签名URL
-      for (const v of items) {
-        try {
-          const sr: any = await request.post('/studio/sign-url', { path: v.video_url })
-          if (sr?.url) v.video_url = sr.url
-        } catch {}
-      }
       setVideos(items)
     } catch { /* ignore */ }
     setVideosLoading(false)
@@ -106,7 +113,7 @@ export default function Dashboard() {
                             cover={
                               <div style={{ position: 'relative', background: '#000', height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
                                 onClick={async () => { try { const sr: any = await request.post('/studio/sign-url', { path: v._video_url || v.video_url }); window.open(sr?.url || v.video_url, '_blank') } catch { window.open(v.video_url, '_blank') } }}>
-                                <video src={v.video_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                <VideoProxy url={v._video_url || v.video_url} />
                                 <PlayCircleOutlined style={{ position: 'absolute', fontSize: 40, color: 'rgba(255,255,255,0.8)' }} />
                               </div>
                             }
