@@ -1,6 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
-import { Spin } from 'antd'
-import request from '../../utils/request'
+import { useState, useEffect } from 'react'
 
 function VideoProxy({ url }: { url: string }) {
   const [proxySrc, setProxySrc] = useState('')
