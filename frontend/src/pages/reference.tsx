@@ -61,6 +61,17 @@ const platformColors: Record<string, string> = {
   custom: '#8c8c8c',
 };
 
+const getSignedUrl = async (url: string | undefined | null) => {
+  if (!url) return ''
+  try {
+    const idx = url.indexOf('/uploads/')
+    const path = idx >= 0 ? url.substring(idx) : url
+    const r = await fetch('/api/v1/studio/sign-url?path=' + encodeURIComponent(path))
+    const d = await r.json()
+    return d.url || ''
+  } catch { return '' }
+};
+
 const getProxyUrl = (url: string | undefined | null) => {
   if (!url) return ''
   const idx = url.indexOf('/uploads/')

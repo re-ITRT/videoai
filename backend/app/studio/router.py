@@ -92,8 +92,22 @@ async def save_workflow_state(session_id: int, body: dict, user: User = Depends(
     return {"ok": True}
 
 
+@router.get("/sign-url")
+async def get_signed_url(path: str = ""):
+    """给文件路径签发临时签名URL（用于新标签页打开，无需auth）"""
+    from app.core.signer import generate_signed_url
+    if not path:
+        return {"error": "path required"}
+    if path.startswith("http"):
+        idx = path.find("/uploads/")
+        if idx >= 0:
+            path = path[idx:]
+    signed = generate_signed_url(path, expire_seconds=3600)
+    full_url = f"http://114.117.242.17:3000{signed}"
+    return {"url": full_url}
+
 @router.get("/video-proxy")
-async def video_proxy(path: str = "", user = Depends(get_current_user)):
+async def video_proxy(path: str = ""):
     """视频代理：不暴露mp4直链，通过后端流式传输"""
     from fastapi.responses import FileResponse
     import os as _ov, re as _re
