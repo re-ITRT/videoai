@@ -60,7 +60,14 @@ export default function MaterialList() {
         return <span style={{ fontSize: 28, cursor: 'pointer' }} onClick={() => window.open(fullUrl, '_blank')}>🎵</span>
       }
       if (r.material_type === 'video' || (url && url.match(/\.(mp4|webm|mov)$/i))) {
-        return <video src={fullUrl} style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 4, cursor: 'pointer' }} onClick={() => window.open(fullUrl, '_blank')} />
+        const playVideo = async () => {
+          const targetUrl = url.startsWith('http') ? url : 'http://114.117.242.17:3000' + url
+          // 通过 video-proxy 打开，不暴露直链
+          const idx = targetUrl.indexOf('/uploads/')
+          const path = idx >= 0 ? targetUrl.substring(idx) : targetUrl
+          window.open('/api/v1/studio/video-proxy?path=' + encodeURIComponent(path), '_blank')
+        }
+        return <video src={fullUrl} style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 4, cursor: 'pointer' }} onClick={playVideo} />
       }
       return <img src={url} loading="lazy" alt="" style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 4, cursor: 'pointer' }} onClick={() => window.open(fullUrl, '_blank')} />
     } },
