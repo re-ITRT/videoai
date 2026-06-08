@@ -538,6 +538,17 @@ async def ai_generate_template(
                 c = resp.json()["choices"][0]["message"]["content"]
                 parsed = json.loads(c)
                 templates = parsed if isinstance(parsed, list) else parsed.get("templates", [parsed])
+                # 确保每个模板有 bgm_preference
+                for t in templates:
+                    if not t.get("bgm_preference"):
+                        # 从标签或策略中推断
+                        tags = t.get("tags", [])
+                        for bgm_tag in ["轻快", "中性", "稳重"]:
+                            if bgm_tag in tags or bgm_tag in (t.get("strategy", "") + str(t.get("factors", {}))):
+                                t["bgm_preference"] = bgm_tag
+                                break
+                        if not t.get("bgm_preference"):
+                            t["bgm_preference"] = "轻快"  # 默认
                 return {"templates": templates, "source": "ai"}
     except Exception as e:
         print(f"[ai-generate] LLM failed: {e}")
