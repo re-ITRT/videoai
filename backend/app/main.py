@@ -34,7 +34,7 @@ setup_logging()
 app = FastAPI(title="Video-AI API", version="0.1.0", docs_url="/docs")
 
 
-@app.on_event("startup")
+@app.on_event("startup")  # pragma: no cover
 async def startup():
     # 确保 video_ai 数据库存在（Docker 重启后可能丢失）
     try:

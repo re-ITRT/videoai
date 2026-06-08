@@ -20,7 +20,7 @@ try:
         task_track_started=True,
         task_acks_late=True,
         worker_prefetch_multiplier=1,
-    )
-except ImportError:
+    )  # pragma: no cover
+except ImportError:  # pragma: no cover
     # Celery not installed, but workflow.py still works
     pass

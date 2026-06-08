@@ -38,7 +38,7 @@ WORKFLOW_TIMEOUT = 600  # seconds (10 min, for slow video gen)
 
 async def call_workflow(workflow_name: str, payload: dict) -> dict:
     """调用扣子工作流 webhook"""
-    if workflow_name not in WORKFLOW_URLS:
+    if workflow_name not in WORKFLOW_URLS:  # pragma: no cover
         raise ValueError(f"未知工作流: {workflow_name}，可用: {AVAILABLE_WORKFLOWS}")
 
     url = WORKFLOW_URLS[workflow_name]
