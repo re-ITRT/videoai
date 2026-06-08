@@ -86,6 +86,16 @@ export default function ScriptTemplates() {
     setSaving(true)
     try {
       await request.put(`/workflows/prompts/${editName}/system.md`, { content: buildSystemMd(sysSections) })
+      // 保存 BGM 偏好
+      try {
+        const tr: any = await request.get('/template/templates', { params: { limit: 100 } })
+        const existing = (tr?.items || []).find((t: any) => t.name === editName)
+        if (existing) {
+          await request.put(`/template/templates/${existing.id}`, { bgm_preference: editBgmPref || '' })
+        } else if (editBgmPref) {
+          await request.post('/template/templates', { name: editName, strategy: '', factors: {}, category: '', tags: [], bgm_preference: editBgmPref })
+        }
+      } catch {}
       message.success('模板已保存')
     } catch { message.error('保存失败') }
     setSaving(false)
@@ -251,7 +261,14 @@ export default function ScriptTemplates() {
             ),
           }))} />
         )}
-        <Button type="primary" style={{ marginTop: 12 }} onClick={handleSave} loading={saving}>保存模板</Button>
+        <div style={{ marginTop: 12, marginBottom: 8 }}>BGM 偏好</div>
+        <Select allowClear style={{ width: 200 }} value={editBgmPref} onChange={setEditBgmPref} options={[
+          { value: '', label: '不限' },
+          { value: '轻快', label: '⚡ 轻快' },
+          { value: '中性', label: '➡ 中性' },
+          { value: '稳重', label: '🐢 稳重' },
+        ]} />
+        <Button type="primary" style={{ marginLeft: 12 }} onClick={handleSave} loading={saving}>保存模板</Button>
       </Modal>
 
       {/* AI 生成结果弹窗 */}
