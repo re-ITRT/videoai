@@ -140,6 +140,29 @@ async def publish_video(
     await db.commit()
     await db.refresh(pv)
 
+    # 提取视频第一帧作为封面
+    try:
+        import subprocess as _sp, uuid as _uuid, re as _re
+        thumb_name = f"thumb_{_uuid.uuid4().hex[:12]}.jpg"
+        thumb_path = f"/app/uploads/analyze/{thumb_name}"
+        # 从 video_url 提取本地路径
+        local_vid = ""
+        m = _re.search(r'/signed/[^/]+/(.+)', video_url)
+        if m:
+            local_vid = '/app/uploads/' + m.group(1)
+        if not local_vid or not os.path.exists(local_vid):
+            idx = str(video_url).find("/uploads/")
+            if idx >= 0:
+                local_vid = "/app" + str(video_url)[idx:]
+        if local_vid and os.path.exists(local_vid):
+            _sp.run(["ffmpeg", "-y", "-i", local_vid, "-vframes", "1", "-q:v", "2", thumb_path],
+                    capture_output=True, timeout=15)
+            if os.path.exists(thumb_path):
+                pv.cover_url = f"http://114.117.242.17:3000/uploads/analyze/{thumb_name}"
+                await db.commit()
+    except Exception as _e:
+        print(f"[export] thumbnail failed: {_e}")
+
     # 保存 BGM 信息
     bgm_url = body.get("bgm_url", "")
     bgm_name = body.get("bgm_name", "")

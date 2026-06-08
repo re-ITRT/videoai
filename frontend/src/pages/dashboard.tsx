@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 
-function VideoProxy({ url }: { url: string }) {
+function VideoProxy({ url, coverUrl }: { url: string; coverUrl?: string }) {
   const [showVideo, setShowVideo] = useState(false)
   const [proxySrc, setProxySrc] = useState('')
   useEffect(() => {
@@ -11,7 +11,13 @@ function VideoProxy({ url }: { url: string }) {
   }, [url])
   if (!showVideo) {
     return <div style={{ position: 'relative', width: '100%', height: '100%', cursor: 'pointer', background: '#000', overflow: 'hidden' }} onClick={() => setShowVideo(true)}>
-      {proxySrc && <video src={proxySrc} preload="metadata" muted style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.9 }} />}
+      {coverUrl ? (
+        <img src={coverUrl} alt="cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      ) : proxySrc ? (
+        <video src={proxySrc} preload="metadata" muted style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.9 }} />
+      ) : (
+        <div style={{ width: '100%', height: '100%', background: '#1a1a2e' }} />
+      )}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <PlayCircleOutlined style={{ fontSize: 40, color: 'rgba(255,255,255,0.85)' }} />
       </div>
@@ -120,7 +126,7 @@ export default function Dashboard() {
                             cover={
                               <div style={{ position: 'relative', background: '#000', height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
                                 onClick={async () => { try { const sr: any = await request.post('/studio/sign-url', { path: v._video_url || v.video_url }); window.open(sr?.url || v.video_url, '_blank') } catch { window.open(v.video_url, '_blank') } }}>
-                                <VideoProxy url={v._video_url || v.video_url} />
+                                <VideoProxy url={v._video_url || v.video_url} coverUrl={v.cover_url} />
                                 <PlayCircleOutlined style={{ position: 'absolute', fontSize: 40, color: 'rgba(255,255,255,0.8)' }} />
                               </div>
                             }
