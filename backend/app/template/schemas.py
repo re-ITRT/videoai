@@ -29,6 +29,7 @@ class StrategyFactorUpdate(BaseModel):
     category: Optional[str] = None
     tags: Optional[List[str]] = None
     bgm_preference: Optional[str] = None
+    bgm_lightness_target: Optional[int] = None
 
 
 class StrategyFactorResponse(StrategyFactorBase):
@@ -53,6 +54,7 @@ class InspirationTemplateBase(BaseModel):
     attribution_score: float = 0.0
     predicted_play_count: int = 2000
     bgm_preference: str = ""
+    bgm_lightness_target: int = 0
 
 
 class InspirationTemplateCreate(InspirationTemplateBase):
@@ -67,6 +69,7 @@ class InspirationTemplateUpdate(BaseModel):
     category: Optional[str] = None
     tags: Optional[List[str]] = None
     bgm_preference: Optional[str] = None
+    bgm_lightness_target: Optional[int] = None
 
 
 class InspirationTemplateResponse(InspirationTemplateBase):

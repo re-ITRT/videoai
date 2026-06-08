@@ -144,15 +144,23 @@ export default function StudioPage() {
     try {
       const r: any = await request.get('/materials', { params: { material_type: 'audio' } })
       let list = Array.isArray(r) ? r : r?.items || []
-      // 按 BGM 风格偏好排序：匹配的靠前
-      const pref = stateRef.current.bgm_style || ''
-      if (pref) {
-        list = [...list].sort((a: any, b: any) => {
-          const moodA = (a.audio_features?.mood || '') === pref ? 1 : 0
-          const moodB = (b.audio_features?.mood || '') === pref ? 1 : 0
-          return moodB - moodA  // 匹配的排在前面
-        })
+      // 按 BGM 轻快度匹配排序（带相似度）
+      const defaultTarget = 50
+      // 从模板查 bgm_lightness_target
+      let targetLs = defaultTarget
+      const tmpl = stateRef.current.selected_template
+      if (tmpl && tmpl !== 'default') {
+        try {
+          const tr: any = await request.get('/template/templates', { params: { limit: 100 } })
+          const t = (tr?.items || []).find((x: any) => x.name === tmpl)
+          if (t?.bgm_lightness_target) targetLs = t.bgm_lightness_target
+        } catch {}
       }
+      list = [...list].map((m: any) => {
+        const ls = m.audio_features?.lightness_score ?? m.audio_features?.features?.lightness_score ?? 50
+        const sim = Math.max(0, Math.min(100, 100 - Math.abs(targetLs - ls)))
+        return { ...m, _similarity: Math.round(sim), _targetLs: targetLs }
+      }).sort((a: any, b: any) => b._similarity - a._similarity)
       setBgmMaterials(list)
     } catch {}
   }
@@ -719,7 +727,9 @@ export default function StudioPage() {
                       <List.Item onClick={() => setSelectedBgmId(selectedBgmId === m.id ? null : m.id)}
                         style={{ cursor: 'pointer', background: selectedBgmId === m.id ? '#fff7e6' : undefined }}>
                         <Space><SoundOutlined style={{ color: '#fa8c16', fontSize: 20 }} />
-                          <div><div style={{ fontWeight: 500 }}>{m.name || '未命名'}</div><div style={{ color: '#999', fontSize: 11 }}>{m.tags?.join(', ') || ''}</div>
+                          <div><div style={{ fontWeight: 500 }}>{m.name || '未命名'}</div>
+                            <div style={{ color: '#999', fontSize: 11 }}>{m.tags?.join(', ') || ''}</div>
+                            <div><Tag color={m._similarity >= 80 ? 'green' : m._similarity >= 50 ? 'orange' : 'default'} style={{ fontSize: 10 }}>匹配 {m._similarity}%</Tag></div>
                           {m.image_url && <audio src={m.image_url} controls style={{ width: 200, height: 28, marginTop: 4 }} />}</div>
                         </Space>
                       </List.Item>

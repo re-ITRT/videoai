@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Table, Button, Card, message, Space, Modal, Input, Tabs, Tag, Spin, Descriptions, Progress, Typography, Divider, Select } from 'antd'
+import { Table, Button, Card, message, Space, Modal, Input, Tabs, Tag, Spin, Descriptions, Progress, Typography, Divider, Select, Slider } from 'antd'
 import { PlusOutlined, EditOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import request from '../../utils/request'
 
@@ -39,11 +39,12 @@ export default function ScriptTemplates() {
   const [editVisible, setEditVisible] = useState(false)
   const [editName, setEditName] = useState('')
   const [editBgmPref, setEditBgmPref] = useState('')
+  const [editBgmTarget, setEditBgmTarget] = useState(50)
   const [sysSections, setSysSections] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [createVisible, setCreateVisible] = useState(false)
   const [createName, setCreateName] = useState('')
-  const [createBgmPref, setCreateBgmPref] = useState('')
+  const [createBgmTarget, setCreateBgmTarget] = useState(50)
   const [creating, setCreating] = useState(false)
 
   // AI 生成
@@ -91,9 +92,9 @@ export default function ScriptTemplates() {
         const tr: any = await request.get('/template/templates', { params: { limit: 100 } })
         const existing = (tr?.items || []).find((t: any) => t.name === editName)
         if (existing) {
-          await request.put(`/template/templates/${existing.id}`, { bgm_preference: editBgmPref || '' })
+          await request.put(`/template/templates/${existing.id}`, { bgm_preference: editBgmTarget >= 55 ? '轻快' : editBgmTarget <= 30 ? '稳重' : '中性', bgm_lightness_target: editBgmTarget || '' })
         } else if (editBgmPref) {
-          await request.post('/template/templates', { name: editName, strategy: '', factors: {}, category: '', tags: [], bgm_preference: editBgmPref })
+          await request.post('/template/templates', { name: editName, strategy: '', factors: {}, category: '', tags: [], bgm_preference: editBgmTarget >= 55 ? '轻快' : editBgmTarget <= 30 ? '稳重' : '中性', bgm_lightness_target: editBgmTarget })
         }
       } catch {}
       message.success('模板已保存')
@@ -238,13 +239,11 @@ export default function ScriptTemplates() {
       <Modal title="新建模板" open={createVisible} onCancel={() => setCreateVisible(false)} onOk={handleCreate} confirmLoading={creating}>
         <div style={{ marginBottom: 8 }}>模板名称</div>
         <Input placeholder="输入模板名称" value={createName} onChange={e => setCreateName(e.target.value)} onPressEnter={handleCreate} style={{ marginBottom: 12 }} />
-        <div style={{ marginBottom: 8 }}>BGM 偏好（选填）</div>
-        <Select placeholder="不限" allowClear style={{ width: '100%' }} value={createBgmPref} onChange={setCreateBgmPref} options={[
-          { value: '', label: '不限' },
-          { value: '轻快', label: '⚡ 轻快' },
-          { value: '中性', label: '➡ 中性' },
-          { value: '稳重', label: '🐢 稳重' },
-        ]} />
+        <div style={{ marginBottom: 4, fontSize: 12, color: '#666' }}>BGM 轻快度目标值（0=稳重 50=中性 100=轻快）</div>
+        <Slider min={0} max={100} step={5} value={createBgmTarget} onChange={setCreateBgmTarget} style={{ width: '100%' }} />
+        <Tag color={createBgmTarget >= 55 ? 'green' : createBgmTarget <= 30 ? 'purple' : 'default'} style={{ marginTop: 4 }}>
+          {createBgmTarget >= 55 ? '⚡ 轻快' : createBgmTarget <= 30 ? '🐢 稳重' : '➡ 中性'} ({createBgmTarget})
+        </Tag>
       </Modal>
 
       {/* 编辑模板 */}
@@ -261,13 +260,11 @@ export default function ScriptTemplates() {
             ),
           }))} />
         )}
-        <div style={{ marginTop: 12, marginBottom: 8 }}>BGM 偏好</div>
-        <Select allowClear style={{ width: 200 }} value={editBgmPref} onChange={setEditBgmPref} options={[
-          { value: '', label: '不限' },
-          { value: '轻快', label: '⚡ 轻快' },
-          { value: '中性', label: '➡ 中性' },
-          { value: '稳重', label: '🐢 稳重' },
-        ]} />
+        <div style={{ marginTop: 12, marginBottom: 4, fontSize: 12, color: '#666' }}>BGM 轻快度目标值（0=稳重 50=中性 100=轻快）</div>
+        <Slider min={0} max={100} step={5} value={editBgmTarget} onChange={setEditBgmTarget} style={{ width: 300 }} />
+        <Tag color={editBgmTarget >= 55 ? 'green' : editBgmTarget <= 30 ? 'purple' : 'default'} style={{ marginTop: 4 }}>
+          {editBgmTarget >= 55 ? '⚡ 轻快' : editBgmTarget <= 30 ? '🐢 稳重' : '➡ 中性'} ({editBgmTarget})
+        </Tag>
         <Button type="primary" style={{ marginLeft: 12 }} onClick={handleSave} loading={saving}>保存模板</Button>
       </Modal>
 
