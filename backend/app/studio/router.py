@@ -507,21 +507,10 @@ async def studio_compose_video(body: dict, db: AsyncSession = Depends(get_db), u
     files = await _gsf(db, session_id)
     clips = [f for f in files if f.file_type == "video_clip"]
     if clip_ids:
+        # 总是按 clip_ids 顺序排列（用户可能调过序）
+        id_order = {cid: i for i, cid in enumerate(clip_ids)}
         clips = [f for f in clips if f.id in clip_ids]
-        # 如果有 transitions 参数，说明来自分镜编辑，按 clip_ids 顺序保持用户排序
-        transitions = body.get("transitions")
-        if transitions:
-            id_order = {cid: i for i, cid in enumerate(clip_ids)}
-            clips.sort(key=lambda f: id_order.get(f.id, 999))
-        else:
-            # 否则按 scene_id 排序
-            def _scene_sort_key(f):
-                desc = f.description or ""
-                try:
-                    return int(desc.replace("场景 ", "").replace(" 视频片段", ""))
-                except:
-                    return 999
-            clips.sort(key=_scene_sort_key)
+        clips.sort(key=lambda f: id_order.get(f.id, 999))
     if not clips:
         raise HTTPException(400, "没有可合成的视频片段")
 
