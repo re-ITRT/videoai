@@ -111,6 +111,7 @@ export default function StudioPage() {
         setState((prev: any) => ({ ...prev, ...r }))
         if (r.asrResults) setAsrResults(r.asrResults)
         setMaterials(r.cached_materials || [])
+        if (r._all_search_results) setAllSearchResults(r._all_search_results)
       }
     }).catch(() => {})
     // 加载合成的最终视频和字幕视频
@@ -183,6 +184,7 @@ export default function StudioPage() {
       if (r && typeof r === 'object') {
         setState({ ...state, ...r })
         setMaterials(r.cached_materials || [])
+        if (r._all_search_results) setAllSearchResults(r._all_search_results)
       }
     } catch {}
   }
@@ -278,14 +280,19 @@ export default function StudioPage() {
     setGenerating(null)
   }
 
+  // 嵌入搜索到的全部结果（低阈值），用于前端滑块二次筛选
+  const [allSearchResults, setAllSearchResults] = useState<any[]>([])
   const semanticSearch = async () => {
     const prod = state.products.find((p: any) => p.id === state.selected_product_id)
     if (!prod) return message.warning('请先选择产品介绍')
     setGenerating('嵌入搜索')
     try {
-      const res: any = await request.post('/studio/semantic-search', { product_info: { title: prod.title, content: prod.content }, threshold: localThreshold })
-      setMaterials(res?.materials || [])
-      saveState({ cached_materials: res?.materials || [] })
+      const res: any = await request.post('/studio/semantic-search', { product_info: { title: prod.title, content: prod.content }, threshold: 0.05 })
+      const full = res?.materials || []
+      setAllSearchResults(full)
+      saveState({ cached_materials: full, _all_search_results: full })
+      // 按当前阈值显示
+      setMaterials(full.filter((m: any) => (m.similarity ?? m.score ?? 0) >= localThreshold))
     } catch { message.error('搜索失败') }
     setGenerating(null)
   }
@@ -513,7 +520,7 @@ export default function StudioPage() {
                 <Card title="素材选择" size="small" style={{ minHeight: 400 }}>
                   <div style={{ marginBottom: 16 }}>
                     <span>相似度阈值: {localThreshold}</span>
-                    <Slider min={0} max={0.95} step={0.05} value={localThreshold} onChange={setLocalThreshold} />
+                    <Slider min={0} max={0.95} step={0.05} value={localThreshold} onChange={v => { setLocalThreshold(v); setMaterials(allSearchResults.filter((m: any) => (m.similarity ?? m.score ?? 0) >= v)) }} />
                   </div>
                   <List size="small" dataSource={materials} renderItem={(m: any) => (
                     <List.Item style={{ cursor: 'pointer', background: state.selected_material_ids.includes(m.id) ? '#e6f4ff' : undefined }}
