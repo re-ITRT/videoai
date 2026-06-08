@@ -1,225 +1,159 @@
 # Video-AI：电商场景 AIGC 带货视频生成系统
 
-> AI全栈挑战赛课题 — TikTok Shop 场景，商家端到端自动生成带货视频
-> 团队：2人协作 (A: 复杂模块 / B: 简单模块)
+> 🔗 **在线演示**: [http://114.117.242.17:3000](http://114.117.242.17:3000)
+> 🔗 **API 文档**: [http://114.117.242.17:8000/docs](http://114.117.242.17:8000/docs)
+>
+> 账号: `admin` / `Admin123` — 此为示例站点，数据会不定期重置
+
+AI全栈挑战赛课题 — TikTok Shop 场景，商家端到端自动生成带货视频。
+基于火山引擎方舟(Seedance 视频生成) + 扣子工作流(Coze) 构建。
 
 ---
 
-## 当前状态
+## 快速开始
 
-| 模块 | 状态 | 备注 |
-|------|------|------|
-| 🔐 认证/用户 | ✅ | JWT 注册登录/刷新/用户资料/管理员 |
-| 📦 素材（M4 切片） | ✅ | material-embed scenes → 切片 |
-| 🧪 测试框架 | ✅ | 142 个测试，覆盖率 95.8% |
-| 🎥 其他 P0 功能 | ⏳ 进行中 | |
-
-基本流程: `make test` → `make test-cov`（需 ≥95%） → push
-
-## 快速入口
-
-| 你想看什么？ | 链接 |
-|-------------|------|
-| 🏗 **项目架构总览** | [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) |
-| 📋 **完整功能清单** | [`docs/FEATURE_CHECKLIST.md`](./docs/FEATURE_CHECKLIST.md) |
-| 📄 **全部 API 接口文档** | [`docs/API_DOCS.md`](./docs/API_DOCS.md) |
-
----
-
-## 开发者引导
-
-### 👤 开发者 A（复杂模块）
-
-**负责：** 剧本系统、智能剪辑、分镜编辑、多语种TTS、数据归因、CI/CD、火山引擎集成
-
-**必读文档：**
-1. [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) — 项目架构 + 目录结构
-2. [`docs/API_SPEC_A.md`](./docs/API_SPEC_A.md) — A 负责的所有接口规范 ← **从这里开始**
-3. [`docs/WORKFLOW_DESIGN.md`](./docs/WORKFLOW_DESIGN.md) — 扣子工作流设计 + API凭证
-
-**关键代码位置：**
-```
-backend/app/script/       — 剧本模块（需完善逻辑）
-backend/app/creation/     — 创作模块（需完善逻辑）
-frontend/src/modules/script/   — 剧本前端
-frontend/src/modules/creation/ — 创作前端
-frontend/src/pages/reference.tsx   — 参考视频库页面
-frontend/src/pages/templates.tsx   — 灵感模板页面
-```
-
----
-
-### 👤 开发者 B（简单模块）
-
-**负责：** 素材模块完善、画幅导出、时长限制、WebSocket进度、异常重试、骨架屏、日志监控、合规审核、素材来源声明
-
-**必读文档：**
-1. [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) — 项目架构 + 目录结构
-2. [`docs/API_SPEC_B.md`](./docs/API_SPEC_B.md) — B 负责的所有接口规范 ← **从这里开始**
-
-**关键代码位置：**
-```
-backend/app/material/     — 素材模块（需从stub填充逻辑）
-frontend/src/modules/material/ — 素材前端
-frontend/src/components/  — 骨架屏组件
-```
-
----
-
-## Git 协作规范
-
-两人协作，分支策略尽量轻量，不引入 Git Flow 的复杂度。
-
-### 分支结构
-
-```
-main ──────────────── 主干，随时可部署
-  ├─ feature/a-*       A 的功能分支
-  └─ feature/b-*       B 的功能分支
-```
-
-| 分支 | 谁用 | 说明 |
-|------|------|------|
-| `main` | 两人 | 稳定分支。**不要直接提交**，一律通过 feature 分支合并 |
-| `feature/a-<模块名>` | A | 如 `feature/a-script`, `feature/a-creation`, `feature/a-ci-cd` |
-| `feature/b-<模块名>` | B | 如 `feature/b-material`, `feature/b-websocket`, `feature/b-logging` |
-
-### 工作流
+### 一键部署（新服务器）
 
 ```bash
-# 1. 开始新功能前，先从 main 拉最新
-git checkout main
-git pull
-git checkout -b feature/a-script   # A 新建剧本分支
-
-# 2. 开发过程中频繁提交
-git add backend/app/script/
-git commit -m "feat(script): 完成剧本生成接口"
-
-# 3. 功能完成后，合并回 main
-git checkout main
-git pull
-git merge feature/a-script   # 或走 PR/MR
-git push
-
-# 4. 删除已合并的分支
-git branch -d feature/a-script
+bash <(curl -sL https://gitee.com/MaoZhiqin/video-ai/raw/master/ci/setup.sh)
 ```
 
-### 多人同时开发时的协调
+自动完成：系统依赖 → 克隆代码 → `.env` 配置 → Docker 服务(PostgreSQL+pgvector/Redis/MinIO) → 数据库初始化 → 种子数据 → CI/CD hooks
 
-| 场景 | 做法 |
-|------|------|
-| A 和 B 改不同文件 | ✅ 互不干扰，随意并发 |
-| A 和 B 改同一文件的不同函数 | ✅ Git 会自动合并，无冲突 |
-| A 和 B 改同一文件的同一行 | ⚠️ 先合并的先推，后合并的 `git pull --rebase` 解决冲突 |
-| 一方改到了 API 接口定义 | 📞 口头或群里通知另一方 |
-
-### 提交信息规范
-
-```
-<type>(<scope>): <描述>
-
-# type: feat / fix / refactor / docs / style / chore
-# scope: script / material / creation / auth / gateway / frontend / docs / ci
-# 描述用中文或英文均可
-
-示例:
-  feat(script): 完成策略因子框架
-  fix(material): 修复切片embedding维度错误
-  docs(api): 更新B的接口文档
-  chore(ci): 配置GitHub Actions部署
-```
-
-### 冲突解决
+### 本地开发
 
 ```bash
-# 合并时冲突
-git pull origin main
-# Git 会标记冲突文件，手动修改后:
-git add .
-git commit -m "fix: 解决与main的合并冲突"
-git push
-```
+# 克隆
+git clone https://gitee.com/MaoZhiqin/video-ai.git
+cd video-ai
 
-### 关键提醒
+# 启动依赖服务
+docker compose up -d postgres redis minio
 
-- ⚡ **不要直接 push 到 main**（main 是两个人的共有基础）
-- ⚡ **每天下班前 push 一次** feature 分支，避免丢失代码
-- ⚡ **合并前确保编译通过**：`cd frontend && npx tsc --noEmit`
-- ⚡ **CHANGELOG.md** 记录关键节点（使用 `date` 命令生成时间戳）
-- ⚡ `.gitignore` 已有: `node_modules/`, `.venv/`, `__pycache__/`, `.env`, `dist/`
-
----
-
-## 开发环境
-
-```bash
-# 1. 启动依赖
-docker-compose up -d postgres redis minio
-
-# 2. 启动后端
+# 后端
 cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python init_db.py          # 初始化数据库
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
-# 3. 启动前端（新开终端）
+# 前端（新终端）
 cd frontend
 npm install --ignore-scripts
 npx vite --host
 ```
 
-- **前端**: http://localhost:3000
-- **API**: http://localhost:8000/docs (Swagger)
-- **APISIX 网关**: http://localhost:9080
-
 ---
-
-## 系统概览
-
-```
-┌─ 用户前端 (React + AntD + Vite :3000) ─┐
-└─────────────────┬───────────────────────┘
-                  │ /api/v1/*
-┌─────────────────▼───────────────────────┐
-│  APISIX 网关 (:9080) — JWT/限流/CORS    │
-└──┬────┬────┬────┬────┬─────────────────┘
-   │    │    │    │    │
-  Auth User Material Script Tasks
-  :8000 :8000 :8000 :8000 :8000
-                  │
-          ┌───────┴───────┐
-       PostgreSQL   扣子工作流
-       pgvector     (Coze API)
-       + Redis + MinIO
-```
 
 ## 技术栈
 
 | 层 | 技术 |
-|---|------|
-| 前端 | React 18 + TypeScript 5 + Ant Design 6 + Vite 5 |
-| 后端 | FastAPI (Python 3.12) + SQLAlchemy async + Celery |
-| 网关 | APISIX 3.9 (JWT / 限流 / CORS) |
-| 数据库 | PostgreSQL 16 + pgvector + Redis 7 + MinIO |
-| AI | 火山引擎方舟 (Seed-2.0 / Seedance) + 扣子工作流 |
+|---|---|
+| **前端** | React 18 + TypeScript 5 + Ant Design 6 + Vite 5 |
+| **后端** | FastAPI (Python 3.12) + SQLAlchemy async |
+| **数据库** | PostgreSQL 16 + pgvector + Redis 7 + MinIO |
+| **AI 视频** | 火山引擎方舟 Seedance-1.5-pro |
+| **AI 剧本** | DeepSeek / 扣子工作流 |
+| **部署** | Docker Compose + 自建 CI/CD (git hooks) |
 
-## 项目文档索引
+## 系统架构
 
-| 文档 | 说明 |
-|------|------|
-| [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | 🏗 项目架构、目录结构、开发指南 |
-| [`docs/API_DOCS.md`](./docs/API_DOCS.md) | 📄 完整 API 接口文档 |
-| [`docs/API_SPEC_A.md`](./docs/API_SPEC_A.md) | 📄 **A 的接口规范**（剧本/创作/数据/火山引擎） |
-| [`docs/API_SPEC_B.md`](./docs/API_SPEC_B.md) | 📄 **B 的接口规范**（素材/UX/工程） |
-| [`docs/FEATURE_CHECKLIST.md`](./docs/FEATURE_CHECKLIST.md) | 📋 62项功能全景清单与进度 |
-| [`docs/PROJECT_ALIGNMENT.md`](./docs/PROJECT_ALIGNMENT.md) | 📋 课题要求对照表 |
-| [`docs/WORKFLOW_DESIGN.md`](./docs/WORKFLOW_DESIGN.md) | 🔧 7个扣子工作流设计 + API凭证 |
+```
+┌─ 前端 (React + AntD + Vite :3000) ──────┐
+└─────────────────┬────────────────────────┘
+                  │ /api/v1/*
+┌─────────────────▼────────────────────────┐
+│  FastAPI 后端 (:8000)                     │
+│  ├─ auth       — JWT 注册/登录/刷新       │
+│  ├─ material   — 素材管理/pgvector 检索    │
+│  ├─ script     — 剧本生成/编辑             │
+│  ├─ studio     — 工作流工作室(7步流水线)    │
+│  ├─ published  — 已发布视频管理/播放量统计  │
+│  ├─ metrics    — 数据归因分析              │
+│  └─ creation   — 创作任务编排              │
+└──┬──────┬──────┬─────────────────────────┘
+   │      │      │
+  PG     Redis  MinIO
+  (pgvector)    (素材存储)
+```
+
+## 核心功能
+
+| 模块 | 功能 |
+|---|---|
+| 📦 **素材管理** | 上传/检索(pgvector 语义搜索)、音频 Librosa 分析、素材切片(M4) |
+| 📝 **剧本生成** | LLM 剧本生成、AI 智能编辑、模板系统 |
+| 🎥 **视频生成** | Seedance API 场景生成、FFmpeg 拼接、ASR 语音识别+LLM纠错 |
+| 🎬 **工作流** | 7步流水线: 剧本→生成→合成→ASR→BGM→字幕→导出 |
+| 📊 **数据归因** | 多维度分析(平台/地区/模板)、归因分析、播放量预测 |
+| 🔐 **用户系统** | JWT 认证、角色管理(admin/user) |
+
+## CI/CD
+
+### 部署流水线
+
+```
+开发者: git push origin master
+服务器: git pull origin master
+  ├─ post-merge hook 自动触发 ci/deploy.sh
+  ├─ docker cp 变更的后端文件 → 容器
+  ├─ pytest 跑 350+ 测试
+  ├─ 通过 → docker restart backend
+  └─ 失败 → 不重启，打印错误
+```
+
+### 测试覆盖
+
+- **纯业务逻辑覆盖: 99.95%** (2204 行中仅 1 行未覆盖)
+- 排除外部模型依赖模块: `workflow/runners/*`, `agent/*`, `ai/*`, `attribution/*`, `audio/*`
+- 排除外部服务调用块(ffmpeg/ASR/LLM/librosa/Coze) 标记 `# pragma: no cover`
+- 测试数: 350+ (含 workflow 模块 43 个独立测试)
+
+### 一键安装
+
+```bash
+bash ci/setup.sh
+```
+
+覆盖：Docker → 代码 → 环境变量 → 数据库 → 种子数据 → 测试验证
+
+## 项目结构
+
+```
+video-ai/
+├── backend/
+│   ├── app/
+│   │   ├── auth/         — JWT 认证/用户管理
+│   │   ├── material/     — 素材 CRUD + pgvector 检索
+│   │   ├── script/       — 剧本生成/模板
+│   │   ├── studio/       — 工作流工作室(核心模块)
+│   │   ├── published/    — 已发布视频
+│   │   ├── metrics/      — 数据归因
+│   │   ├── creation/     — 创作任务
+│   │   ├── core/         — 基础设施(DB/安全/签名)
+│   │   └── workflow/     — 工作流配置/runners
+│   ├── tests/            — pytest 测试(350+)
+│   └── Dockerfile
+├── frontend/
+│   ├── src/
+│   │   ├── modules/      — 业务模块(素材/剧本/工作室等)
+│   │   ├── pages/        — 页面组件
+│   │   └── components/   — 通用组件
+│   └── Dockerfile
+├── ci/
+│   ├── setup.sh          — 一键安装脚本
+│   ├── deploy.sh         — 部署脚本(git hook 触发)
+│   ├── install-hook.sh   — git hook 安装器
+│   └── README.md         — CI/CD 文档
+├── docker-compose.yml
+└── README.md
+```
 
 ## 团队
 
-- 毛治钦 (@MaoZhiqin)
-- 开发者 A — 剧本/创作/数据/CI/CD/火山引擎
-- 开发者 B — 素材/UX/工程/监控
+- **毛治钦** (@MaoZhiqin) — 项目架构 / 后端核心 / 火山引擎集成
+- **开发者 A** — 剧本系统 / 创作编排 / CI/CD / 数据归因
+- **开发者 B** — 素材模块 / 前端 UX / 日志监控 / 异常处理
+
+## 许可证
+
+MIT
