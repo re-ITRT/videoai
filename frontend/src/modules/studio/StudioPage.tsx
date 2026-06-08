@@ -725,11 +725,11 @@ export default function StudioPage() {
                   {bgmMaterials.length === 0 ? <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>暂无音频素材</div> : (
                     <List size="small" dataSource={bgmMaterials} renderItem={(m: any) => (
                       <List.Item onClick={() => setSelectedBgmId(selectedBgmId === m.id ? null : m.id)}
-                        style={{ cursor: 'pointer', background: selectedBgmId === m.id ? '#fff7e6' : undefined }}>
+                        style={{ cursor: 'pointer', background: selectedBgmId === m.id ? '#fff7e6' : undefined }}
+                        actions={[<Tag key="sim" color={m._similarity >= 80 ? 'green' : m._similarity >= 50 ? 'orange' : 'default'} style={{ fontSize: 11 }}>匹配 {m._similarity}%</Tag>]}>
                         <Space><SoundOutlined style={{ color: '#fa8c16', fontSize: 20 }} />
                           <div><div style={{ fontWeight: 500 }}>{m.name || '未命名'}</div>
                             <div style={{ color: '#999', fontSize: 11 }}>{m.tags?.join(', ') || ''}</div>
-                            <div><Tag color={m._similarity >= 80 ? 'green' : m._similarity >= 50 ? 'orange' : 'default'} style={{ fontSize: 10 }}>匹配 {m._similarity}%</Tag></div>
                           {m.image_url && <audio src={m.image_url} controls style={{ width: 200, height: 28, marginTop: 4 }} />}</div>
                         </Space>
                       </List.Item>
