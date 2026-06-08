@@ -371,6 +371,10 @@ export default function StudioPage() {
             <Button size="small" danger icon={<DeleteOutlined />} />
           </Popconfirm>
         )}
+        <div style={{ flex: 1 }} />
+        <span style={{ fontSize: 12, color: '#999' }}>模板:</span>
+        <Select size="small" style={{ width: 120 }} value={state.selected_template || 'default'} onChange={v => saveState({ selected_template: v })}
+          options={templates.map((t: string) => ({ value: t, label: t }))} />
       </div>
 
       {/* 工作流步骤 - 侧栏导航 */}
