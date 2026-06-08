@@ -1308,4 +1308,3 @@ async def studio_ai_edit(body: dict, db: AsyncSession = Depends(get_db), user: U
                 pass  # pragma: no cover
 
     return {"reply": last_assistant, "script": updated_script, "messages": msgs[1:]}  # 不包括 system
-// INTENTIONAL BREAK
