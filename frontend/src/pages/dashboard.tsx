@@ -10,12 +10,14 @@ function VideoProxy({ url }: { url: string }) {
     setProxySrc(`/api/v1/studio/video-proxy?path=${encodeURIComponent(path)}`)
   }, [url])
   if (!showVideo) {
-    return <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', color: '#fff', fontSize: 12, cursor: 'pointer' }} onClick={() => setShowVideo(true)}>
-      <PlayCircleOutlined style={{ fontSize: 32, marginBottom: 4 }} />
-      <span>预览</span>
+    return <div style={{ position: 'relative', width: '100%', height: '100%', cursor: 'pointer', background: '#000', overflow: 'hidden' }} onClick={() => setShowVideo(true)}>
+      {proxySrc && <video src={proxySrc} preload="metadata" muted style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.9 }} />}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <PlayCircleOutlined style={{ fontSize: 40, color: 'rgba(255,255,255,0.85)' }} />
+      </div>
     </div>
   }
-  if (!proxySrc) return <div style={{ width: '100%', height: '100%', background: '#f0f0f0' }} />
+  if (!proxySrc) return <div style={{ width: '100%', height: '100%', background: '#000' }} />
   return <video src={proxySrc} controls autoPlay style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
 }
 import { Card, Row, Col, Statistic, Skeleton, Tabs, Tag, Empty, Spin, Button, message, Modal, Space, Typography, Divider, Descriptions } from 'antd'

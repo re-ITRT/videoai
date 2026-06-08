@@ -18,12 +18,15 @@ function VideoProxy({ url, style }: { url: string; style?: any }) {
     setProxySrc(`/api/v1/studio/video-proxy?path=${encodeURIComponent(path)}`)
   }, [url])
   if (!showVideo) {
-    return <div style={{ width: '100%', height: style?.height || 200, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', color: '#fff', fontSize: 12, cursor: 'pointer', ...(style || {}) }} onClick={() => setShowVideo(true)}>
-      <PlayCircleOutlined style={{ fontSize: 28, marginBottom: 2 }} />
-      <span>预览</span>
+    const h = style?.height || 200
+    return <div style={{ position: 'relative', width: '100%', height: h, cursor: 'pointer', background: '#000', borderRadius: 4, overflow: 'hidden', ...(style || {}) }} onClick={() => setShowVideo(true)}>
+      {proxySrc && <video src={proxySrc} preload="metadata" muted style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.9, borderRadius: 4 }} />}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <PlayCircleOutlined style={{ fontSize: 32, color: 'rgba(255,255,255,0.85)' }} />
+      </div>
     </div>
   }
-  if (!proxySrc) return <div style={{ width: '100%', height: style?.height || 200, background: '#f5f5f5', borderRadius: 4, ...(style || {}) }} />
+  if (!proxySrc) return <div style={{ width: '100%', height: style?.height || 200, background: '#000', borderRadius: 4, ...(style || {}) }} />
   return <video src={proxySrc} controls autoPlay style={{ width: '100%', maxHeight: 200, borderRadius: 4, ...(style || {}) }} />
 }
 
