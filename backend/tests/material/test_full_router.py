@@ -23,7 +23,7 @@ class TestUploadMaterial:
         with patch("app.material.service.create_material", new_callable=AsyncMock) as cm:
             cm.return_value = Material(
                 id=1, user_id="1", material_type="product", input_type="image",
-                image_url="/u/test.jpg",
+                image_url="/u/test.jpg", tags=[], audio_features={}, source="upload",
             )
             result = await upload_material(req, db_session, dummy_user)
             assert hasattr(result, "id") or isinstance(result, dict)
@@ -34,13 +34,13 @@ class TestUploadMaterial:
         req = MaterialUploadRequest(
             material_type="product", input_type="image",
             image_url="/u/test.jpg",
-            scenes=[{"time_range": "0-10", "description": "intro"}],
+            scenes=['{"time_range": "0-10", "description": "intro"}'],
         )
         with patch("app.material.service.create_material", new_callable=AsyncMock) as cm, \
              patch("app.material.service.parse_and_create_slices", new_callable=AsyncMock):
             cm.return_value = Material(
                 id=1, user_id="1", material_type="product", input_type="image",
-                image_url="/u/test.jpg",
+                image_url="/u/test.jpg", tags=[], audio_features={}, source="upload",
             )
             result = await upload_material(req, db_session, dummy_user)
             assert hasattr(result, "id") or isinstance(result, dict)
@@ -58,7 +58,7 @@ class TestListMaterials:
     @pytest.mark.asyncio
     async def test_with_items(self, db_session, dummy_user):
         from app.material.router import list_materials
-        m = Material(id=1, name="test", user_id="1", material_type="product", input_type="image")
+        m = Material(id=1, name="test", user_id="1", material_type="product", input_type="image", tags=[], audio_features={})
         with patch("app.material.service.list_materials", new_callable=AsyncMock) as lm:
             lm.return_value = [m]
             result = await list_materials(db=db_session, current_user=dummy_user)
@@ -87,7 +87,7 @@ class TestGetMaterial:
     @pytest.mark.asyncio
     async def test_found(self, db_session, dummy_user):
         from app.material.router import get_material
-        m = Material(id=1, name="test", user_id="1", material_type="product", input_type="image")
+        m = Material(id=1, name="test", user_id="1", material_type="product", input_type="image", tags=[], audio_features={})
         with patch("app.material.service.get_material", new_callable=AsyncMock, return_value=m):
             result = await get_material(1, db_session, dummy_user)
             assert hasattr(result, "id") or isinstance(result, dict)
@@ -156,7 +156,7 @@ class TestListSlices:
     @pytest.mark.asyncio
     async def test_list_slices_success(self, db_session, dummy_user):
         from app.material.router import list_slices
-        m = Material(id=1, name="test", user_id="1", material_type="product", input_type="image")
+        m = Material(id=1, name="test", user_id="1", material_type="product", input_type="image", tags=[], audio_features={})
         with patch("app.material.service.get_material", new_callable=AsyncMock, return_value=m), \
              patch("app.material.service.list_slices", new_callable=AsyncMock, return_value=[]):
             result = await list_slices(1, db=db_session, current_user=dummy_user)
@@ -176,10 +176,10 @@ class TestCreateSlice:
     @pytest.mark.asyncio
     async def test_create_slice_success(self, db_session, dummy_user):
         from app.material.router import create_slice
-        m = Material(id=1, name="test", user_id="1", material_type="product", input_type="image")
+        m = Material(id=1, name="test", user_id="1", material_type="product", input_type="image", tags=[], audio_features={})
         req = SliceCreateRequest(slice_type="keyframe", time_range="0-5", description="test")
         with patch("app.material.service.get_material", new_callable=AsyncMock, return_value=m), \
              patch("app.material.service.create_slice", new_callable=AsyncMock) as cs:
-            cs.return_value = MagicMock(id=1, material_id=1, slice_type="keyframe", time_range="0-5")
+            cs.return_value = MagicMock(id=1, material_id=1, slice_type="keyframe", time_range="0-5", scene_id=None, description="test", image_url=None)
             result = await create_slice(1, req, db_session, dummy_user)
             assert hasattr(result, "id") or isinstance(result, dict)

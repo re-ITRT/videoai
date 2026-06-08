@@ -8,17 +8,17 @@ class TestListScripts:
     @pytest.mark.asyncio
     async def test_list_scripts_empty(self, db_session):
         from app.script.router import list_scripts
-        result = await list_scripts(db=db_session)
+        result = await list_scripts(0, 20, db=db_session)
         assert result == []
 
     @pytest.mark.asyncio
     async def test_list_scripts_with_data(self, db_session):
         from app.script.router import list_scripts
         from app.script.models import Script
-        s = Script(task_id=1, strategy="template", version="v1")
+        s = Script(task_id=1, strategy="template", version="v1", content="{}")
         db_session.add(s)
         await db_session.flush()
-        result = await list_scripts(db=db_session)
+        result = await list_scripts(0, 20, db=db_session)
         assert len(result) == 1
         assert result[0]["strategy"] == "template"
 
