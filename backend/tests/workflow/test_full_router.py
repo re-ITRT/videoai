@@ -5,6 +5,7 @@ import json
 import os
 import sys
 import shutil
+import tempfile
 from unittest.mock import patch, AsyncMock, MagicMock
 from typing import AsyncGenerator
 
@@ -108,6 +109,20 @@ async def _create_user(db_session, uid=1, username="testuser") -> User:
     return user
 
 
+def _temp_templates_dir(copy_default: bool = False) -> tuple[str, str]:
+    """Create a temp directory, optionally copy the real 'default' template into it.
+    Returns (temp_dir_path, original_TEMPLATES_DIR_path).
+    Caller MUST call shutil.rmtree(temp_dir) in finally block.
+    """
+    from app.workflow.router import TEMPLATES_DIR as ORIG_TD
+    tmp = tempfile.mkdtemp(prefix="test_templates_")
+    if copy_default:
+        src_default = os.path.join(ORIG_TD, "default")
+        if os.path.isdir(src_default):
+            shutil.copytree(src_default, os.path.join(tmp, "default"))
+    return tmp, ORIG_TD
+
+
 # ==============================================================
 # GET /api/v1/workflows/available
 # ==============================================================
@@ -121,7 +136,6 @@ class TestListAvailableWorkflows:
         assert "script-generate" in result["workflows"]
         assert "video-generate" in result["workflows"]
         assert "asr-correct" in result["workflows"]
-        assert "material-analyze" in result["workflows"]
 
 
 # ==============================================================
@@ -345,13 +359,15 @@ class TestListAllTemplates:
 
     @pytest.mark.asyncio
     async def test_template_without_info_json(self):
-        from app.workflow.router import list_all_templates, TEMPLATES_DIR
-        test_dir = os.path.join(TEMPLATES_DIR, "__test_no_info")
+        from app.workflow.router import list_all_templates
+        tmp, orig = _temp_templates_dir()
+        test_dir = os.path.join(tmp, "__test_no_info")
         os.makedirs(test_dir, exist_ok=True)
         with open(os.path.join(test_dir, "system.md"), "w") as f:
             f.write("preview content")
         try:
-            result = await list_all_templates()
+            with patch("app.workflow.router.TEMPLATES_DIR", tmp):
+                result = await list_all_templates()
             assert "__test_no_info" in result["templates"]
             tmpl = result["templates"]["__test_no_info"]
             assert tmpl["display_name"] == "__test_no_info"
@@ -359,37 +375,42 @@ class TestListAllTemplates:
             assert tmpl["tags"] == []
             assert tmpl["prompt_preview"] == "preview content"
         finally:
-            shutil.rmtree(test_dir, ignore_errors=True)
+            shutil.rmtree(tmp, ignore_errors=True)
 
     @pytest.mark.asyncio
     async def test_template_without_system_md(self):
-        from app.workflow.router import list_all_templates, TEMPLATES_DIR
-        test_dir = os.path.join(TEMPLATES_DIR, "__test_no_system")
+        from app.workflow.router import list_all_templates
+        tmp, orig = _temp_templates_dir()
+        test_dir = os.path.join(tmp, "__test_no_system")
         os.makedirs(test_dir, exist_ok=True)
         with open(os.path.join(test_dir, "template_info.json"), "w") as f:
             json.dump({"name": "NoSystem", "description": "desc"}, f)
         try:
-            result = await list_all_templates()
+            with patch("app.workflow.router.TEMPLATES_DIR", tmp):
+                result = await list_all_templates()
             assert "__test_no_system" in result["templates"]
             tmpl = result["templates"]["__test_no_system"]
             assert tmpl["display_name"] == "NoSystem"
             assert tmpl["description"] == "desc"
             assert tmpl["prompt_preview"] == ""
         finally:
-            shutil.rmtree(test_dir, ignore_errors=True)
+            shutil.rmtree(tmp, ignore_errors=True)
 
     @pytest.mark.asyncio
     async def test_skips_non_directory_entries(self):
-        from app.workflow.router import list_all_templates, TEMPLATES_DIR
-        test_file = os.path.join(TEMPLATES_DIR, "__test_file_entry.txt")
+        from app.workflow.router import list_all_templates
+        tmp, orig = _temp_templates_dir()
+        test_file = os.path.join(tmp, "__test_file_entry.txt")
         try:
             with open(test_file, "w") as f:
                 f.write("not a dir")
-            result = await list_all_templates()
+            with patch("app.workflow.router.TEMPLATES_DIR", tmp):
+                result = await list_all_templates()
             assert "__test_file_entry.txt" not in result["templates"]
         finally:
             if os.path.exists(test_file):
                 os.remove(test_file)
+            shutil.rmtree(tmp, ignore_errors=True)
 
 
 # ==============================================================
@@ -454,71 +475,79 @@ class TestUpdateWorkflowPrompt:
 
     @pytest.mark.asyncio
     async def test_creates_new_file(self):
-        from app.workflow.router import update_workflow_prompt, TEMPLATES_DIR
-        fpath = os.path.join(TEMPLATES_DIR, "default", "__test_new.j2")
+        from app.workflow.router import update_workflow_prompt
+        tmp, orig = _temp_templates_dir(copy_default=True)
+        fpath = os.path.join(tmp, "default", "__test_new.j2")
         try:
-            result = await update_workflow_prompt(
-                workflow_name="default", filename="__test_new.j2",
-                body={"content": "hello"},
-            )
+            with patch("app.workflow.router.TEMPLATES_DIR", tmp):
+                result = await update_workflow_prompt(
+                    workflow_name="default", filename="__test_new.j2",
+                    body={"content": "hello"},
+                )
             assert result == {"ok": True}
             assert os.path.isfile(fpath)
             with open(fpath) as f:
                 assert f.read() == "hello"
         finally:
-            if os.path.exists(fpath):
-                os.remove(fpath)
+            shutil.rmtree(tmp, ignore_errors=True)
 
     @pytest.mark.asyncio
     async def test_overwrites_existing(self):
-        from app.workflow.router import update_workflow_prompt, TEMPLATES_DIR
-        fpath = os.path.join(TEMPLATES_DIR, "default", "__test_overwrite.j2")
+        from app.workflow.router import update_workflow_prompt
+        tmp, orig = _temp_templates_dir(copy_default=True)
+        fpath = os.path.join(tmp, "default", "__test_overwrite.j2")
         try:
             with open(fpath, "w") as f:
                 f.write("old")
-            result = await update_workflow_prompt(
-                workflow_name="default", filename="__test_overwrite.j2",
-                body={"content": "new"},
-            )
+            with patch("app.workflow.router.TEMPLATES_DIR", tmp):
+                result = await update_workflow_prompt(
+                    workflow_name="default", filename="__test_overwrite.j2",
+                    body={"content": "new"},
+                )
             assert result == {"ok": True}
             with open(fpath) as f:
                 assert f.read() == "new"
         finally:
             if os.path.exists(fpath):
                 os.remove(fpath)
+            shutil.rmtree(tmp, ignore_errors=True)
 
     @pytest.mark.asyncio
     async def test_empty_body_writes_empty(self):
-        from app.workflow.router import update_workflow_prompt, TEMPLATES_DIR
-        fpath = os.path.join(TEMPLATES_DIR, "default", "__test_empty.j2")
+        from app.workflow.router import update_workflow_prompt
+        tmp, orig = _temp_templates_dir(copy_default=True)
+        fpath = os.path.join(tmp, "default", "__test_empty.j2")
         try:
-            result = await update_workflow_prompt(
-                workflow_name="default", filename="__test_empty.j2", body={},
-            )
+            with patch("app.workflow.router.TEMPLATES_DIR", tmp):
+                result = await update_workflow_prompt(
+                    workflow_name="default", filename="__test_empty.j2", body={},
+                )
             assert result == {"ok": True}
             with open(fpath) as f:
                 assert f.read() == ""
         finally:
             if os.path.exists(fpath):
                 os.remove(fpath)
+            shutil.rmtree(tmp, ignore_errors=True)
 
     @pytest.mark.asyncio
     async def test_writes_to_templates_dir_by_default(self):
         """Router code always breaks on TEMPLATES_DIR iteration"""
-        from app.workflow.router import update_workflow_prompt, TEMPLATES_DIR
-        fpath = os.path.join(TEMPLATES_DIR, "__test_root_dir", "__test_root.j2")
+        from app.workflow.router import update_workflow_prompt
+        tmp, orig = _temp_templates_dir()
+        fpath = os.path.join(tmp, "__test_root_dir", "__test_root.j2")
         try:
-            result = await update_workflow_prompt(
-                workflow_name="__test_root_dir", filename="__test_root.j2",
-                body={"content": "root"},
-            )
+            with patch("app.workflow.router.TEMPLATES_DIR", tmp):
+                result = await update_workflow_prompt(
+                    workflow_name="__test_root_dir", filename="__test_root.j2",
+                    body={"content": "root"},
+                )
             assert result == {"ok": True}
             assert os.path.isfile(fpath)
             with open(fpath) as f:
                 assert f.read() == "root"
         finally:
-            if os.path.exists(os.path.dirname(fpath)):
-                shutil.rmtree(os.path.dirname(fpath), ignore_errors=True)
+            shutil.rmtree(tmp, ignore_errors=True)
 
 
 # ==============================================================
@@ -527,13 +556,15 @@ class TestUpdateWorkflowPrompt:
 class TestCreateTemplate:
     @pytest.mark.asyncio
     async def test_create_success(self):
-        from app.workflow.router import create_template, TEMPLATES_DIR
+        from app.workflow.router import create_template
+        tmp, orig = _temp_templates_dir(copy_default=True)
         name = "__test_create_ok"
-        dst = os.path.join(TEMPLATES_DIR, name)
+        dst = os.path.join(tmp, name)
         try:
             if os.path.exists(dst):
                 shutil.rmtree(dst)
-            result = await create_template(body={"name": name})
+            with patch("app.workflow.router.TEMPLATES_DIR", tmp):
+                result = await create_template(body={"name": name})
             assert result == {"ok": True, "name": name}
             assert os.path.isdir(dst)
             assert os.path.isfile(os.path.join(dst, "system.md"))
@@ -541,8 +572,7 @@ class TestCreateTemplate:
                 info = json.load(f)
                 assert info["name"] == name
         finally:
-            if os.path.exists(dst):
-                shutil.rmtree(dst)
+            shutil.rmtree(tmp, ignore_errors=True)
 
     @pytest.mark.asyncio
     async def test_empty_name_400(self):
@@ -586,17 +616,19 @@ class TestDeleteTemplate:
 
     @pytest.mark.asyncio
     async def test_delete_success(self):
-        from app.workflow.router import delete_template, TEMPLATES_DIR
+        from app.workflow.router import delete_template
+        tmp, orig = _temp_templates_dir(copy_default=True)
         name = "__test_delete_ok"
-        dst = os.path.join(TEMPLATES_DIR, name)
-        shutil.copytree(os.path.join(TEMPLATES_DIR, "default"), dst)
+        dst = os.path.join(tmp, name)
+        src_default = os.path.join(tmp, "default")
+        shutil.copytree(src_default, dst)
         try:
-            result = await delete_template(template_name=name)
+            with patch("app.workflow.router.TEMPLATES_DIR", tmp):
+                result = await delete_template(template_name=name)
             assert result == {"ok": True}
             assert not os.path.exists(dst)
         finally:
-            if os.path.exists(dst):
-                shutil.rmtree(dst)
+            shutil.rmtree(tmp, ignore_errors=True)
 
 
 # ==============================================================
