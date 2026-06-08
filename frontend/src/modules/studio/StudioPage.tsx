@@ -143,7 +143,16 @@ export default function StudioPage() {
   const loadBgmMaterials = async () => {
     try {
       const r: any = await request.get('/materials', { params: { material_type: 'audio' } })
-      const list = Array.isArray(r) ? r : r?.items || []
+      let list = Array.isArray(r) ? r : r?.items || []
+      // 按 BGM 风格偏好排序：匹配的靠前
+      const pref = stateRef.current.bgm_style || ''
+      if (pref) {
+        list = [...list].sort((a: any, b: any) => {
+          const moodA = (a.audio_features?.mood || '') === pref ? 1 : 0
+          const moodB = (b.audio_features?.mood || '') === pref ? 1 : 0
+          return moodB - moodA  // 匹配的排在前面
+        })
+      }
       setBgmMaterials(list)
     } catch {}
   }
