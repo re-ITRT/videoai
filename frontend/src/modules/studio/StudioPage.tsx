@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Select, Button, Card, Input, Modal, Space, message, List, Popconfirm, Slider, Tag, Menu, Spin } from 'antd'
+import { Select, Button, Card, Input, Modal, Space, message, List, Popconfirm, Slider, Tag, Menu } from 'antd'
 import { PlusOutlined, PlayCircleOutlined, EditOutlined, DeleteOutlined, VideoCameraOutlined, RobotOutlined, SoundOutlined, CustomerServiceOutlined, AppstoreOutlined, FileTextOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons'
 import request from '../../utils/request'
 import ScriptEditor from '../agent/ScriptEditor'
@@ -564,7 +564,7 @@ export default function StudioPage() {
                                   <span>场景 {clip.scene_id}</span>
                                   <span>{clip.duration ? clip.duration + 's' : ''}</span>
                                 </div>
-                                <VideoProxy clipId={clip.id} style={{ width: '100%', height: 80, objectFit: 'cover' }} />
+                                <VideoProxy url={clip.url} style={{ width: '100%', height: 80, objectFit: 'cover' }} />
                                 <div style={{ display: 'flex', gap: 2, marginTop: 4, justifyContent: 'center' }}>
                                   <Button size="small" icon={<ArrowUpOutlined />} disabled={ci === 0}
                                     onClick={e => { e.stopPropagation(); const arr = [...editingClips]; [arr[ci-1], arr[ci]] = [arr[ci], arr[ci-1]]; setEditingClips(arr) }}
