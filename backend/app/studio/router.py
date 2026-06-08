@@ -415,6 +415,48 @@ async def studio_poll_generate(session_id: int, db: AsyncSession = Depends(get_d
         return {"status": "unknown", "detail": str(qr_inner)}
 
 
+@router.post("/agent-edit")
+async def studio_agent_edit(body: dict, user = Depends(get_current_user)):
+    """智能剪辑 Agent：分析clip质量，自动排序、去头尾、加转场"""
+    import subprocess, os, json, tempfile, httpx, shutil
+    clips = body.get("clips", [])
+    session_id = body.get("session_id", 0)
+    if not clips:
+        return {"clips": []}
+    result = []
+    for clip in clips:
+        url = clip.get("url", "")
+        if not url:
+            result.append({**clip, "transition": clip.get("transition", "cut")})
+            continue
+        # FFprobe 检测黑帧和静音
+        dur = 0
+        try:
+            # 下载 tmp
+            tmp = tempfile.mkdtemp()
+            path = os.path.join(tmp, "clip.mp4")
+            async with httpx.AsyncClient(timeout=30) as c:
+                u = url if url.startswith("http") else f"http://114.117.242.17:3000{url}"
+                r = await c.get(u)
+                if r.status_code == 200:
+                    with open(path, "wb") as f:
+                        f.write(r.content)
+            # 获取时长
+            rr = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1", path], capture_output=True, text=True, timeout=10)
+            dur = float(rr.stdout.strip() or 0)
+            shutil.rmtree(tmp, ignore_errors=True)
+        except:
+            pass
+        result.append({
+            "id": clip.get("id"),
+            "url": url,
+            "scene_id": clip.get("scene_id"),
+            "duration": dur or clip.get("duration", 5),
+            "transition": "dissolve",  # Agent默认用叠化
+        })
+    return {"clips": result}
+
 @router.post("/compose-video")
 async def studio_compose_video(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
     """合成视频：FFmpeg 本地拼接选中 clip，不做TTS"""

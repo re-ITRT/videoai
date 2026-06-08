@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Select, Button, Card, Input, Modal, Space, message, List, Collapse, Popconfirm, Slider, Tag, Menu } from 'antd'
-import { PlusOutlined, PlayCircleOutlined, EditOutlined, DeleteOutlined, VideoCameraOutlined, RobotOutlined, SoundOutlined, CustomerServiceOutlined, AppstoreOutlined, FileTextOutlined } from '@ant-design/icons'
+import { PlusOutlined, PlayCircleOutlined, EditOutlined, DeleteOutlined, VideoCameraOutlined, RobotOutlined, SoundOutlined, CustomerServiceOutlined, AppstoreOutlined, FileTextOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons'
 import request from '../../utils/request'
 import ScriptEditor from '../agent/ScriptEditor'
 import AiScriptEditor from '../agent/AiScriptEditor'
@@ -62,6 +62,9 @@ export default function StudioPage() {
   const [bgmMaterials, setBgmMaterials] = useState<any[]>([])
   const [selectedBgmId, setSelectedBgmId] = useState<number | null>(null)
   const [step, setStep] = useState(0)
+  // 分镜剪辑
+  const [editingClips, setEditingClips] = useState<any[]>([])
+  const [agentLoading, setAgentLoading] = useState(false)
   const stepIcons = [<PlusOutlined />, <VideoCameraOutlined />, <AppstoreOutlined />, <FileTextOutlined />, <PlayCircleOutlined />, <SoundOutlined />, <CustomerServiceOutlined />, <VideoCameraOutlined />]
   const stepLabels = ['产品介绍', '素材选择', '素材集合', '剧本生成', '视频生成', 'ASR校准', 'BGM选择', '导出']
 
@@ -258,14 +261,32 @@ export default function StudioPage() {
     generatingRef.current = false
   }
 
+  // 智能剪辑 Agent
+  const handleAgentEdit = async () => {
+    setAgentLoading(true)
+    try {
+      const res: any = await request.post('/studio/agent-edit', {
+        session_id: sessionIdRef.current,
+        clips: editingClips.map((c: any) => ({ id: c.id, url: c.url, scene_id: c.scene_id, duration: c.duration })),
+      }, { timeout: 120000 })
+      if (res && Array.isArray(res.clips)) {
+        setEditingClips(res.clips)
+        message.success('智能剪辑完成')
+      } else {
+        message.error('剪辑处理失败')
+      }
+    } catch { message.error('智能剪辑请求失败') }
+    setAgentLoading(false)
+  }
+
   // 合成视频（纯合成，不自动ASR，输出给ASR步骤）
-  const composeVid = async () => {
+  const composeVid = async (editClips?: any[]) => {
+    const clipsToUse = editClips || stateRef.current.clip_collections?.find((c: any) => c.id === stateRef.current.selected_clip_collection_id)?.clips || []
     const st = stateRef.current
-    const coll = (st.clip_collections || []).find((c: any) => c.id === st.selected_clip_collection_id)
-    if (!coll || !coll.clips?.length) return message.warning('请先选择视频片段集合')
+    if (!clipsToUse.length) return message.warning('请先选择视频片段集合')
     setGenerating('合成视频')
     try {
-      const res: any = await request.post('/studio/compose-video', { session_id: sessionIdRef.current, clip_ids: coll.clips.map((c: any) => c.id) })
+      const res: any = await request.post('/studio/compose-video', { session_id: sessionIdRef.current, clip_ids: clipsToUse.map((c: any) => c.id), transitions: editClips ? editClips.map((c: any) => c.transition || 'cut') : undefined })
       if (res?.videos?.length > 0) {
         const vid = res.videos[0]
         saveState({ composed_video: vid })
@@ -449,19 +470,55 @@ export default function StudioPage() {
                   {!state.last_script?.script?.title ? <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>生成剧本后点击生成</div> : (
                     <div>
                       <List size="small" dataSource={state.clip_collections} renderItem={(c: any) => (
-                        <List.Item onClick={() => saveState({ selected_clip_collection_id: c.id })}
+                        <List.Item onClick={() => { saveState({ selected_clip_collection_id: c.id }); setEditingClips(c.clips?.map((clip: any) => ({ ...clip, transition: 'cut' })) || []) }}
                           style={{ cursor: 'pointer', background: state.selected_clip_collection_id === c.id ? '#e6f4ff' : undefined }}
                           actions={[<span key="del" onClick={e => { e.stopPropagation(); deleteClipCollection(c.id) }}><DeleteOutlined style={{ color: '#ff4d4f' }} /></span>]}>
                           <Space><VideoCameraOutlined /><span>{c.name} ({c.clips?.length || 0} 片段)</span></Space>
                         </List.Item>
                       )} />
                       {(!state.clip_collections || state.clip_collections.length === 0) && <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>点击下方按钮开始生成</div>}
-                      {selectedClipColl && <Collapse ghost size="small" items={[{key:'clips',label:<span>查看片段 ({selectedClipColl.clips?.length||0})</span>,children:<div style={{maxHeight:200,overflow:'auto'}}>{selectedClipColl.clips?.map((clip:any)=>(<div key={clip.id} style={{padding:'4px 0',borderBottom:'1px solid #f0f0f0'}}><a href={clip.url} target="_blank" rel="noreferrer">场景 {clip.scene_id}</a></div>))}</div>}]} />}
+                      {/* 分镜剪辑面板 */}
+                      {selectedClipColl && editingClips.length > 0 && (
+                        <div style={{ marginTop: 12 }}>
+                          <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>🎬 分镜剪辑 — {selectedClipColl.name}</div>
+                          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 8 }}>
+                            {editingClips.map((clip: any, ci: number) => (
+                              <div key={clip.id || ci} style={{ minWidth: 160, maxWidth: 180, background: '#fafafa', borderRadius: 6, border: '1px solid #f0f0f0', padding: 8, position: 'relative' }}>
+                                <div style={{ fontSize: 11, color: '#999', marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
+                                  <span>场景 {clip.scene_id}</span>
+                                  <span>{clip.duration || '?'}s</span>
+                                </div>
+                                <video src={clip.url} controls style={{ width: '100%', height: 80, borderRadius: 4, objectFit: 'cover' }} />
+                                <div style={{ display: 'flex', gap: 2, marginTop: 4, justifyContent: 'center' }}>
+                                  <Button size="small" icon={<ArrowUpOutlined />} disabled={ci === 0}
+                                    onClick={e => { e.stopPropagation(); const arr = [...editingClips]; [arr[ci-1], arr[ci]] = [arr[ci], arr[ci-1]]; setEditingClips(arr) }}
+                                    style={{ fontSize: 10, height: 20, padding: '0 3px' }} />
+                                  <Button size="small" icon={<ArrowDownOutlined />} disabled={ci === editingClips.length - 1}
+                                    onClick={e => { e.stopPropagation(); const arr = [...editingClips]; [arr[ci], arr[ci+1]] = [arr[ci+1], arr[ci]]; setEditingClips(arr) }}
+                                    style={{ fontSize: 10, height: 20, padding: '0 3px' }} />
+                                  <Select size="small" value={clip.transition || 'cut'} onChange={v => { const arr = [...editingClips]; arr[ci] = { ...arr[ci], transition: v }; setEditingClips(arr) }}
+                                    style={{ width: 62, fontSize: 10 }} options={[
+                                      { value: 'cut', label: '切' },
+                                      { value: 'dissolve', label: '叠化' },
+                                      { value: 'fade', label: '渐黑' },
+                                    ]} />
+                                  <Button size="small" icon={<DeleteOutlined />} danger
+                                    onClick={e => { e.stopPropagation(); setEditingClips(editingClips.filter((_: any, i: number) => i !== ci)) }}
+                                    style={{ fontSize: 10, height: 20, padding: '0 3px' }} />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </Card>
                 <Space style={{ marginTop: 8 }}>
-                  {selectedClipColl && <GenBtn label="合成视频" onClick={composeVid} />}
+                  {selectedClipColl && editingClips.length > 0 && (
+                    <Button icon={<RobotOutlined />} loading={agentLoading} onClick={handleAgentEdit}>🤖 智能剪辑</Button>
+                  )}
+                  {selectedClipColl && editingClips.length > 0 && <GenBtn label="合成视频" onClick={() => composeVid(editingClips)} />}
                 </Space>
               </div>
             )}
