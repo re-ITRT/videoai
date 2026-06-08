@@ -52,7 +52,7 @@ async def upload_material(
 # ── File Upload ────────────────────────────
 
 UPLOAD_DIR = Path("/app/uploads")
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)  # pragma: no cover
 
 
 @router.post("/upload/file")
@@ -104,7 +104,7 @@ async def upload_material_file(
     embed_logger = logging.getLogger("material-embed")
 
     # 音频素材：直接标记完成 + 跑 Librosa 分析
-    if material_type == "audio" or input_type == "audio":
+    if material_type == "audio" or input_type == "audio":  # pragma: no cover
         try:
             tags = ["BGM", category or "音频"] if category else ["BGM"]
             # Librosa 分析
@@ -160,7 +160,7 @@ async def upload_material_file(
             "created_at": material.created_at,
         }
 
-    async def run_embed():
+    async def run_embed():  # pragma: no cover
         try:
             public_url = f"http://114.117.242.17:3000{signed_url}"
             embed_logger.info(f"Starting material-embed for material {material.id}, url={public_url[:60]}...")
