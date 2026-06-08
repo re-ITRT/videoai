@@ -1,11 +1,26 @@
 import { useState, useEffect, useRef } from 'react'
-import { Select, Button, Card, Input, Modal, Space, message, List, Popconfirm, Slider, Tag, Menu } from 'antd'
+import { Select, Button, Card, Input, Modal, Space, message, List, Popconfirm, Slider, Tag, Menu, Spin } from 'antd'
 import { PlusOutlined, PlayCircleOutlined, EditOutlined, DeleteOutlined, VideoCameraOutlined, RobotOutlined, SoundOutlined, CustomerServiceOutlined, AppstoreOutlined, FileTextOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons'
 import request from '../../utils/request'
 import ScriptEditor from '../agent/ScriptEditor'
 import AiScriptEditor from '../agent/AiScriptEditor'
 
 const { TextArea } = Input
+
+// 通过后端签名获取视频URL（前端不暴露mp4直链）
+function SignedVideo({ clipId, style }: { clipId: number; style?: any }) {
+  const [src, setSrc] = useState('')
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    let cancelled = false
+    request.get(`/studio/video-url/${clipId}`).then((r: any) => {
+      if (!cancelled && r?.url) { setSrc(r.url); setLoading(false) }
+    }).catch(() => setLoading(false))
+    return () => { cancelled = true }
+  }, [clipId])
+  if (loading) return <div style={{ width: '100%', height: 200, background: '#f5f5f5', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', ...(style || {}) }}><Spin /></div>
+  return <video src={src} controls style={{ width: '100%', maxHeight: 200, borderRadius: 4, ...(style || {}) }} />
+}
 
 function SpeedBar() {
   const [speed, setSpeed] = useState(1)
@@ -549,7 +564,7 @@ export default function StudioPage() {
                                   <span>场景 {clip.scene_id}</span>
                                   <span>{clip.duration ? clip.duration + 's' : ''}</span>
                                 </div>
-                                <video src={clip.url} controls style={{ width: '100%', height: 80, borderRadius: 4, objectFit: 'cover' }} />
+                                <SignedVideo clipId={clip.id} style={{ width: '100%', height: 80, objectFit: 'cover' }} />
                                 <div style={{ display: 'flex', gap: 2, marginTop: 4, justifyContent: 'center' }}>
                                   <Button size="small" icon={<ArrowUpOutlined />} disabled={ci === 0}
                                     onClick={e => { e.stopPropagation(); const arr = [...editingClips]; [arr[ci-1], arr[ci]] = [arr[ci], arr[ci-1]]; setEditingClips(arr) }}

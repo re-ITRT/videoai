@@ -92,6 +92,31 @@ async def save_workflow_state(session_id: int, body: dict, user: User = Depends(
     return {"ok": True}
 
 
+@router.get("/video-url/{clip_id}")
+async def get_signed_video_url(clip_id: int, db: AsyncSession = Depends(get_db), user = Depends(get_current_user)):
+    """根据 clip_id 返回临时签名 URL（前端不暴露 mp4 直链）"""
+    from app.agent.models import SessionFile
+    from app.core.signer import generate_signed_url
+    from sqlalchemy import select as _s
+    r = await db.execute(_s(SessionFile).where(SessionFile.id == clip_id))
+    sf = r.scalar_one_or_none()
+    if not sf or not sf.file_url:
+        raise HTTPException(404, "clip not found")
+    url = sf.file_url
+    if url.startswith("http"):
+        # 从已有的 signed URL 或者直链中提取路径
+        idx = url.find("/uploads/")
+        if idx >= 0:
+            path = url[idx:]
+        else:
+            raise HTTPException(400, "invalid url format")
+    else:
+        path = url
+    # 生成新鲜签名
+    signed = generate_signed_url(path, expire_seconds=3600)
+    full_url = f"http://114.117.242.17:3000{signed}"
+    return {"url": full_url}
+
 @router.post("/semantic-search")
 async def semantic_search(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
     """产品介绍 → query-generate → material-search → 返回素材相似度列表"""
