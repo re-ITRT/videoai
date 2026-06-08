@@ -89,8 +89,7 @@ async def upload_and_analyze(
             capture_output=True, text=True, timeout=30,
         )
         if os.path.exists(cover_path):
-            signed = generate_signed_url(f"/uploads/analyze/{cover_name}", expire_seconds=86400)
-            cover_url = f"http://114.117.242.17:3000{signed}"
+            cover_url = f"http://114.117.242.17:3000/uploads/analyze/{cover_name}"
 
     embed_data = {}
     scenes = []
