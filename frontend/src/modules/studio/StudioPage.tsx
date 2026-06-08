@@ -178,7 +178,16 @@ export default function StudioPage() {
     try {
       const r: any = await request.post('/agent/sessions', { title: sessionTitle || '新工作流' })
       setSessions(s => [...s, r]); setSessionId(r.id); setSessionModal(false); setSessionTitle(''); setSessionTemplate('default')
-      saveState({ session_name: sessionTitle || '新工作流', selected_template: sessionTemplate, bgm_style: sessionBgmStyle })
+      // 查模板的 BGM 偏好
+      let bgmPref = sessionBgmStyle
+      if (!bgmPref && sessionTemplate !== 'default') {
+        try {
+          const tr: any = await request.get('/template/templates', { params: { limit: 100 } })
+          const tmpl = (tr?.items || []).find((t: any) => t.name === sessionTemplate || String(t.id) === sessionTemplate)
+          if (tmpl?.bgm_preference) bgmPref = tmpl.bgm_preference
+        } catch {}
+      }
+      saveState({ session_name: sessionTitle || '新工作流', selected_template: sessionTemplate, bgm_style: bgmPref })
     } catch { message.error('创建失败') }
   }
 

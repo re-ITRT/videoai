@@ -42,6 +42,7 @@ export default function ScriptTemplates() {
   const [saving, setSaving] = useState(false)
   const [createVisible, setCreateVisible] = useState(false)
   const [createName, setCreateName] = useState('')
+  const [createBgmPref, setCreateBgmPref] = useState('')
   const [creating, setCreating] = useState(false)
 
   // AI 生成
@@ -198,6 +199,7 @@ export default function ScriptTemplates() {
       : <a onClick={() => openEdit(v)}>{v}</a> },
     { title: '描述', dataIndex: 'description' },
     { title: 'Prompt 预览', dataIndex: 'prompt_preview', ellipsis: true },
+    { title: '标签', dataIndex: 'tags', render: (tags: string[]) => tags?.map(t => <Tag key={t}>{t}</Tag>) },
     { title: '操作', render: (_: any, r: any) => (
       <Space>
         <Button size="small" icon={<EditOutlined />} disabled={r.name === 'default'} onClick={() => openEdit(r.name)}>编辑</Button>
@@ -223,7 +225,15 @@ export default function ScriptTemplates() {
 
       {/* 新建模板 */}
       <Modal title="新建模板" open={createVisible} onCancel={() => setCreateVisible(false)} onOk={handleCreate} confirmLoading={creating}>
-        <Input placeholder="输入模板名称" value={createName} onChange={e => setCreateName(e.target.value)} onPressEnter={handleCreate} />
+        <div style={{ marginBottom: 8 }}>模板名称</div>
+        <Input placeholder="输入模板名称" value={createName} onChange={e => setCreateName(e.target.value)} onPressEnter={handleCreate} style={{ marginBottom: 12 }} />
+        <div style={{ marginBottom: 8 }}>BGM 偏好（选填）</div>
+        <Select placeholder="不限" allowClear style={{ width: '100%' }} value={createBgmPref} onChange={setCreateBgmPref} options={[
+          { value: '', label: '不限' },
+          { value: '轻快', label: '⚡ 轻快' },
+          { value: '中性', label: '➡ 中性' },
+          { value: '稳重', label: '🐢 稳重' },
+        ]} />
       </Modal>
 
       {/* 编辑模板 */}

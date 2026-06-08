@@ -28,6 +28,7 @@ class StrategyFactorUpdate(BaseModel):
     content: Optional[Dict[str, Any]] = None
     category: Optional[str] = None
     tags: Optional[List[str]] = None
+    bgm_preference: Optional[str] = None
 
 
 class StrategyFactorResponse(StrategyFactorBase):
@@ -51,6 +52,7 @@ class InspirationTemplateBase(BaseModel):
     tags: List[str] = Field(default_factory=list)
     attribution_score: float = 0.0
     predicted_play_count: int = 2000
+    bgm_preference: str = ""
 
 
 class InspirationTemplateCreate(InspirationTemplateBase):
@@ -64,6 +66,7 @@ class InspirationTemplateUpdate(BaseModel):
     reference_video_ids: Optional[List[int]] = None
     category: Optional[str] = None
     tags: Optional[List[str]] = None
+    bgm_preference: Optional[str] = None
 
 
 class InspirationTemplateResponse(InspirationTemplateBase):

@@ -44,6 +44,7 @@ class InspirationTemplate(Base):
     tags = Column(JSONB, default=[])
     attribution_score = Column(Float, default=0.0)  # 归因评分
     predicted_play_count = Column(Integer, default=2000)  # 预测播放量
+    bgm_preference = Column(String(32), default="")  # BGM偏好：轻快/中性/稳重
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
