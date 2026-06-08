@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Select, Button, Card, Input, Modal, Space, message, List, Popconfirm, Slider, Tag, Menu } from 'antd'
+import { Select, Button, Card, Input, Modal, Space, message, List, Collapse, Popconfirm, Slider, Tag, Menu } from 'antd'
 import { PlusOutlined, PlayCircleOutlined, EditOutlined, DeleteOutlined, VideoCameraOutlined, RobotOutlined, SoundOutlined, CustomerServiceOutlined, AppstoreOutlined, FileTextOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons'
 import request from '../../utils/request'
 import ScriptEditor from '../agent/ScriptEditor'
@@ -28,6 +28,8 @@ export default function StudioPage() {
   sessionIdRef.current = sessionId
   const [sessionModal, setSessionModal] = useState(false)
   const [sessionTitle, setSessionTitle] = useState('')
+  const [sessionTemplate, setSessionTemplate] = useState('default')
+  const [sessionBgmStyle, setSessionBgmStyle] = useState<string>('')
 
   const [state, setState] = useState<any>({
     products: [], selected_product_id: null, threshold: 30,
@@ -132,8 +134,8 @@ export default function StudioPage() {
   const createSession = async () => {
     try {
       const r: any = await request.post('/agent/sessions', { title: sessionTitle || '新工作流' })
-      setSessions(s => [...s, r]); setSessionId(r.id); setSessionModal(false); setSessionTitle('')
-      saveState({ session_name: sessionTitle || '新工作流' })
+      setSessions(s => [...s, r]); setSessionId(r.id); setSessionModal(false); setSessionTitle(''); setSessionTemplate('default')
+      saveState({ session_name: sessionTitle || '新工作流', selected_template: sessionTemplate, bgm_style: sessionBgmStyle })
     } catch { message.error('创建失败') }
   }
 
@@ -268,6 +270,7 @@ export default function StudioPage() {
       const res: any = await request.post('/studio/agent-edit', {
         session_id: sessionIdRef.current,
         clips: editingClips.map((c: any) => ({ id: c.id, url: c.url, scene_id: c.scene_id, duration: c.duration })),
+        bgm_style: stateRef.current.bgm_style || '',
       }, { timeout: 120000 })
       if (res && Array.isArray(res.clips)) {
         setEditingClips(res.clips)
@@ -282,6 +285,7 @@ export default function StudioPage() {
   // 合成视频（纯合成，不自动ASR，输出给ASR步骤）
   const composeVid = async (editClips?: any[]) => {
     const clipsToUse = editClips || stateRef.current.clip_collections?.find((c: any) => c.id === stateRef.current.selected_clip_collection_id)?.clips || []
+    const st = stateRef.current
     if (!clipsToUse.length) return message.warning('请先选择视频片段集合')
     setGenerating('合成视频')
     try {
@@ -431,7 +435,7 @@ export default function StudioPage() {
             )}
             {step === 3 && (
               <div>
-                <Card title="剧本生成" size="small" extra={<Select placeholder="模板" size="small" style={{ width: 120 }} value={state.selected_template} onChange={v => saveState({ selected_template: v })} options={templates.map(t => ({ value: t, label: t }))} />} style={{ minHeight: 400 }}>
+                <Card title="剧本生成" size="small" style={{ minHeight: 400 }}>
                   {(state.scripts || []).length === 0 ? (
                     <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>在素材集合步骤生成剧本后在此查看和选择</div>
                   ) : (
@@ -733,7 +737,17 @@ export default function StudioPage() {
       )}
 
       <Modal title="新建工作流" open={sessionModal} onOk={createSession} onCancel={() => setSessionModal(false)}>
-        <Input placeholder="工作流名称" value={sessionTitle} onChange={e => setSessionTitle(e.target.value)} onPressEnter={createSession} />
+        <div style={{ marginBottom: 4, fontSize: 12, color: '#666' }}>名称</div>
+        <Input placeholder="工作流名称" value={sessionTitle} onChange={e => setSessionTitle(e.target.value)} onPressEnter={createSession} style={{ marginBottom: 12 }} />
+        <div style={{ marginBottom: 4, fontSize: 12, color: '#666' }}>生成模板</div>
+        <Select placeholder="选择模板" style={{ width: '100%' }} value={sessionTemplate} onChange={setSessionTemplate} options={templates.map((t: string) => ({ value: t, label: t }))} />
+        <div style={{ marginTop: 12, marginBottom: 4, fontSize: 12, color: '#666' }}>BGM 风格偏好（选填，智能剪辑/合成时自动匹配）</div>
+        <Select placeholder="不限" allowClear style={{ width: '100%' }} value={sessionBgmStyle} onChange={setSessionBgmStyle} options={[
+          { value: '', label: '🎵 不限' },
+          { value: '轻快', label: '⚡ 轻快' },
+          { value: '中性', label: '➡ 中性' },
+          { value: '稳重', label: '🐢 稳重' },
+        ]} />
       </Modal>
       <Modal title={productEditId ? '编辑产品介绍' : '添加产品介绍'} open={productModal} onOk={addProduct} onCancel={() => { setProductModal(false); setProductEditId(null); setProductTitle(''); setProductContent('') }} width={600}>
         <Input placeholder="产品名称（选填）" value={productTitle} onChange={e => setProductTitle(e.target.value)} style={{ marginBottom: 8 }} />
