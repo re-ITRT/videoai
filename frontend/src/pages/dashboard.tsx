@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 
 function VideoProxy({ url }: { url: string }) {
+  const [showVideo, setShowVideo] = useState(false)
   const [proxySrc, setProxySrc] = useState('')
   useEffect(() => {
     if (!url) return
@@ -8,8 +9,14 @@ function VideoProxy({ url }: { url: string }) {
     const path = idx >= 0 ? url.substring(idx) : url
     setProxySrc(`/api/v1/studio/video-proxy?path=${encodeURIComponent(path)}`)
   }, [url])
-  if (!proxySrc) return <div style={{ width: '100%', height: '100%', background: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#ccc' }}>加载中</div>
-  return <video src={proxySrc} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+  if (!showVideo) {
+    return <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', color: '#fff', fontSize: 12, cursor: 'pointer' }} onClick={() => setShowVideo(true)}>
+      <PlayCircleOutlined style={{ fontSize: 32, marginBottom: 4 }} />
+      <span>预览</span>
+    </div>
+  }
+  if (!proxySrc) return <div style={{ width: '100%', height: '100%', background: '#f0f0f0' }} />
+  return <video src={proxySrc} controls autoPlay style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
 }
 import { Card, Row, Col, Statistic, Skeleton, Tabs, Tag, Empty, Spin, Button, message, Modal, Space, Typography, Divider, Descriptions } from 'antd'
 import { VideoCameraOutlined, FileTextOutlined, ThunderboltOutlined, AppstoreOutlined, PlayCircleOutlined, EyeOutlined, DeleteOutlined, RiseOutlined } from '@ant-design/icons'

@@ -9,17 +9,22 @@ const { TextArea } = Input
 
 // 通过后端签名获取视频URL（前端不暴露mp4直链）
 function VideoProxy({ url, style }: { url: string; style?: any }) {
-  // 提取路径传给 video-proxy 端点（不暴露 mp4 直链）
+  const [showVideo, setShowVideo] = useState(false)
   const [proxySrc, setProxySrc] = useState('')
   useEffect(() => {
     if (!url) return
-    // 提取 /uploads/ 后面的路径
     const idx = url.indexOf('/uploads/')
     const path = idx >= 0 ? url.substring(idx) : url
     setProxySrc(`/api/v1/studio/video-proxy?path=${encodeURIComponent(path)}`)
   }, [url])
-  if (!proxySrc) return <div style={{ width: '100%', height: 200, background: '#f5f5f5', borderRadius: 4, ...(style || {}) }} />
-  return <video src={proxySrc} controls style={{ width: '100%', maxHeight: 200, borderRadius: 4, ...(style || {}) }} />
+  if (!showVideo) {
+    return <div style={{ width: '100%', height: style?.height || 200, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', color: '#fff', fontSize: 12, cursor: 'pointer', ...(style || {}) }} onClick={() => setShowVideo(true)}>
+      <PlayCircleOutlined style={{ fontSize: 28, marginBottom: 2 }} />
+      <span>预览</span>
+    </div>
+  }
+  if (!proxySrc) return <div style={{ width: '100%', height: style?.height || 200, background: '#f5f5f5', borderRadius: 4, ...(style || {}) }} />
+  return <video src={proxySrc} controls autoPlay style={{ width: '100%', maxHeight: 200, borderRadius: 4, ...(style || {}) }} />
 }
 
 function SpeedBar() {
