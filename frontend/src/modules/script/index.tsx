@@ -92,7 +92,7 @@ export default function ScriptTemplates() {
         const existing = (tr?.items || []).find((t: any) => t.name === editName)
         if (existing) {
           await request.put(`/template/templates/${existing.id}`, { bgm_preference: editBgmTarget >= 55 ? '轻快' : editBgmTarget <= 30 ? '稳重' : '中性', bgm_lightness_target: editBgmTarget || '' })
-        } else if (editBgmPref) {
+        } else if (editBgmTarget) {
           await request.post('/template/templates', { name: editName, strategy: '', factors: {}, category: '', tags: [], bgm_preference: editBgmTarget >= 55 ? '轻快' : editBgmTarget <= 30 ? '稳重' : '中性', bgm_lightness_target: editBgmTarget })
         }
       } catch {}
