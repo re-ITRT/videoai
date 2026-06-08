@@ -136,7 +136,7 @@ class TestSaveState:
         body = {"products": [{"id": 1}], "selected_product_id": None}
         with patch("app.studio.router.get_state_path", return_value=FAKE_STATE_PATH), \
              patch("builtins.open", mock_open()) as m:
-            result = await save_workflow_state(SESSION_ID, body, dummy_user())
+            result = await save_workflow_state(SESSION_ID, body, dummy_user)
             assert result == {"ok": True}
             handle = m()
             written = "".join(c for c in handle.write.call_args[0])
@@ -396,8 +396,8 @@ class TestMaterialsSearch:
     async def test_search_no_tags(self, db_session, dummy_user):
         from app.studio.router import search_studio_materials
         # 先插入一些素材
-        m1 = Material(user_id="1", name="mat1", image_url="/u/1.jpg", tags='["tag1"]', material_type="product")
-        m2 = Material(user_id="1", name="mat2", image_url="/u/2.jpg", tags='["tag2"]', material_type="general")
+        m1 = Material(user_id="1", name="mat1", image_url="/u/1.jpg", tags='["tag1"]', material_type="product", input_type="image")
+        m2 = Material(user_id="1", name="mat2", image_url="/u/2.jpg", tags='["tag2"]', material_type="general", input_type="image")
         db_session.add_all([m1, m2])
         await db_session.flush()
         result = await search_studio_materials({"threshold": 30, "tags": []}, db_session, dummy_user)
@@ -406,8 +406,8 @@ class TestMaterialsSearch:
     @pytest.mark.asyncio
     async def test_search_with_tag_filter(self, db_session, dummy_user):
         from app.studio.router import search_studio_materials
-        m1 = Material(user_id="1", name="mat1", image_url="/u/1.jpg", tags='["tag1"]', material_type="product")
-        m2 = Material(user_id="1", name="mat2", image_url="/u/2.jpg", tags='["tag2"]', material_type="general")
+        m1 = Material(user_id="1", name="mat1", image_url="/u/1.jpg", tags='["tag1"]', material_type="product", input_type="image")
+        m2 = Material(user_id="1", name="mat2", image_url="/u/2.jpg", tags='["tag2"]', material_type="general", input_type="image")
         db_session.add_all([m1, m2])
         await db_session.flush()
         result = await search_studio_materials({"threshold": 30, "tags": ["tag1"]}, db_session, dummy_user)
@@ -417,7 +417,7 @@ class TestMaterialsSearch:
     @pytest.mark.asyncio
     async def test_search_other_user_not_visible(self, db_session, dummy_user):
         from app.studio.router import search_studio_materials
-        m = Material(user_id="99", name="not_mine", image_url="/u/n.jpg", tags="[]", material_type="product")
+        m = Material(user_id="99", name="not_mine", image_url="/u/n.jpg", tags="[]", material_type="product", input_type="image")
         db_session.add(m)
         await db_session.flush()
         result = await search_studio_materials({"threshold": 30, "tags": []}, db_session, dummy_user)
