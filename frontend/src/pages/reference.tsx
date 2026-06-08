@@ -279,7 +279,7 @@ const ReferencePage: React.FC = () => {
                       video.cover_url ? (
                         <img src={video.cover_url} alt={video.title}
                           style={{ height: '160px', width: '100%', objectFit: 'cover', cursor: 'pointer' }}
-                          onClick={() => window.open(video.source_url, '_blank')} />
+                          onClick={() => window.open(getProxyUrl(video.source_url), '_blank')} />
                       ) : (
                         <div
                           style={{
@@ -292,7 +292,7 @@ const ReferencePage: React.FC = () => {
                             fontSize: '48px',
                             cursor: 'pointer',
                           }}
-                          onClick={() => window.open(video.source_url, '_blank')}
+                          onClick={() => window.open(getProxyUrl(video.source_url), '_blank')}
                         >
                           <PlayCircleOutlined />
                         </div>
@@ -485,7 +485,7 @@ const ReferencePage: React.FC = () => {
             {selectedVideo.source_url && (
               <div>
                 <Text type="secondary" style={{ fontSize: 12 }}>来源：</Text>
-                <a href={selectedVideo.source_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12 }}>{selectedVideo.source_url}</a>
+                <a href={getProxyUrl(selectedVideo.source_url)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12 }}>播放视频</a>
               </div>
             )}
 
