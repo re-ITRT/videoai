@@ -446,6 +446,22 @@ async def ai_generate_template(
     ref_desc = "\n".join([f"  风格={f['style']} Hook={f['hook']} BGM={f['bgm']} 节奏={f['rhythm']}s 播放量={f['play_count']} Hook质量={f['hook_quality']} 综合评分={f['overall_score']}" for f in best_refs])
     pub_desc = "\n".join([f"  标题={f['title']} 风格={f['style']} Hook={f['hook']} BGM={f['bgm']} 播放量={f['play_count']}" for f in best_pubs]) if best_pubs else "  暂无已生成视频"
 
+    # 获取归因分析结果
+    attrs = ""
+    try:
+        from app.attribution.router import _extract_features as _ef
+        all_feats = [_ef(r) for r in refs]
+        # 按播放量排序
+        all_feats.sort(key=lambda x: x["play_count"], reverse=True)
+        top = all_feats[:5]
+        attrs_lines = []
+        for f in top:
+            attrs_lines.append(f"  风格={f['style']} | Hook={f['hook_method']} | BGM轻快度={f['lightness_score']} | BPM={f['bpm']} | 节奏={f['rhythm']}s | 播放量={f['play_count']} | Hook质量={f['hook_quality']} | 综合={f['overall_score']}")
+        if attrs_lines:
+            attrs = "\n".join(attrs_lines)
+    except Exception as _e:
+        print(f"[ai-generate] attr failed: {_e}")
+
     prompt = f"""你是一个电商短视频策略专家。根据以下数据生成3个高质量可执行的灵感模板。
 
 【参考视频最佳组合（按实际播放量排序）】
@@ -454,10 +470,14 @@ async def ai_generate_template(
 【已生成视频数据】
 {pub_desc}
 
+【归因分析——高播放量特征排行】
+{attrs or "暂无归因数据"}
+
 分析要求：
 1. 参考视频的"播放量"是真实数据
-2. 找出高播放量组合的共同特征（风格、Hook、BGM、节奏）
-3. 生成的模板要具体、可执行
+2. 归因分析排行显示了哪些特征组合播放量最高
+3. 找出高播放量组合的共同特征（风格、Hook、BGM、节奏）
+4. 生成的模板要具体、可执行
 
 请输出JSON数组（不要其他文本）：
 [
