@@ -283,7 +283,7 @@ export default function StudioPage() {
     if (!prod) return message.warning('请先选择产品介绍')
     setGenerating('嵌入搜索')
     try {
-      const res: any = await request.post('/studio/semantic-search', { product_info: { title: prod.title, content: prod.content }, threshold: state.threshold })
+      const res: any = await request.post('/studio/semantic-search', { product_info: { title: prod.title, content: prod.content }, threshold: localThreshold })
       setMaterials(res?.materials || [])
       saveState({ cached_materials: res?.materials || [] })
     } catch { message.error('搜索失败') }
