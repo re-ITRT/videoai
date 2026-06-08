@@ -46,3 +46,4 @@ cd /home/ubuntu/video-ai && git pull origin master
 ```bash
 docker exec -w /app video-ai-backend-1 python3 -m pytest tests/ -x -q
 ```
+# CI/CD deploy test
