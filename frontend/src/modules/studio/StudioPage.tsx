@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Select, Button, Card, Input, Modal, Space, message, List, Collapse, Popconfirm, Slider, Tag, Menu } from 'antd'
+import { Select, Button, Card, Input, Modal, Space, message, List, Popconfirm, Slider, Tag, Menu } from 'antd'
 import { PlusOutlined, PlayCircleOutlined, EditOutlined, DeleteOutlined, VideoCameraOutlined, RobotOutlined, SoundOutlined, CustomerServiceOutlined, AppstoreOutlined, FileTextOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons'
 import request from '../../utils/request'
 import ScriptEditor from '../agent/ScriptEditor'
@@ -285,7 +285,6 @@ export default function StudioPage() {
   // 合成视频（纯合成，不自动ASR，输出给ASR步骤）
   const composeVid = async (editClips?: any[]) => {
     const clipsToUse = editClips || stateRef.current.clip_collections?.find((c: any) => c.id === stateRef.current.selected_clip_collection_id)?.clips || []
-    const st = stateRef.current
     if (!clipsToUse.length) return message.warning('请先选择视频片段集合')
     setGenerating('合成视频')
     try {
