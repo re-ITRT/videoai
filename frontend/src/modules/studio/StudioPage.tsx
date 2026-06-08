@@ -476,7 +476,7 @@ export default function StudioPage() {
                   {!state.last_script?.script?.title ? <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>生成剧本后点击生成</div> : (
                     <div>
                       <List size="small" dataSource={state.clip_collections} renderItem={(c: any) => (
-                        <List.Item onClick={() => { saveState({ selected_clip_collection_id: c.id }); setEditingClips(c.clips?.map((clip: any) => ({ ...clip, transition: 'cut' })) || []) }}
+                        <List.Item onClick={async () => { saveState({ selected_clip_collection_id: c.id }); try { const r: any = await request.get(`/studio/clips/${sessionIdRef.current}`); const clipMap = new Map((r?.clips || []).map((x: any) => [x.id, x])); const merged = (c.clips || []).map((clip: any) => ({ ...clip, transition: 'cut', duration: clipMap.get(clip.id)?.duration || clip.duration })); setEditingClips(merged) } catch { setEditingClips((c.clips || []).map((clip: any) => ({ ...clip, transition: 'cut' }))) } }}
                           style={{ cursor: 'pointer', background: state.selected_clip_collection_id === c.id ? '#e6f4ff' : undefined }}
                           actions={[<span key="del" onClick={e => { e.stopPropagation(); deleteClipCollection(c.id) }}><DeleteOutlined style={{ color: '#ff4d4f' }} /></span>]}>
                           <Space><VideoCameraOutlined /><span>{c.name} ({c.clips?.length || 0} 片段)</span></Space>
