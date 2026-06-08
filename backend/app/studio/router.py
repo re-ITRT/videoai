@@ -397,7 +397,7 @@ async def studio_poll_generate(session_id: int, db: AsyncSession = Depends(get_d
                     session_id=session_id, file_type="video_clip",
                     filename=f"clip_{session_id}_scene{clip.get('scene_id', '')}.mp4",
                     file_url=vu,
-                    description=f"场景 {clip.get('scene_id', '')} 视频片段",
+                    description=f"场景 {clip.get('scene_id', '')} 视频片段, dur={clip.get('duration', 0)}",
                 )
                 db.add(sf)
                 await db.flush()
@@ -405,8 +405,15 @@ async def studio_poll_generate(session_id: int, db: AsyncSession = Depends(get_d
         await db.commit()
         # 只返回本次新保存的 clips
         fresh = await _gsf(db, session_id)
-        all_clips = {f.id: {"id": f.id, "scene_id": (f.description or "").replace("场景 ", "").replace(" 视频片段", ""), "url": f.file_url}
-                     for f in fresh if f.file_type == "video_clip"}
+        def _parse_clip(f):
+            desc = f.description or ""
+            sid = desc.replace("场景 ", "").split(" 视频片段")[0].split(",")[0].strip()
+            dur = 0
+            if "dur=" in desc:
+                try: dur = float(desc.split("dur=")[1].split(",")[0])
+                except: pass
+            return {"id": f.id, "scene_id": sid, "url": f.file_url, "duration": dur}
+        all_clips = {f.id: _parse_clip(f) for f in fresh if f.file_type == "video_clip"}
         new_clips = [all_clips[cid] for cid in saved_ids if cid in all_clips]
         return {"status": "completed", "clips": new_clips, "saved": len(new_clips), "total": len(all_clips)}
     elif qr_inner.get("status") == "running":
@@ -575,7 +582,16 @@ async def get_session_clips(session_id: int, db: AsyncSession = Depends(get_db),
     """获取 session 的视频片段"""
     from app.agent.models import SessionFile, get_session_files as _gsf
     files = await _gsf(db, session_id)
-    clips = [{"id": f.id, "scene_id": (f.description or "").replace("场景 ", "").replace(" 视频片段", ""), "url": f.file_url} for f in files if f.file_type == "video_clip"]
+    clips = []
+    for f in files:
+            if f.file_type == "video_clip":
+                desc = f.description or ""
+                sid = desc.replace("场景 ", "").split(" 视频片段")[0].split(",")[0].strip()
+                dur = 0
+                if "dur=" in desc:
+                    try: dur = float(desc.split("dur=")[1].split(",")[0])
+                    except: pass
+                clips.append({"id": f.id, "scene_id": sid, "url": f.file_url, "duration": dur})
     final = [{"id": f.id, "url": f.file_url} for f in files if f.file_type == "final_video"]
     subbed = [{"id": f.id, "url": f.file_url} for f in files if f.file_type == "subbed_video"]
     asr_list = [json.loads(f.description or "[]") for f in files if f.file_type == "asr_subtitles"]
