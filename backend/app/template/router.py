@@ -538,6 +538,15 @@ async def ai_generate_template(
                 c = resp.json()["choices"][0]["message"]["content"]
                 parsed = json.loads(c)
                 templates = parsed if isinstance(parsed, list) else parsed.get("templates", [parsed])
+                # 从数据推断默认BGM偏好（随数据变化自适应）
+                avg_lightness = 0
+                if best_refs:
+                    avg_lightness = sum(f.get("lightness_score", 0) or 0 for f in best_refs) / len(best_refs)
+                default_bgm = "中性"
+                if avg_lightness >= 55:
+                    default_bgm = "轻快"
+                elif avg_lightness <= 30:
+                    default_bgm = "稳重"
                 # 确保每个模板有 bgm_preference
                 for t in templates:
                     if not t.get("bgm_preference"):
@@ -548,7 +557,7 @@ async def ai_generate_template(
                                 t["bgm_preference"] = bgm_tag
                                 break
                         if not t.get("bgm_preference"):
-                            t["bgm_preference"] = "轻快"  # 默认
+                            t["bgm_preference"] = default_bgm
                 return {"templates": templates, "source": "ai"}
     except Exception as e:
         print(f"[ai-generate] LLM failed: {e}")
