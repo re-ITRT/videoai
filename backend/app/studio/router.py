@@ -95,22 +95,26 @@ async def save_workflow_state(session_id: int, body: dict, user: User = Depends(
 @router.get("/video-proxy")
 async def video_proxy(path: str = "", user = Depends(get_current_user)):
     """视频代理：不暴露mp4直链，通过后端流式传输"""
-    from fastapi.responses import FileResponse, StreamingResponse
-    import os as _ov
-    # 解析路径
-    if path.startswith("http"):
-        idx = path.find("/uploads/")
-        if idx >= 0:
-            path = path[idx:]
-    local = "/app" + path if path.startswith("/uploads") else path
-    if not _ov.path.exists(local):
-        # 尝试从 signed URL 提取
-        import re as _re
+    from fastapi.responses import FileResponse
+    import os as _ov, re as _re
+    local = ""
+    # 尝试多种路径格式
+    candidates = [path]
+    if "/signed/" in path:
         m = _re.search(r'/signed/[^/]+/(.+)', path)
         if m:
-            local = "/app/uploads/" + m.group(1)
-    if not _ov.path.exists(local):
-        raise HTTPException(404, "video not found")
+            candidates.insert(0, "/app/uploads/" + m.group(1))
+    if "/uploads/" in path:
+        idx = path.find("/uploads/")
+        candidates.insert(0, "/app" + path[idx:])
+    for c in candidates:
+        if c.startswith("http"):
+            continue
+        if _ov.path.exists(c):
+            local = c
+            break
+    if not local or not _ov.path.exists(local):
+        raise HTTPException(404, f"video not found: {path[:80]}")
     return FileResponse(local, media_type="video/mp4")
 
 @router.get("/video-url/{clip_id}")
