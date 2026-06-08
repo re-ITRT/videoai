@@ -38,6 +38,7 @@ export default function ScriptTemplates() {
   const [loading, setLoading] = useState(false)
   const [editVisible, setEditVisible] = useState(false)
   const [editName, setEditName] = useState('')
+  const [editBgmPref, setEditBgmPref] = useState('')
   const [sysSections, setSysSections] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [createVisible, setCreateVisible] = useState(false)
@@ -270,6 +271,9 @@ export default function ScriptTemplates() {
                 <Descriptions.Item label="📐 策略描述">{tpl.strategy}</Descriptions.Item>
                 <Descriptions.Item label="🏷️ 适用品类">
                   <Tag color="purple">{tpl.category || '通用'}</Tag>
+                </Descriptions.Item>
+                <Descriptions.Item label="🎵 BGM 偏好">
+                  <Tag color={tpl.bgm_preference === '轻快' ? 'green' : tpl.bgm_preference === '稳重' ? 'purple' : 'default'}>{tpl.bgm_preference || '不限'}</Tag>
                 </Descriptions.Item>
                 <Descriptions.Item label="🏷️ 标签">
                   <Space wrap size={[4, 4]}>{(tpl.tags || []).map((t: string) => <Tag key={t}>{t}</Tag>)}</Space>
