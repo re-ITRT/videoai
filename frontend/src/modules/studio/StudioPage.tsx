@@ -492,7 +492,7 @@ export default function StudioPage() {
                               <div key={clip.id || ci} style={{ minWidth: 160, maxWidth: 180, background: '#fafafa', borderRadius: 6, border: '1px solid #f0f0f0', padding: 8, position: 'relative' }}>
                                 <div style={{ fontSize: 11, color: '#999', marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
                                   <span>场景 {clip.scene_id}</span>
-                                  <span>{clip.duration || '?'}s</span>
+                                  <span>{clip.duration ? clip.duration + 's' : ''}</span>
                                 </div>
                                 <video src={clip.url} controls style={{ width: '100%', height: 80, borderRadius: 4, objectFit: 'cover' }} />
                                 <div style={{ display: 'flex', gap: 2, marginTop: 4, justifyContent: 'center' }}>
