@@ -493,7 +493,8 @@ async def ai_generate_template(
     }},
     "category": "适用品类（食品/美妆/家电/服饰等）",
     "tags": ["标签1", "标签2", "标签3"],
-    "attribution_score": 0-100的整数（基于数据评估的推荐强度）
+    "attribution_score": 0-100的整数（基于数据评估的推荐强度）,
+    "bgm_preference": "推荐的BGM风格，如轻快/中性/稳重"
   }}
 ]
 
@@ -648,5 +649,6 @@ def _build_fallback_templates(best: list) -> dict:
             "category": "通用",
             "tags": [f["style"], f["hook"], f["bgm"]],
             "attribution_score": 85 - i * 5,
+            "bgm_preference": f["bgm"],
         })
     return {"templates": templates, "source": "data"}
