@@ -29,6 +29,52 @@ def get_state_path(session_id: int) -> str:
     return os.path.join(ensure_session_dir(session_id)["root"], "workflow_state.json")
 
 
+async def add_trace(session_id: int, step: str, status: str, message: str = None, error: str = None):
+    """写入 trace 到 workflow_state.json"""
+    from datetime import datetime as _dt
+    sp = get_state_path(session_id)
+    state = {}
+    if os.path.exists(sp):
+        with open(sp, "r", encoding="utf-8") as f:
+            try: state = json.loads(f.read())
+            except: state = {}
+    traces = state.get("trace", [])
+    now = _dt.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    existing = next((t for t in traces if t["step"] == step), None)
+    if existing:
+        existing["status"] = status
+        if message: existing["message"] = message
+        if status == "running" and not existing.get("started_at"):
+            existing["started_at"] = now
+        if status in ("completed", "failed"):
+            existing["completed_at"] = now
+        if error: existing["error"] = error
+    else:
+        traces.append({
+            "step": step, "status": status,
+            "started_at": now if status == "running" else None,
+            "completed_at": now if status in ("completed", "failed") else None,
+            "message": message, "error": error,
+        })
+    state["trace"] = traces
+    with open(sp, "w", encoding="utf-8") as f:
+        f.write(json.dumps(state, ensure_ascii=False, indent=2))
+
+
+@router.get("/trace/{session_id}")
+async def get_workflow_trace(session_id: int):
+    """获取工作流 trace"""
+    sp = get_state_path(session_id)
+    if not os.path.exists(sp):
+        return {"traces": []}
+    with open(sp, "r", encoding="utf-8") as f:
+        state = json.loads(f.read())
+    traces = state.get("trace", [])
+    total = len(traces)
+    done = sum(1 for t in traces if t["status"] in ("completed", "failed"))
+    return {"traces": traces, "total": total, "done": done}
+
+
 @router.get("/state/{session_id}")
 async def get_workflow_state(session_id: int, user: User = Depends(get_current_user)):
     sp = get_state_path(session_id)
@@ -274,6 +320,13 @@ async def studio_generate_video(body: dict, db: AsyncSession = Depends(get_db), 
         if "lines" not in s:
             s["lines"] = []
 
+    # 创建 trace：每个场景一条
+    await add_trace(session_id, "generate_script", "completed", "剧本已就绪")
+    for si, sc in enumerate(scenes):
+        sid = sc.get("scene_id", si+1)
+        await add_trace(session_id, f"generate_scene_{sid}", "pending", f"场景{sid}: 等待中")
+    await add_trace(session_id, "compose", "pending", "等待所有场景生成完成")
+
     # 4. 提交任务
     aspect_ratio = body.get("aspect_ratio", "9:16")
     params = {
@@ -387,6 +440,10 @@ async def studio_poll_generate(session_id: int, db: AsyncSession = Depends(get_d
     if not isinstance(qr_inner, dict):
         return {"status": "unknown", "clips": []}
 
+    # 更新 trace
+    for item in task_ids:
+        sid = item.get("scene_id", "?")
+        await add_trace(session_id, f"generate_scene_{sid}", "running", f"场景{sid}: Seedance 生成中")
     if qr_inner.get("status") == "completed":
         clips = qr_inner.get("video_clips", [])
         saved_ids = []
@@ -415,6 +472,10 @@ async def studio_poll_generate(session_id: int, db: AsyncSession = Depends(get_d
             return {"id": f.id, "scene_id": sid, "url": f.file_url, "duration": dur}
         all_clips = {f.id: _parse_clip(f) for f in fresh if f.file_type == "video_clip"}
         new_clips = [all_clips[cid] for cid in saved_ids if cid in all_clips]
+        for item in task_ids:
+            sid = item.get("scene_id", "?")
+            await add_trace(session_id, f"generate_scene_{sid}", "completed", f"场景{sid}: 生成完成")
+        await add_trace(session_id, "compose", "pending", "所有场景已完成，等待合成")
         return {"status": "completed", "clips": new_clips, "saved": len(new_clips), "total": len(all_clips)}
     elif qr_inner.get("status") == "running":
         return {"status": "running", "clips": []}
@@ -550,7 +611,8 @@ async def studio_compose_video(body: dict, db: AsyncSession = Depends(get_db), u
     )
     if result.returncode != 0:
         shutil.rmtree(tmpdir, ignore_errors=True)
-        return {"composed": False, "error": f"FFmpeg 拼接失败: {result.stderr[:200]}"}
+        await add_trace(session_id, "compose", "failed", error=f"FFmpeg 拼接失败")
+    return {"composed": False, "error": f"FFmpeg 拼接失败: {result.stderr[:200]}"}
 
     # 复制到 uploads
     uploads_dir = "/app/uploads/composed"
@@ -569,6 +631,7 @@ async def studio_compose_video(body: dict, db: AsyncSession = Depends(get_db), u
     db.add(sf)
     await db.commit()
 
+    await add_trace(session_id, "compose", "completed", "视频合成完成")
     return {"composed": True, "videos": [{"id": sf.id, "url": url}]}
 
 
@@ -856,6 +919,9 @@ async def studio_burn_subtitles(body: dict, db: AsyncSession = Depends(get_db), 
 
     video_url = body.get("video_url", "")
     segments = body.get("segments", [])
+    session_id_burn = body.get("session_id", 0)
+    if session_id_burn:
+        await add_trace(session_id_burn, "burn_subtitles", "running", "正在烧录字幕...")
     if not video_url:
         raise HTTPException(400, "video_url required")
 
@@ -980,6 +1046,7 @@ async def studio_burn_subtitles(body: dict, db: AsyncSession = Depends(get_db), 
             db.add(sf)
             await db.commit()
 
+        await add_trace(session_id, "burn_subtitles", "completed", "字幕烧录完成")
         return {"url": url}
 
     except Exception as e:
