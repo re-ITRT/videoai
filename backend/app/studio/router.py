@@ -676,7 +676,7 @@ async def studio_compose_video(body: dict, db: AsyncSession = Depends(get_db), u
     if result.returncode != 0:
         shutil.rmtree(tmpdir, ignore_errors=True)
         await add_trace(session_id, "compose", "failed", error=f"FFmpeg 拼接失败")
-    return {"composed": False, "error": f"FFmpeg 拼接失败: {result.stderr[:200]}"}
+        return {"composed": False, "error": f"FFmpeg 拼接失败: {result.stderr[:200]}"}
 
     # 复制到 uploads
     uploads_dir = "/app/uploads/composed"
