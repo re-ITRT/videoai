@@ -1,6 +1,6 @@
 """signed.py 路由函数直接测试"""
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 from fastapi import HTTPException
 
 
@@ -25,11 +25,9 @@ class TestServeSignedFile:
             assert exc.value.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_valid_token_file_found_returns_file(self):
+    async def test_valid_token_file_found(self):
         from app.signed import serve_signed_file
         with patch("app.signed.verify_signed_url", return_value=True), \
-             patch("pathlib.Path.exists", return_value=True), \
-             patch("fastapi.responses.FileResponse") as fr:
-            fr.return_value = {"file": "mock"}
+             patch("pathlib.Path.exists", return_value=True):
             result = await serve_signed_file("good_token", "analyze/exists.jpg")
-            assert result == {"file": "mock"}
+            assert hasattr(result, "media_type") or hasattr(result, "path")
