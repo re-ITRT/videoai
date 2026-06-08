@@ -14,6 +14,7 @@ from app.published.router import (
     delete_published,
 )
 from app.auth.models import User
+from sqlalchemy import delete as sa_delete
 
 
 @pytest.fixture
@@ -222,6 +223,12 @@ class TestPublishVideo:
         """无 body audio_features，视频路径匹配 signed → 本地音频提取"""
         import numpy as np
 
+        # Create a mock for mfcc that supports [i].mean() chain
+        mfcc_row_mock = MagicMock()
+        mfcc_row_mock.mean.return_value = np.float64(0.1)
+        mfcc_mock = MagicMock()
+        mfcc_mock.__getitem__.return_value = mfcc_row_mock
+
         with (
             patch(CW_PATH, new_callable=AsyncMock) as cw,
             patch("os.path.exists", return_value=True),
@@ -230,30 +237,24 @@ class TestPublishVideo:
             patch("shutil.rmtree"),
             patch("librosa.load", return_value=(np.zeros(16000), 16000)),
             patch("librosa.get_duration", return_value=30.0),
+            patch("librosa.beat.beat_track", return_value=(120.0, np.array([1, 2, 3]))),
+            patch("librosa.feature.spectral_centroid") as sc,
+            patch("librosa.feature.zero_crossing_rate") as zcr,
+            patch("librosa.feature.spectral_rolloff") as sr,
+            patch("librosa.feature.mfcc", return_value=mfcc_mock) as _mfcc,
         ):
             cw.return_value = {"data": {"scenes": [], "tags": []}}
+            sc.return_value = MagicMock()
+            sc.return_value.mean.return_value = np.float64(2000.0)
+            zcr.return_value = MagicMock()
+            zcr.return_value.mean.return_value = np.float64(0.05)
+            sr.return_value = MagicMock()
+            sr.return_value.mean.return_value = np.float64(4000.0)
 
-            # Mock librosa.feature functions
-            with (
-                patch("librosa.beat.beat_track", return_value=(120.0, np.array([1, 2, 3]))),
-                patch("librosa.feature.spectral_centroid") as sc,
-                patch("librosa.feature.zero_crossing_rate") as zcr,
-                patch("librosa.feature.spectral_rolloff") as sr,
-                patch("librosa.feature.mfcc") as mfcc,
-            ):
-                sc.return_value = MagicMock()
-                sc.return_value.mean.return_value = np.float64(2000.0)
-                zcr.return_value = MagicMock()
-                zcr.return_value.mean.return_value = np.float64(0.05)
-                sr.return_value = MagicMock()
-                sr.return_value.mean.return_value = np.float64(4000.0)
-                mfcc.return_value = np.zeros((13, 10))
-                mfcc.return_value.mean.return_value = np.float64(0.1)
-
-                result = await publish_video(
-                    body={"video_url": "http://example.com/signed/token/videos/test.mp4"},
-                    db=db_session, user=dummy_user,
-                )
+            result = await publish_video(
+                body={"video_url": "http://example.com/signed/token/videos/test.mp4"},
+                db=db_session, user=dummy_user,
+            )
 
         pv = await db_session.get(PublishedVideo, result["id"])
         assert pv.audio_features["bpm"] == 120.0
@@ -419,6 +420,15 @@ class TestPublishVideo:
 # ======================================================
 
 class TestListPublished:
+
+    @pytest.fixture(autouse=True)
+    async def cleanup_published(self, db_session):
+        """Ensure clean PublishedVideo table before each list test"""
+        # Delete all PublishedVideo records to avoid cross-test contamination
+        from app.published.models import PublishedVideo as PV
+        stmt = sa_delete(PV)
+        await db_session.execute(stmt)
+        await db_session.commit()
 
     @pytest.mark.asyncio
     async def test_empty_list(self, db_session, dummy_user):
@@ -628,6 +638,14 @@ class TestListPublished:
 
 class TestIncrementView:
 
+    @pytest.fixture(autouse=True)
+    async def cleanup_published(self, db_session):
+        """Ensure clean PublishedVideo table before each increment view test"""
+        from app.published.models import PublishedVideo as PV
+        stmt = sa_delete(PV)
+        await db_session.execute(stmt)
+        await db_session.commit()
+
     @pytest.mark.asyncio
     async def test_increment_success(self, db_session, dummy_user):
         pv = PublishedVideo(
@@ -669,7 +687,7 @@ class TestIncrementView:
 
     @pytest.mark.asyncio
     async def test_increment_none_play_count(self, db_session, dummy_user):
-        """play_count 为 None → 从 0+1 开始"""
+        """play_count 为 None → 模型默认 2000 → 2000+1"""
         pv = PublishedVideo(
             user_id=1, title="空播放量", video_url="http://ex.com/v.mp4",
             play_count=None, tags=[], scenes=[], analysis_report={},
@@ -681,7 +699,8 @@ class TestIncrementView:
         result = await increment_view(
             video_id=pv.id, db=db_session, user=dummy_user,
         )
-        assert result["play_count"] == 1
+        # PublishedVideo model defaults play_count=2000, so None→2000→2000+1=2001
+        assert result["play_count"] == 2001
 
 
 # ======================================================
@@ -689,6 +708,14 @@ class TestIncrementView:
 # ======================================================
 
 class TestUpdatePlayCount:
+
+    @pytest.fixture(autouse=True)
+    async def cleanup_published(self, db_session):
+        """Ensure clean PublishedVideo table before each update play count test"""
+        from app.published.models import PublishedVideo as PV
+        stmt = sa_delete(PV)
+        await db_session.execute(stmt)
+        await db_session.commit()
 
     @pytest.mark.asyncio
     async def test_update_success(self, db_session, dummy_user):
@@ -755,6 +782,14 @@ class TestUpdatePlayCount:
 # ======================================================
 
 class TestDeletePublished:
+
+    @pytest.fixture(autouse=True)
+    async def cleanup_published(self, db_session):
+        """Ensure clean PublishedVideo table before each delete test"""
+        from app.published.models import PublishedVideo as PV
+        stmt = sa_delete(PV)
+        await db_session.execute(stmt)
+        await db_session.commit()
 
     @pytest.mark.asyncio
     async def test_delete_success(self, db_session, dummy_user):
