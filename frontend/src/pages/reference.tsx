@@ -61,6 +61,13 @@ const platformColors: Record<string, string> = {
   custom: '#8c8c8c',
 };
 
+const getProxyUrl = (url: string) => {
+  if (!url) return ''
+  const idx = url.indexOf('/uploads/')
+  const path = idx >= 0 ? url.substring(idx) : url
+  return '/api/v1/studio/video-proxy?path=' + encodeURIComponent(path)
+};
+
 const ReferencePage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [videos, setVideos] = useState<ReferenceVideo[]>([]);
