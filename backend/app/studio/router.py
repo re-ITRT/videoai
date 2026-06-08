@@ -1,1146 +1,752 @@
-"""工作流工作室 API — 基于 Session 文件夹存储"""
-import json, os
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.database import get_db
-from app.core.deps import get_current_user
-from app.auth.models import User
-from app.agent.models import ensure_session_dir
+import { useState, useEffect, useRef } from 'react'
+import { Select, Button, Card, Input, Modal, Space, message, List, Popconfirm, Slider, Tag, Menu } from 'antd'
+import { PlusOutlined, PlayCircleOutlined, EditOutlined, DeleteOutlined, VideoCameraOutlined, RobotOutlined, SoundOutlined, CustomerServiceOutlined, AppstoreOutlined, FileTextOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons'
+import request from '../../utils/request'
+import ScriptEditor from '../agent/ScriptEditor'
+import AiScriptEditor from '../agent/AiScriptEditor'
 
-router = APIRouter(prefix="/api/v1/studio", tags=["studio"])
+const { TextArea } = Input
 
-DEFAULT_STATE = {
-    "products": [],
-    "selected_product_id": None,
-    "threshold": 30,
-    "selected_material_ids": [],
-    "collections": [],
-    "selected_collection_id": None,
-    "selected_template": "",
-    "cached_materials": [],
-    "last_script": None,
-    "clip_collections": [],
-    "selected_clip_collection_id": None,
-    "final_videos": [],
+function SpeedBar() {
+  const [speed, setSpeed] = useState(1)
+  const speeds = [0.5, 1, 1.5, 2]
+  return (
+    <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginTop: 4 }}>
+      {speeds.map(s => (
+        <Button key={s} size="small" type={speed === s ? 'primary' : 'default'}
+          onClick={() => { setSpeed(s); document.querySelectorAll('video').forEach(v => { try { v.playbackRate = s } catch {} }) }}
+          style={{ fontSize: 11, lineHeight: '18px', height: 22, padding: '0 6px' }}>{s}x</Button>
+      ))}
+    </div>
+  )
 }
 
+export default function StudioPage() {
+  const [sessions, setSessions] = useState<any[]>([])
+  const [sessionId, setSessionId] = useState<number | null>(null)
+  const sessionIdRef = useRef(sessionId)
+  sessionIdRef.current = sessionId
+  const [sessionModal, setSessionModal] = useState(false)
+  const [sessionTitle, setSessionTitle] = useState('')
 
-def get_state_path(session_id: int) -> str:
-    return os.path.join(ensure_session_dir(session_id)["root"], "workflow_state.json")
+  const [state, setState] = useState<any>({
+    products: [], selected_product_id: null, threshold: 30,
+    selected_material_ids: [], collections: [], selected_template: '',
+    clip_collections: [], selected_clip_collection_id: null,
+    final_videos: [], scripts: [], selected_script_id: null, exports: [], selected_export_id: null, asrResults: {},
+    composed_video: null, subbed_video: null, bgm_mixed_video: null,
+  })
+  const stateRef = useRef(state)
+  stateRef.current = state
 
+  const [materials, setMaterials] = useState<any[]>([])
+    const [localThreshold, setLocalThreshold] = useState(0.5)
+  const [productModal, setProductModal] = useState(false)
+  const [productTitle, setProductTitle] = useState('')
+  const [productContent, setProductContent] = useState('')
+  const [productEditId, setProductEditId] = useState<number | null>(null)
+  const [templates, setTemplates] = useState<string[]>([])
+  const [generating, setGenerating] = useState<string | null>(null)
+  const [scriptEditorOpen, setScriptEditorOpen] = useState(false)
+  const [aiScriptEditorOpen, setAiScriptEditorOpen] = useState(false)
+  const [asrLoadingId, setAsrLoadingId] = useState<number | null>(null)
+  void asrLoadingId; void setAsrLoadingId;
+  const [asrResults, setAsrResults] = useState<Record<number, any>>(state.asrResults || {})
+  const [selectedAsrVideo, setSelectedAsrVideo] = useState<number | null>(null)
+  const [editedSegments, setEditedSegments] = useState<string[]>([])
+  const [burningSub, setBurningSub] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  void exporting;
+  const [subbedUrl, setSubbedUrl] = useState('')
+  // BGM
+  const [bgmMaterials, setBgmMaterials] = useState<any[]>([])
+  const [selectedBgmId, setSelectedBgmId] = useState<number | null>(null)
+  const [step, setStep] = useState(0)
+  // 分镜剪辑
+  const [editingClips, setEditingClips] = useState<any[]>([])
+  const [agentLoading, setAgentLoading] = useState(false)
+  const stepIcons = [<PlusOutlined />, <VideoCameraOutlined />, <AppstoreOutlined />, <FileTextOutlined />, <PlayCircleOutlined />, <SoundOutlined />, <CustomerServiceOutlined />, <VideoCameraOutlined />]
+  const stepLabels = ['产品介绍', '素材选择', '素材集合', '剧本生成', '视频生成', 'ASR校准', 'BGM选择', '导出']
 
-@router.get("/state/{session_id}")
-async def get_workflow_state(session_id: int, user: User = Depends(get_current_user)):
-    sp = get_state_path(session_id)
-    if os.path.exists(sp):
-        with open(sp, "r", encoding="utf-8") as f:
-            return json.loads(f.read())
-    return dict(DEFAULT_STATE)
+  // 加载 Session 列表
+  useEffect(() => {
+    request.get('/agent/sessions').then((r: any) => setSessions(r || [])).catch(() => {})
+    request.get('/workflows/prompts').then((r: any) => setTemplates(Object.keys(r?.templates || {}))).catch(() => {})
+    loadBgmMaterials()
+  }, [])
 
+  // 切换 Session 时加载状态
+  useEffect(() => {
+    if (!sessionId) return
+    request.get(`/studio/state/${sessionId}`).then((r: any) => {
+      if (r && typeof r === 'object' && !r.detail) {
+        setState((prev: any) => ({ ...prev, ...r }))
+        if (r.asrResults) setAsrResults(r.asrResults)
+        setMaterials(r.cached_materials || [])
+      }
+    }).catch(() => {})
+    // 加载合成的最终视频和字幕视频
+    request.get(`/studio/clips/${sessionId}`).then((r: any) => {
+      if (r) {
+        const fv = r.final_videos || []
+        setState((prev: any) => ({ ...prev, final_videos: fv }))
+        // 不自动从服务器重建 clip_collections（用户删了就删了）
+      }
+    }).catch(() => {})
+  }, [sessionId])
 
-@router.put("/state/{session_id}")
-async def save_workflow_state(session_id: int, body: dict, user: User = Depends(get_current_user)):
-    sp = get_state_path(session_id)
-    with open(sp, "w", encoding="utf-8") as f:
-        f.write(json.dumps(body, ensure_ascii=False, indent=2))
-    return {"ok": True}
+  const loadBgmMaterials = async () => {
+    try {
+      const r: any = await request.get('/materials', { params: { material_type: 'audio' } })
+      const list = Array.isArray(r) ? r : r?.items || []
+      setBgmMaterials(list)
+    } catch {}
+  }
 
+  // ========== 以下函数与原来完全一致 ==========
 
-@router.post("/semantic-search")
-async def semantic_search(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    """产品介绍 → query-generate → material-search → 返回素材相似度列表"""
-    from app.workers.workflow import call_workflow
-    from app.material.search import search_materials_by_embeddings
-    
-    product_info = body.get("product_info", {})
-    # 用低阈值搜索（0.1），让前端滑动实时筛选
-    threshold = 0.1
-
-    # 1. 调用 query-generate 生成关键词
-    qg = await call_workflow("query-generate", {
-        "product_info": {"product_id": 1, "name": product_info.get("title", ""), "description": product_info.get("content", "")},
-        "video_style": "电商带货",
-        "target_duration": 30,
-    })
-    product_queries = qg.get("product_queries", []) if isinstance(qg, dict) else []
-    general_queries = qg.get("general_queries", []) if isinstance(qg, dict) else []
-
-    # 2. 调用 material-search 生成向量
-    ms = await call_workflow("material-search", {
-        "product_queries": product_queries,
-        "general_queries": general_queries,
-    })
-    embeddings = ms.get("product_embeddings", []) if isinstance(ms, dict) else []
-
-    # 3. 用向量搜索 PG
-    all_results = []
-    seen = set()
-    for emb in embeddings:
-        vector = emb.get("embedding", [])
-        if not vector:
-            continue
-        items = await search_materials_by_embeddings(db, str(user.id), vector, threshold)
-        for item in items:
-            item.pop("text_content", None)
-            mid = item.get("id")
-            if mid not in seen:
-                seen.add(mid)
-                all_results.append(item)
-
-    all_results.sort(key=lambda r: r.get("similarity", 0), reverse=True)
-    return {"materials": all_results, "total": len(all_results)}
-
-
-@router.post("/generate-script")
-async def studio_generate_script(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    """直接生成剧本（不走LLM对话，直接调 runner 或 workflow）"""
-    from app.workflow.runners.script_generate import run_script_generate
-    from app.workflow.models import WorkflowConfig
-    from sqlalchemy import select as _s
-    import json, os
-
-    product_content = body.get("product_content", "")
-    template = body.get("template", "default")
-    materials = body.get("materials", [])  # [{id, description, tags}]
-    session_id = body.get("session_id", 0)
-    script_data = body.get("script")
-    save_only = body.get("save_only", False)
-
-    if save_only and script_data:
-        # 只保存剧本，不重新生成
-        _save_script(session_id, {"script": script_data})
-        return {"success": True, "saved": True}
-
-    params = {
-        "product_info": {"product_id": 1, "name": product_content[:30], "description": product_content, "selling_points": []},
-        "style": "电商带货",
-        "duration": 30,
-        "selected_materials": materials,
+  const saveState = async (patch: any) => {
+    const st = { ...stateRef.current, ...patch }
+    setState(st)
+    if (sessionIdRef.current) {
+      try { await request.put(`/studio/state/${sessionIdRef.current}`, st) } catch {}
     }
+  }
 
-    # 查工作流配置
-    wf = await db.execute(_s(WorkflowConfig).where(WorkflowConfig.user_id == user.id, WorkflowConfig.workflow_name == "script-generate"))
-    wf_cfg = wf.scalar_one_or_none()
+// @ts-ignore - kept for potential future use
+  const loadSession = async (sid: number) => {
+    setSessionId(sid)
+    try {
+      const r: any = await request.get(`/studio/state/${sid}`)
+      if (r && typeof r === 'object') {
+        setState({ ...state, ...r })
+        setMaterials(r.cached_materials || [])
+      }
+    } catch {}
+  }
 
-    if wf_cfg and wf_cfg.enabled:
-        cfg = json.loads(wf_cfg.config or "{}")
-        if cfg.get("api_key") and cfg.get("base_url") and cfg.get("model"):
-            result = await run_script_generate(api_key=cfg["api_key"], base_url=cfg["base_url"], model=cfg["model"], params=params, template=template)
-            # 注入素材ID到每个场景（LLM可能忽略）
-            result = _inject_materials(result, materials)
-            _save_script(session_id, result)
-            return result
-    # fallback: 调 Coze workflow
-    from app.workers.workflow import call_workflow
-    result = await call_workflow("script-generate", params)
-    result = _inject_materials(result, materials)
-    _save_script(session_id, result)
-    return result
+  const deleteSession = async (sid: number) => {
+    try { await request.delete(`/agent/sessions/${sid}`); setSessions(s => s.filter(x => x.id !== sid)); if (sessionId === sid) setSessionId(null) } catch {}
+  }
 
+  const createSession = async () => {
+    try {
+      const r: any = await request.post('/agent/sessions', { title: sessionTitle || '新工作流' })
+      setSessions(s => [...s, r]); setSessionId(r.id); setSessionModal(false); setSessionTitle('')
+      saveState({ session_name: sessionTitle || '新工作流' })
+    } catch { message.error('创建失败') }
+  }
 
-def _inject_materials(script_data: dict, materials: list) -> dict:
-    """强制将素材ID列表注入每个场景的 materials 字段（仅补充空场景）"""
-    script_body = script_data.get("script", script_data)
-    scenes = script_body.get("scenes", [])
-    mid_list = [m.get("material_id") or m.get("id") for m in materials if m.get("material_id") or m.get("id")]
-    if mid_list:
-        for s in scenes:
-            if not s.get("materials"):
-                s["materials"] = mid_list  # fallback: 全部注入
-    return script_data
-
-
-def _save_script(session_id: int, script_data: dict):
-    """保存剧本到 session 目录"""
-    import json, os
-    d = ensure_session_dir(session_id)
-    spath = os.path.join(d["scripts"], f"script_{session_id}.json")
-    with open(spath, "w", encoding="utf-8") as f:
-        f.write(json.dumps(script_data, ensure_ascii=False, indent=2))
-
-
-@router.post("/generate-video")
-async def studio_generate_video(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    """提交视频生成任务（异步，立即返回）"""
-    from app.agent.models import ensure_session_dir, SessionFile, get_session_files as _gsf
-    from app.workers.workflow import call_workflow
-    from app.core.signer import generate_signed_url
-    import json, os, asyncio
-
-    session_id = body.get("session_id", 0)
-    script_name = body.get("script_name", f"script_{session_id}")
-
-    # 1. 读剧本文件
-    sname = script_name or f"script_{session_id}"
-    script_path = os.path.join(ensure_session_dir(session_id)["scripts"], f"{sname}.json")
-    if not os.path.exists(script_path):
-        raise HTTPException(404, f"剧本文件不存在: {script_name}")
-    with open(script_path, "r", encoding="utf-8") as f:
-        script_data = json.loads(f.read())
-    script_body = script_data.get("script", script_data)
-    scenes = script_body.get("scenes", [])
-    title = script_body.get("title", "")
-    style = script_body.get("style", "电商带货")
-    if not scenes:
-        raise HTTPException(400, "剧本没有场景")
-
-    # 2. 获取素材图片（signed URL）— 优先用 scenes 中的 materials，否则用素材集合
-    from sqlalchemy import select as _s
-    from app.material.models import Material
-    scene_mids = set()
-    for s in scenes:
-        for mid in s.get("materials", []):
-            scene_mids.add(mid)
-    # 如果 scenes 没指定素材，从工作流 state 的素材集合取
-    if not scene_mids:
-        state_path = os.path.join(ensure_session_dir(session_id)["root"], "workflow_state.json")
-        if os.path.exists(state_path):
-            with open(state_path, "r", encoding="utf-8") as f:
-                st = json.loads(f.read())
-            sel = st.get("selected_collection_id")
-            coll = next((c for c in st.get("collections", []) if c.get("id") == sel), None)
-            if coll:
-                scene_mids = set(coll.get("material_ids", []))
-    material_urls = {}
-    if scene_mids:
-        import subprocess as _sp, tempfile as _tf, os as _os, shutil as _shutil, uuid as _uuid, httpx as _httpx
-        from app.agent.models import ensure_session_dir
-        frame_dir = _os.path.join(ensure_session_dir(session_id)["root"], "video_frames")
-        _os.makedirs(frame_dir, exist_ok=True)
-        r = await db.execute(_s(Material).where(Material.id.in_(scene_mids)))
-        for m in r.scalars().all():
-            if not m.image_url:
-                continue
-            # 视频素材：截取2-3帧作为参考图
-            is_vid = m.material_type == 'video' or any(ext in (m.image_url or '') for ext in ['.mp4', '.webm', '.mov'])
-            if is_vid and m.image_url:
-                # 下载视频到临时目录
-                vid_path = _os.path.join(frame_dir, f"tmp_{m.id}.mp4")
-                try:
-                    async with _httpx.AsyncClient(timeout=60) as _cli:
-                        vu = m.image_url if m.image_url.startswith('http') else f"http://114.117.242.17:3000{m.image_url}"
-                        vr = await _cli.get(vu)
-                        if vr.status_code == 200:
-                            with open(vid_path, 'wb') as _f:
-                                _f.write(vr.content)
-                            # 获取视频时长
-                            dur_r = _sp.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
-                                             '-of', 'default=noprint_wrappers=1:nokey=1', vid_path],
-                                            capture_output=True, text=True, timeout=10)
-                            dur = float(dur_r.stdout.strip() or 5)
-                            # 取3帧：0%、50%、90%位置
-                            frames = []
-                            for pct in [0.05, 0.5, 0.9]:
-                                ts = dur * pct
-                                out_name = f"frame_{m.id}_{_uuid.uuid4().hex[:8]}.jpg"
-                                out_path = _os.path.join(frame_dir, out_name)
-                                _sp.run(['ffmpeg', '-y', '-ss', str(ts), '-i', vid_path,
-                                         '-vframes', '1', '-q:v', '2', out_path],
-                                        capture_output=True, timeout=15)
-                                if _os.path.exists(out_path):
-                                    signed = generate_signed_url(
-                                        out_path.replace("/app/uploads", "/uploads"),
-                                        expire_seconds=86400)
-                                    url = f"http://114.117.242.17:3000{signed}"
-                                    frames.append(url)
-                            if frames:
-                                for fu in frames:
-                                    mid_key = f"{m.id}_frame_{len(frames)}"
-                                    material_urls[f"{m.id}_frames"] = material_urls.get(f"{m.id}_frames", [])
-                                    material_urls[f"{m.id}_frames"].append(fu)
-                            _os.remove(vid_path)
-                except Exception as _e:
-                    print(f"[generate-video] video frame extract failed for {m.id}: {_e}")
-                # 也保留原 image_url 作为兜底
-                if m.image_url:
-                    signed = generate_signed_url(m.image_url, expire_seconds=86400)
-                    material_urls[m.id] = f"http://114.117.242.17:3000{signed}"
-            elif m.image_url:
-                signed = generate_signed_url(m.image_url, expire_seconds=86400)
-                material_urls[m.id] = f"http://114.117.242.17:3000{signed}"
-
-    # 3. 构建 reference_images
-    for s in scenes:
-        refs = []
-        for mid in s.get("materials", []):
-            if mid in material_urls:
-                refs.append({"url": material_urls[mid], "role": "reference_image"})
-            # 视频帧
-            fk = f"{mid}_frames"
-            if fk in material_urls:
-                for fu in material_urls[fk]:
-                    refs.append({"url": fu, "role": "reference_image"})
-        s["reference_images"] = refs
-        if "lines" not in s:
-            s["lines"] = []
-
-    # 4. 提交任务
-    aspect_ratio = body.get("aspect_ratio", "9:16")
-    params = {
-        "workflow_type": "generate",
-        "session_id": session_id,
-        "script": {
-            "title": title or script_body.get("title", f"视频_{session_id}"),
-            "style": style or "电商带货",
-            "aspect_ratio": aspect_ratio,
-            "duration": sum(s.get("duration", 5) for s in scenes),
-            "scenes": [{
-                "scene_id": s.get("scene_id", i+1),
-                "type": s.get("type", "scene"),
-                "visual_desc": s.get("visual_desc", ""),
-                "duration": s.get("duration", 5),
-                "lines": s.get("lines", []),
-                "text_overlays": s.get("text_overlays", []),
-                "reference_images": s.get("reference_images", []),
-            } for i, s in enumerate(scenes)],
-        },
+  const addProduct = async () => {
+    if (!productContent.trim()) return message.warning('请输入产品介绍')
+    let products: any[]
+    if (productEditId) {
+      products = state.products.map((p: any) => p.id === productEditId ? { ...p, title: productTitle || productContent.slice(0, 30), content: productContent } : p)
+    } else {
+      products = [...state.products, { id: Date.now(), title: productTitle || productContent.slice(0, 30), content: productContent }]
     }
+    saveState({ products }); setProductModal(false); setProductTitle(''); setProductContent(''); setProductEditId(null)
+  }
 
-    # 检查本地工作流配置
-    from app.workflow.models import WorkflowConfig
-    wf = await db.execute(
-        _s(WorkflowConfig).where(WorkflowConfig.user_id == user.id, WorkflowConfig.workflow_name == "video-generate")
-    )
-    wf_cfg = wf.scalar_one_or_none()
-    local_api_key = None
-    if wf_cfg and wf_cfg.enabled:
-        cfg = json.loads(wf_cfg.config or "{}")
-        local_api_key = cfg.get("api_key")
+  const deleteProduct = (id: number) => {
+    const products = state.products.filter((p: any) => p.id !== id)
+    const sel = state.selected_product_id === id ? null : state.selected_product_id
+    saveState({ products, selected_product_id: sel })
+  }
 
-    if local_api_key:
-        # 本地模式：调火山方舟 API
-        from app.workflow.runners.video_generate import run_video_generate
-        try:
-            result = await run_video_generate(local_api_key, params)
-        except Exception as e:
-            raise HTTPException(502, f"本地视频生成失败: {str(e)}")
-        save_mode = "local"
-    else:
-        # 兜底：调 Coze workflow
-        try:
-            result = await call_workflow("video-generate", params)
-        except Exception as e:
-            print(f"[generate-video] Coze ERROR: {e}")
-            raise HTTPException(502, f"Coze workflow 返回错误: {str(e)}")
-        save_mode = "coze"
+  const editProduct = (p: any) => {
+    setProductTitle(p.title)
+    setProductContent(p.content)
+    setProductEditId(p.id)
+    setProductModal(true)
+  }
 
-    inner = result.get("result", result) if isinstance(result, dict) else result
-    task_ids = inner.get("task_ids", []) if isinstance(inner, dict) else []
-    print(f"[generate-video] task_ids count={len(task_ids)}")
-    if not task_ids:
-        raise HTTPException(500, "提交视频生成任务失败")
+  const createCollection = async () => {
+    const ids = state.selected_material_ids
+    if (!ids.length) return message.warning('请先选择素材')
+    const cols = [...(state.collections || [])]
+    cols.push({ id: Date.now(), name: `集合 #${cols.length + 1}`, material_ids: ids })
+    saveState({ collections: cols })
+  }
 
-    # 5. 保存 task_ids（含模式标记）
-    print(f"[generate-video] saving task_ids... session_id={session_id}, mode={save_mode}")
-    sf = SessionFile(
-        session_id=session_id, file_type="video_task",
-        filename=f"tasks_{session_id}.json",
-        file_url="",
-        description=json.dumps({"mode": save_mode, "task_ids": task_ids, "api_key": local_api_key or ""}, ensure_ascii=False),
-    )
-    db.add(sf)
-    await db.commit()
-    print(f"[generate-video] saved, returning")
-    return {"submitted": True, "task_ids": task_ids, "session_id": session_id}
+  const runAsr = async (id: number, url: string) => {
+    setAsrLoadingId(id)
+    try {
+      const res: any = await request.post('/studio/asr', { video_url: url, session_id: sessionId }, { timeout: 600000 })
+      if (res.error) { message.error(res.error); return }
+      const newResults = {...(stateRef.current.asrResults || {}), [id]: res}
+      setAsrResults(newResults)
+      saveState({ asrResults: newResults })
+      setSelectedAsrVideo(id)
+      setEditedSegments(res.segments?.map((s: any) => s.text) || [])
+    } catch { message.error('ASR 请求失败') }
+    setAsrLoadingId(null)
+  }
 
+  const deleteExport = (id: number) => {
+    const exports = (stateRef.current.exports || []).filter((e: any) => e.id !== id)
+    const sel = stateRef.current.selected_export_id === id ? null : stateRef.current.selected_export_id
+    try { saveState({ exports, selected_export_id: sel || (exports.length > 0 ? exports[0].id : null) }) } catch {}
+  }
 
-@router.post("/poll-generate/{session_id}")
-async def studio_poll_generate(session_id: int, db: AsyncSession = Depends(get_db)):
-    """轮询视频生成状态（无需登录）"""
-    from app.agent.models import SessionFile, get_session_files as _gsf
-    from app.workers.workflow import call_workflow
-    import json
+  const genScript = async () => {
+    const prod = state.products.find((p: any) => p.id === state.selected_product_id)
+    if (!prod) return message.warning('请选择产品介绍')
+    if (!state.selected_template) return message.warning('请选择模板')
+    const coll = state.collections.find((c: any) => c.id === state.selected_collection_id)
+    if (!coll) return message.warning('请选择素材集合')
+    setGenerating('生成剧本')
+    try {
+      const matDetails = materials.filter((m: any) => coll.material_ids.includes(m.id)).map((m: any) => ({ material_id: m.id, description: m.tags?.join(', ') || '', tags: m.tags || [] }))
+      const res: any = await request.post('/studio/generate-script', { product_content: prod.content, template: state.selected_template, materials: matDetails, session_id: sessionId })
+      const newScript = { id: Date.now(), name: `${prod.title?.slice(0, 16) || '剧本'} #${(state.scripts?.length || 0) + 1}`, script: res.script || res, created_at: new Date().toISOString() }
+      const scripts = [...(state.scripts || []), newScript]
+      message.success('剧本已生成')
+      saveState({ scripts, selected_script_id: newScript.id })
+    } catch { message.error('生成失败') }
+    setGenerating(null)
+  }
 
-    files = await _gsf(db, session_id)
-    tasks = [f for f in files if f.file_type == "video_task"]
-    if not tasks:
-        return {"status": "no_task", "clips": [], "total": 0}
+  const semanticSearch = async () => {
+    const prod = state.products.find((p: any) => p.id === state.selected_product_id)
+    if (!prod) return message.warning('请先选择产品介绍')
+    setGenerating('嵌入搜索')
+    try {
+      const res: any = await request.post('/studio/semantic-search', { product_info: { title: prod.title, content: prod.content }, threshold: state.threshold })
+      setMaterials(res?.materials || [])
+      saveState({ cached_materials: res?.materials || [] })
+    } catch { message.error('搜索失败') }
+    setGenerating(null)
+  }
 
-    latest = tasks[0]  # 最新的 task（created_at DESC）
-    raw = json.loads(latest.description)
-    # 兼容新旧格式: 旧格式直接是 list，新格式是 {"mode":..., "task_ids":..., "api_key":...}
-    if isinstance(raw, dict) and "task_ids" in raw:
-        task_ids = raw["task_ids"]
-        mode = raw.get("mode", "coze")
-        api_key = raw.get("api_key", "")
-    else:
-        task_ids = raw
-        mode = "coze"
-        api_key = ""
+  const generatingRef = useRef(false)
 
-    if mode == "local" and api_key:
-        from app.workflow.runners.video_generate import query_video_status
-        try:
-            qr = await query_video_status(api_key, task_ids)
-        except Exception:
-            return {"status": "error", "detail": "Local query failed"}
-        qr_inner = qr
-    else:
-        try:
-            qr = await call_workflow("video-generate", {
-                "workflow_type": "query",
-                "task_ids": task_ids,
-            })
-        except Exception:
-            return {"status": "error", "detail": "Coze query failed"}
-        qr_inner = qr.get("result", qr) if isinstance(qr, dict) else qr
-    if not isinstance(qr_inner, dict):
-        return {"status": "unknown", "clips": []}
+  const genVideo = async () => {
+    if (generatingRef.current) return
+    generatingRef.current = true
+    const sid = sessionIdRef.current
+    if (!sid) { generatingRef.current = false; return }
+    const selScript = state.scripts?.find((s: any) => s.id === state.selected_script_id)
+    if (!selScript) { generatingRef.current = false; return message.warning('请选择剧本') }
+    setGenerating('生成视频')
+    try {
+      const script_name = `script_${sid}`
+      // Save the script to session file
+      await request.post('/studio/generate-script', { product_content: '', template: state.selected_template, materials: [], session_id: sid, save_only: true, script: selScript.script }).catch(() => {})
+      const submitRes: any = await request.post('/studio/generate-video', { session_id: sid, script_name }, { timeout: 300000 })
+      if (!submitRes?.submitted) { generatingRef.current = false; return message.error('提交失败') }
+      message.info('视频生成已提交，等待中...')
+      let done = false
+      for (let i = 0; i < 60; i++) {
+        await new Promise(r => setTimeout(r, 30000))
+        try {
+          const pollRes: any = await request.post(`/studio/poll-generate/${sid}`)
+          if (pollRes?.status === 'completed') {
+            const newClips = pollRes.clips || []
+            if (newClips.length > 0) {
+              const cols = [...(stateRef.current.clip_collections || [])]
+              const col = { id: Date.now(), name: `视频运行 #${cols.length + 1}`, clips: newClips, created_at: new Date().toISOString() }
+              cols.push(col)
+              saveState({ clip_collections: cols, selected_clip_collection_id: col.id })
+            }
+            message.success(`生成完成，${pollRes.saved || 0} 个片段`)
+            done = true; break
+          } else if (pollRes?.status === 'running') continue
+          else { message.error('生成异常'); break }
+        } catch { continue }
+      }
+      if (!done) message.error('生成超时')
+    } catch { message.error('生成失败') }
+    setGenerating(null)
+    generatingRef.current = false
+  }
 
-    if qr_inner.get("status") == "completed":
-        clips = qr_inner.get("video_clips", [])
-        saved_ids = []
-        for clip in clips:
-            vu = clip.get("video_url", "")
-            if vu:
-                sf = SessionFile(
-                    session_id=session_id, file_type="video_clip",
-                    filename=f"clip_{session_id}_scene{clip.get('scene_id', '')}.mp4",
-                    file_url=vu,
-                    description=f"场景 {clip.get('scene_id', '')} 视频片段",
-                )
-                db.add(sf)
-                await db.flush()
-                saved_ids.append(sf.id)
-        await db.commit()
-        # 只返回本次新保存的 clips
-        fresh = await _gsf(db, session_id)
-        all_clips = {f.id: {"id": f.id, "scene_id": (f.description or "").replace("场景 ", "").replace(" 视频片段", ""), "url": f.file_url}
-                     for f in fresh if f.file_type == "video_clip"}
-        new_clips = [all_clips[cid] for cid in saved_ids if cid in all_clips]
-        return {"status": "completed", "clips": new_clips, "saved": len(new_clips), "total": len(all_clips)}
-    elif qr_inner.get("status") == "running":
-        return {"status": "running", "clips": []}
-    else:
-        return {"status": "unknown", "detail": str(qr_inner)}
+  // 智能剪辑 Agent
+  const handleAgentEdit = async () => {
+    setAgentLoading(true)
+    try {
+      const res: any = await request.post('/studio/agent-edit', {
+        session_id: sessionIdRef.current,
+        clips: editingClips.map((c: any) => ({ id: c.id, url: c.url, scene_id: c.scene_id, duration: c.duration })),
+      }, { timeout: 120000 })
+      if (res && Array.isArray(res.clips)) {
+        setEditingClips(res.clips)
+        message.success('智能剪辑完成')
+      } else {
+        message.error('剪辑处理失败')
+      }
+    } catch { message.error('智能剪辑请求失败') }
+    setAgentLoading(false)
+  }
 
+  // 合成视频（纯合成，不自动ASR，输出给ASR步骤）
+  const composeVid = async (editClips?: any[]) => {
+    const clipsToUse = editClips || stateRef.current.clip_collections?.find((c: any) => c.id === stateRef.current.selected_clip_collection_id)?.clips || []
+    if (!clipsToUse.length) return message.warning('请先选择视频片段集合')
+    setGenerating('合成视频')
+    try {
+      const res: any = await request.post('/studio/compose-video', { session_id: sessionIdRef.current, clip_ids: clipsToUse.map((c: any) => c.id), transitions: editClips ? editClips.map((c: any) => c.transition || 'cut') : undefined })
+      if (res?.videos?.length > 0) {
+        const vid = res.videos[0]
+        saveState({ composed_video: vid })
+        message.success('合成完成，前往 ASR 校准步骤')
+      } else {
+        message.error('合成失败')
+      }
+    } catch { message.error('合成失败') }
+    setGenerating(null)
+  }
 
-@router.post("/agent-edit")
-async def studio_agent_edit(body: dict, user = Depends(get_current_user)):
-    """智能剪辑 Agent：分析clip质量，自动排序、去头尾、加转场"""
-    import subprocess, os, json, tempfile, httpx, shutil
-    clips = body.get("clips", [])
-    session_id = body.get("session_id", 0)
-    if not clips:
-        return {"clips": []}
-    result = []
-    for clip in clips:
-        url = clip.get("url", "")
-        if not url:
-            result.append({**clip, "transition": clip.get("transition", "cut")})
-            continue
-        # FFprobe 检测黑帧和静音
-        dur = 0
-        try:
-            # 下载 tmp
-            tmp = tempfile.mkdtemp()
-            path = os.path.join(tmp, "clip.mp4")
-            async with httpx.AsyncClient(timeout=30) as c:
-                u = url if url.startswith("http") else f"http://114.117.242.17:3000{url}"
-                r = await c.get(u)
-                if r.status_code == 200:
-                    with open(path, "wb") as f:
-                        f.write(r.content)
-            # 获取时长
-            rr = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
-                "-of", "default=noprint_wrappers=1:nokey=1", path], capture_output=True, text=True, timeout=10)
-            dur = float(rr.stdout.strip() or 0)
-            shutil.rmtree(tmp, ignore_errors=True)
-        except:
-            pass
-        result.append({
-            "id": clip.get("id"),
-            "url": url,
-            "scene_id": clip.get("scene_id"),
-            "duration": dur or clip.get("duration", 5),
-            "transition": "dissolve",  # Agent默认用叠化
-        })
-    return {"clips": result}
+  const deleteCollection = async (id: number) => {
+    const cols = (stateRef.current.collections || []).filter((c: any) => c.id !== id)
+    const patch: any = { collections: cols }
+    if (stateRef.current.selected_collection_id === id) patch.selected_collection_id = null
+    try { await saveState(patch) } catch {}
+  }
 
-@router.post("/compose-video")
-async def studio_compose_video(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    """合成视频：FFmpeg 本地拼接选中 clip，不做TTS"""
-    from app.agent.models import SessionFile, get_session_files as _gsf
-    from app.core.signer import generate_signed_url
-    import subprocess, tempfile, os, httpx, uuid, shutil
+  const deleteScript = (id?: number) => {
+    const scripts = (state.scripts || []).filter((s: any) => s.id !== (id || state.selected_script_id))
+    const sel = state.selected_script_id === id ? null : state.selected_script_id
+    try { saveState({ scripts, selected_script_id: sel || (scripts.length > 0 ? scripts[0].id : null) }) } catch {}
+  }
 
-    session_id = body.get("session_id", 0)
-    clip_ids = body.get("clip_ids")
+  const deleteClipCollection = async (id: number) => {
+    const cols = (stateRef.current.clip_collections || []).filter((c: any) => c.id !== id)
+    const patch: any = { clip_collections: cols }
+    if (stateRef.current.selected_clip_collection_id === id) patch.selected_clip_collection_id = null
+    try { await saveState(patch) } catch {}
+  }
 
-    # 清理旧的 final_video 和 subbed_video，避免累积
-    from sqlalchemy import delete as _del
-    await db.execute(_del(SessionFile).where(
-        SessionFile.session_id == session_id,
-        SessionFile.file_type.in_(["final_video", "subbed_video", "asr_subtitles", "asr_duration"]),
-    ))
-    await db.commit()
+  const doExport = async () => {
+    const mv = stateRef.current.bgm_mixed_video
+    if (!mv) return message.warning('请先在 BGM 步骤合成视频')
+    setExporting(true)
+    try {
+      const bgmId = selectedBgmId
+      const bgm = bgmId ? bgmMaterials.find((m: any) => m.id === bgmId) : null
+      const payload: any = {
+        video_url: mv.url,
+        title: state.session_name || '导出视频',
+        session_id: sessionId,
+        script_template: state.selected_template || 'default',
+      }
+      if (bgm) {
+        payload.bgm_url = bgm.image_url?.startsWith('http') ? bgm.image_url : `http://114.117.242.17:3000${bgm.image_url}`
+        payload.bgm_name = bgm.name || ''
+      }
+      const res: any = await request.post('/published/export', payload, { timeout: 300000 })
+      if (res.success) {
+        const exp = { id: Date.now(), video_url: subbedUrl, title: state.session_name || '导出视频', bgm_name: bgm?.name || '', script_template: state.selected_template || 'default', created_at: new Date().toISOString() }
+        const exports = [...(state.exports || []), exp]
+        saveState({ exports, selected_export_id: exp.id })
+        setSubbedUrl('')
+        message.success('导出成功！')
+      } else {
+        message.error(res.message || '导出失败')
+      }
+    } catch { message.error('导出请求失败') }
+    setExporting(false)
+  }
 
-    files = await _gsf(db, session_id)
-    clips = [f for f in files if f.file_type == "video_clip"]
-    if clip_ids:
-        clips = [f for f in clips if f.id in clip_ids]
-    # 按 scene_id 排序（从 description 提取场景号）
-    def _scene_sort_key(f):
-        desc = f.description or ""
-        try:
-            return int(desc.replace("场景 ", "").replace(" 视频片段", ""))
-        except:
-            return 999
-    clips.sort(key=_scene_sort_key)
-    if not clips:
-        raise HTTPException(400, "没有可合成的视频片段")
+  const GenBtn = ({ label, onClick }: any) => (
+    <div style={{ textAlign: 'center', margin: '8px 0' }}>
+      <Button type="primary" icon={<PlayCircleOutlined />} loading={generating === label} onClick={onClick} style={{ width: 180 }}>{label}</Button>
+    </div>
+  )
 
-    # 下载 clips
-    tmpdir = tempfile.mkdtemp()
-    inputs = []
-    async with httpx.AsyncClient(timeout=120) as client:
-        for vf in clips:
-            url = vf.file_url or ""
-            if not url.startswith("http"):
-                url = "http://114.117.242.17:3000" + url
-            try:
-                resp = await client.get(url)
-                resp.raise_for_status()
-                path = os.path.join(tmpdir, f"clip_{vf.id}.mp4")
-                with open(path, "wb") as f:
-                    f.write(resp.content)
-                inputs.append(path)
-            except Exception:
-                continue
+  const selectedClipColl = (state.clip_collections || []).find((c: any) => c.id === state.selected_clip_collection_id)
 
-    if len(inputs) < 1:
-        shutil.rmtree(tmpdir, ignore_errors=True)
-        return {"composed": False, "error": "无法下载视频片段"}
+  return (
+    <div style={{ padding: 0, display: 'flex', flexDirection: 'column', height: 'calc(100vh - 180px)' }}>
+      {/* Session 切换栏 */}
+      <div style={{ display: 'flex', gap: 8, padding: '8px 12px', background: '#fafafa', borderBottom: '1px solid #f0f0f0', alignItems: 'center' }}>
+        <Button size="small" type="primary" icon={<PlusOutlined />} onClick={() => setSessionModal(true)}>新建</Button>
+        <Select placeholder="选择工作流" style={{ width: 220 }} size="small" value={sessionId} onChange={setSessionId}
+          options={sessions.map((s: any) => ({ value: s.id, label: s.title }))} />
+        {sessionId && (
+          <Popconfirm title="确定删除？" onConfirm={() => deleteSession(sessionId)}>
+            <Button size="small" danger icon={<DeleteOutlined />} />
+          </Popconfirm>
+        )}
+      </div>
 
-    # FFmpeg concat
-    list_path = os.path.join(tmpdir, "files.txt")
-    with open(list_path, "w") as f:
-        for p in inputs:
-            f.write(f"file '{p}'\n")
-
-    out_name = f"final_{session_id}_{uuid.uuid4().hex[:8]}.mp4"
-    out_path = os.path.join(tmpdir, out_name)
-    result = subprocess.run(
-        ["ffmpeg", "-f", "concat", "-safe", "0", "-i", list_path, "-c", "copy", "-y", out_path],
-        capture_output=True, text=True, timeout=120,
-    )
-    if result.returncode != 0:
-        shutil.rmtree(tmpdir, ignore_errors=True)
-        return {"composed": False, "error": f"FFmpeg 拼接失败: {result.stderr[:200]}"}
-
-    # 复制到 uploads
-    uploads_dir = "/app/uploads/composed"
-    os.makedirs(uploads_dir, exist_ok=True)
-    dest = os.path.join(uploads_dir, out_name)
-    shutil.copy2(out_path, dest)
-    shutil.rmtree(tmpdir, ignore_errors=True)
-
-    signed = generate_signed_url(dest.replace("/app/uploads", "/uploads"), expire_seconds=86400)
-    url = f"http://114.117.242.17:3000{signed}"
-
-    sf = SessionFile(
-        session_id=session_id, file_type="final_video",
-        filename=out_name, file_url=url, description="FFmpeg 合成视频",
-    )
-    db.add(sf)
-    await db.commit()
-
-    return {"composed": True, "videos": [{"id": sf.id, "url": url}]}
-
-
-@router.get("/clips/{session_id}")
-async def get_session_clips(session_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    """获取 session 的视频片段"""
-    from app.agent.models import SessionFile, get_session_files as _gsf
-    files = await _gsf(db, session_id)
-    clips = [{"id": f.id, "scene_id": (f.description or "").replace("场景 ", "").replace(" 视频片段", ""), "url": f.file_url} for f in files if f.file_type == "video_clip"]
-    final = [{"id": f.id, "url": f.file_url} for f in files if f.file_type == "final_video"]
-    subbed = [{"id": f.id, "url": f.file_url} for f in files if f.file_type == "subbed_video"]
-    asr_list = [json.loads(f.description or "[]") for f in files if f.file_type == "asr_subtitles"]
-    asr_durs = [float(f.description or "0") for f in files if f.file_type == "asr_duration"]
-    return {
-        "clips": clips, "final_videos": final,
-        "subbed_videos": subbed,
-        "asr_segments": asr_list[0] if asr_list else [],
-        "asr_duration": asr_durs[0] if asr_durs else 0,
-    }
-
-
-@router.post("/delete-clip")
-async def studio_delete_clip(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    """删除指定 SessionFile（视频片段或最终视频），同时删除物理文件"""
-    from app.agent.models import SessionFile
-    from sqlalchemy import select as _s
-    import os as _os
-    clip_id = body.get("clip_id")
-    file_url = body.get("file_url", "")
-    if clip_id:
-        r = await db.execute(_s(SessionFile).where(SessionFile.id == clip_id))
-        sf = r.scalar_one_or_none()
-        if sf:
-            # 删物理文件
-            if sf.file_url:
-                idx = sf.file_url.find("/uploads/")
-                if idx >= 0:
-                    fpath = "/app" + sf.file_url[idx:]
-                    if _os.path.exists(fpath):
-                        _os.remove(fpath)
-            await db.delete(sf)
-    if file_url and not clip_id:
-        # 直接按 URL 删除
-        from sqlalchemy import delete as _del
-        idx = file_url.find("/uploads/")
-        if idx >= 0:
-            fpath = "/app" + file_url[idx:]
-            if _os.path.exists(fpath):
-                _os.remove(fpath)
-        # 也删 DB 记录
-        urls = [file_url]
-        if not file_url.startswith("http"):
-            urls = [f"http://114.117.242.17:3000{file_url}", file_url]
-        for u in urls:
-            await db.execute(_del(SessionFile).where(SessionFile.file_url == u))
-    await db.commit()
-    return {"ok": True}
-
-
-@router.post("/materials/search")
-async def search_studio_materials(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    """搜索素材（带阈值和标签）"""
-    from sqlalchemy import select as _s, text as _t
-    from app.material.models import Material
-    threshold = body.get("threshold", 30) / 100.0
-    tags = body.get("tags", [])
-    query = _s(Material).where(Material.user_id == str(user.id))
-    if tags:
-        for tag in tags:
-            query = query.where(Material.tags.contains(_t(f'"{tag}"')))
-    r = await db.execute(query.order_by(Material.id.desc()))
-    items = [{"id": m.id, "image_url": m.image_url, "tags": m.tags, "similarity": 1.0} for m in r.scalars().all()]
-    return {"materials": items, "total": len(items)}
-
-
-# ── ASR 语音识别 ────────────────────────
-
-@router.post("/asr")
-async def studio_asr(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    """对视频做语音识别，返回带时间戳的字幕"""
-    import subprocess, tempfile, os, httpx, shutil, uuid
-    from faster_whisper import WhisperModel
-
-    video_url = body.get("video_url", "")
-    session_id = body.get("session_id")
-    if not video_url:
-        raise HTTPException(400, "video_url required")
-
-    tmpdir = tempfile.mkdtemp()
-    try:
-        # 从 URL 提取本地路径（绕过 signed URL 过期问题）
-        vid_path = os.path.join(tmpdir, "input.mp4")
-        local_path = None
-        idx = video_url.find("/uploads/")
-        if idx >= 0:
-            local_path = "/app" + video_url[idx:]
-            if not os.path.exists(local_path):
-                local_path = None
-        if not local_path:
-            idx = video_url.find("/signed/")
-            if idx >= 0:
-                rest = video_url[idx + 8:]
-                slash = rest.find("/")
-                if slash >= 0:
-                    local_path = "/app/uploads/" + rest[slash+1:]
-                    if not os.path.exists(local_path):
-                        local_path = None
-        if local_path:
-            with open(local_path, "rb") as src, open(vid_path, "wb") as dst:
-                dst.write(src.read())
-        else:
-            async with httpx.AsyncClient(timeout=300) as client:
-                url = video_url if video_url.startswith("http") else f"http://114.117.242.17:3000{video_url}"
-                resp = await client.get(url)
-                resp.raise_for_status()
-                with open(vid_path, "wb") as f:
-                    f.write(resp.content)
-
-        # 提取音频
-        audio_path = os.path.join(tmpdir, "audio.wav")
-        subprocess.run(
-            ["ffmpeg", "-i", vid_path, "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", "-y", audio_path],
-            capture_output=True, text=True, timeout=120,
-        )
-
-        # 语音识别
-        # 语音识别（本地模型优先）
-        model_dir = "/app/models/whisper_tiny"
-        if not os.path.exists(os.path.join(model_dir, "model.bin")):
-            model_dir = "tiny"  # fallback
-        model = WhisperModel(model_dir, device="cpu", compute_type="int8")
-        segments, info = model.transcribe(audio_path, language="zh", vad_filter=True)
-
-        subs = []
-        for seg in segments:
-            text = seg.text.strip()
-            # 繁转简
-            try:
-                import unicodedata
-                # 简单方法：用 zhconv
-                try:
-                    from zhconv import convert
-                    text = convert(text, 'zh-hans')
-                except ImportError:
-                    # fallback: 用标准 unicodedata
-                    pass
-            except Exception:
-                pass
-            subs.append({
-                "start": round(seg.start, 1),
-                "end": round(seg.end, 1),
-                "text": text,
-            })
-
-        # 4. LLM 错别字校正（通过 ASR 纠错工作流配置），并传入剧本辅助纠错
-        if subs:
-            try:
-                from app.workflow.models import WorkflowConfig
-                from sqlalchemy import select as _s
-                wf = await db.execute(_s(WorkflowConfig).where(
-                    WorkflowConfig.user_id == user.id,
-                    WorkflowConfig.workflow_name == "asr-correct",
-                    WorkflowConfig.enabled == 1,
-                ))
-                wf_cfg = wf.scalar_one_or_none()
-                if wf_cfg:
-                    cfg_dict = json.loads(wf_cfg.config or "{}")
-                    api_key = cfg_dict.get("api_key")
-                    base_url = (cfg_dict.get("base_url") or "https://api.deepseek.com/v1").rstrip("/")
-                    model = cfg_dict.get("model", "deepseek-v4-flash")
-                    if api_key:
-                        # 读取剧本作为纠错参考
-                        script_context = ""
-                        try:
-                            from app.agent.models import ensure_session_dir
-                            sp = os.path.join(ensure_session_dir(session_id)["scripts"], f"script_{session_id}.json")
-                            if os.path.exists(sp):
-                                with open(sp, "r", encoding="utf-8") as sf:
-                                    sd = json.loads(sf.read())
-                                lines_text = []
-                                for sc in (sd.get("script", sd).get("scenes", sd.get("scenes", []))):
-                                    for ln in sc.get("lines", []):
-                                        speaker = ln.get("speaker", "")
-                                        text = ln.get("text", "")
-                                        if text:
-                                            lines_text.append(f"[{speaker}] {text}")
-                                if lines_text:
-                                    script_context = "\n".join(lines_text)
-                        except Exception:
-                            pass
-
-                        all_text = "\n".join([s["text"] for s in subs])
-                        prompt = f"""你是一个ASR字幕校对助手。将语音识别结果与剧本台词对比，修正识别错误。"""
-
-                        if script_context:
-                            prompt += f"""
-
-参考剧本台词（用于对比和修正ASR识别错误）：
-{script_context}
-"""
-                        prompt += f"""
-
-【校对规则】：
-1. 【以剧本为准】如果某句ASR文本与剧本中同一场景/相近时间段的台词内容相似（部分字词匹配、语义对应），则采用剧本中对应的正确文本。不要求逐字同音
-2. 【禁止加台词】如果剧本有某句台词但ASR完全没有对应内容，不能凭空补上去
-3. 【禁止加字】ASR原文中没有的字不能自己加（除非剧本对应台词明确有）
-4. 【错别字修正】纠正明显错误的字词，尤其是产品名、品牌名、专业术语等专有名词
-5. 【标点符号】只加必要的标点符号
-6. 【不确定则保留】如果一段话无法匹配任何剧本台词，则只改明显错别字，保持原样
-
-待修正ASR文本（每行对应一个时间片段）：
-{all_text}
-
-只输出修正后的文本，每行对应一行："""
-                        payload = {
-                            "model": model,
-                            "messages": [
-                                {"role": "system", "content": "你是一个字幕校对助手。以剧本台词为参考，修正ASR识别错误。优先采用剧本中的正确文本，不要求原词同音。不确定的保持原样。只输出修正文本。"},
-                                {"role": "user", "content": prompt}
-                            ],
-                            "temperature": 0.1,
+      {/* 工作流步骤 - 侧栏导航 */}
+      {sessionId ? (
+        <div style={{ display: 'flex', gap: 16, flex: 1, overflow: 'hidden' }}>
+          <div style={{ width: 160, flexShrink: 0, borderRight: '1px solid #f0f0f0', paddingRight: 8, paddingTop: 8 }}>
+            <Menu mode="inline" selectedKeys={[String(step)]}
+              onClick={({ key }) => setStep(Number(key))}
+              style={{ border: 'none' }}
+              items={stepLabels.map((s, i) => ({ key: String(i), icon: stepIcons[i], label: s }))} />
+          </div>
+          <div style={{ flex: 1, overflow: 'auto', padding: '0 8px' }}>
+            {step === 0 && (
+              <div>
+                <Card title="产品介绍" size="small" extra={<Button size="small" icon={<PlusOutlined />} onClick={() => { setProductEditId(null); setProductTitle(''); setProductContent(''); setProductModal(true) }} />} style={{ minHeight: 400 }}>
+                  <List size="small" dataSource={state.products} renderItem={(p: any) => (
+                    <List.Item onClick={() => saveState({ selected_product_id: p.id })}
+                      style={{ cursor: 'pointer', background: state.selected_product_id === p.id ? '#e6f4ff' : undefined }}
+                      actions={[
+                        <Button key="edit" size="small" type="link" icon={<EditOutlined />} onClick={e => { e.stopPropagation(); editProduct(p) }} />,
+                        <span key="del" onClick={e => { e.stopPropagation(); deleteProduct(p.id) }}><DeleteOutlined style={{ color: '#ff4d4f' }} /></span>
+                      ]}>
+                      {p.title || p.content?.slice(0, 30)}
+                    </List.Item>
+                  )} />
+                </Card>
+                <GenBtn label="嵌入搜索" onClick={semanticSearch} />
+              </div>
+            )}
+            {step === 1 && (
+              <div>
+                <Card title="素材选择" size="small" style={{ minHeight: 400 }}>
+                  <div style={{ marginBottom: 16 }}>
+                    <span>相似度阈值: {localThreshold}</span>
+                    <Slider min={0} max={0.95} step={0.05} value={localThreshold} onChange={setLocalThreshold} />
+                  </div>
+                  <List size="small" dataSource={materials} renderItem={(m: any) => (
+                    <List.Item style={{ cursor: 'pointer', background: state.selected_material_ids.includes(m.id) ? '#e6f4ff' : undefined }}
+                      onClick={() => saveState({ selected_material_ids: state.selected_material_ids.includes(m.id) ? state.selected_material_ids.filter((x: number) => x !== m.id) : [...state.selected_material_ids, m.id] })}>
+                      <Space>{m.image_url && <img src={m.image_url} style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 4 }} />}<span>{m.id}</span></Space>
+                    </List.Item>
+                  )} />
+                </Card>
+                <GenBtn label="生成素材集合" onClick={createCollection} />
+              </div>
+            )}
+            {step === 2 && (
+              <div>
+                <Card title="素材集合" size="small" style={{ minHeight: 400 }}>
+                  <List size="small" dataSource={state.collections} renderItem={(c: any) => (
+                    <List.Item onClick={() => saveState({ selected_collection_id: c.id })}
+                      style={{ cursor: 'pointer', background: state.selected_collection_id === c.id ? '#e6f4ff' : undefined }}
+                      actions={[<span key="del" onClick={e => { e.stopPropagation(); deleteCollection(c.id) }}><DeleteOutlined style={{ color: '#ff4d4f' }} /></span>]}>
+                      <span style={{ fontSize: 13 }}>{c.name} ({c.material_ids?.length || 0} 素材)</span>
+                    </List.Item>
+                  )} />
+                  {state.collections.length === 0 && <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>选素材后点击生成</div>}
+                </Card>
+                <GenBtn label="生成剧本" onClick={genScript} />
+              </div>
+            )}
+            {step === 3 && (
+              <div>
+                <Card title="剧本生成" size="small" extra={<Select placeholder="模板" size="small" style={{ width: 120 }} value={state.selected_template} onChange={v => saveState({ selected_template: v })} options={templates.map(t => ({ value: t, label: t }))} />} style={{ minHeight: 400 }}>
+                  {(state.scripts || []).length === 0 ? (
+                    <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>在素材集合步骤生成剧本后在此查看和选择</div>
+                  ) : (
+                    <List size="small" dataSource={state.scripts} renderItem={(s: any) => (
+                      <List.Item onClick={() => saveState({ selected_script_id: s.id })}
+                        style={{ cursor: 'pointer', background: state.selected_script_id === s.id ? '#e6f4ff' : undefined }}
+                        actions={[
+                          <Button key="edit" size="small" type="link" icon={<EditOutlined />} onClick={e => { e.stopPropagation(); setScriptEditorOpen(true) }} />,
+                          <Button key="ai" size="small" type="link" icon={<RobotOutlined />} onClick={e => { e.stopPropagation(); setAiScriptEditorOpen(true) }} />,
+                          <span key="del" onClick={e => { e.stopPropagation(); deleteScript(s.id) }}><DeleteOutlined style={{ color: '#ff4d4f' }} /></span>
+                        ]}>
+                        <Space>
+                          <span style={{ fontWeight: state.selected_script_id === s.id ? 600 : 400 }}>{s.name}</span>
+                          <Tag style={{ fontSize: 10 }}>{s.script?.scenes?.length || 0} 场景</Tag>
+                        </Space>
+                      </List.Item>
+                    )} />
+                  )}
+                  {state.selected_script_id && (() => {
+                    const sel = (state.scripts || []).find((s: any) => s.id === state.selected_script_id)
+                    return sel ? (
+                      <div style={{ marginTop: 12, padding: 12, background: '#f6ffed', borderRadius: 4 }}>
+                        <div style={{ fontWeight: 600 }}>✅ {sel.script?.title || sel.name}</div>
+                        <div style={{ color: '#666', fontSize: 12 }}>{sel.script?.scenes?.length || 0} 个场景</div>
+                      </div>
+                    ) : null
+                  })()}
+                </Card>
+                <GenBtn label="生成视频" onClick={genVideo} />
+              </div>
+            )}
+            {step === 4 && (
+              <div>
+                <Card title="视频生成" size="small" extra={state.clip_collections?.length > 0 ? <Tag color="green">{state.clip_collections.length} 次运行</Tag> : undefined} style={{ minHeight: 400 }}>
+                  {!state.last_script?.script?.title ? <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>生成剧本后点击生成</div> : (
+                    <div>
+                      <List size="small" dataSource={state.clip_collections} renderItem={(c: any) => (
+                        <List.Item onClick={() => { saveState({ selected_clip_collection_id: c.id }); setEditingClips(c.clips?.map((clip: any) => ({ ...clip, transition: 'cut' })) || []) }}
+                          style={{ cursor: 'pointer', background: state.selected_clip_collection_id === c.id ? '#e6f4ff' : undefined }}
+                          actions={[<span key="del" onClick={e => { e.stopPropagation(); deleteClipCollection(c.id) }}><DeleteOutlined style={{ color: '#ff4d4f' }} /></span>]}>
+                          <Space><VideoCameraOutlined /><span>{c.name} ({c.clips?.length || 0} 片段)</span></Space>
+                        </List.Item>
+                      )} />
+                      {(!state.clip_collections || state.clip_collections.length === 0) && <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>点击下方按钮开始生成</div>}
+                      {/* 分镜剪辑面板 */}
+                      {selectedClipColl && editingClips.length > 0 && (
+                        <div style={{ marginTop: 12 }}>
+                          <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>🎬 分镜剪辑 — {selectedClipColl.name}</div>
+                          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 8 }}>
+                            {editingClips.map((clip: any, ci: number) => (
+                              <div key={clip.id || ci} style={{ minWidth: 160, maxWidth: 180, background: '#fafafa', borderRadius: 6, border: '1px solid #f0f0f0', padding: 8, position: 'relative' }}>
+                                <div style={{ fontSize: 11, color: '#999', marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
+                                  <span>场景 {clip.scene_id}</span>
+                                  <span>{clip.duration || '?'}s</span>
+                                </div>
+                                <video src={clip.url} controls style={{ width: '100%', height: 80, borderRadius: 4, objectFit: 'cover' }} />
+                                <div style={{ display: 'flex', gap: 2, marginTop: 4, justifyContent: 'center' }}>
+                                  <Button size="small" icon={<ArrowUpOutlined />} disabled={ci === 0}
+                                    onClick={e => { e.stopPropagation(); const arr = [...editingClips]; [arr[ci-1], arr[ci]] = [arr[ci], arr[ci-1]]; setEditingClips(arr) }}
+                                    style={{ fontSize: 10, height: 20, padding: '0 3px' }} />
+                                  <Button size="small" icon={<ArrowDownOutlined />} disabled={ci === editingClips.length - 1}
+                                    onClick={e => { e.stopPropagation(); const arr = [...editingClips]; [arr[ci], arr[ci+1]] = [arr[ci+1], arr[ci]]; setEditingClips(arr) }}
+                                    style={{ fontSize: 10, height: 20, padding: '0 3px' }} />
+                                  <Select size="small" value={clip.transition || 'cut'} onChange={v => { const arr = [...editingClips]; arr[ci] = { ...arr[ci], transition: v }; setEditingClips(arr) }}
+                                    style={{ width: 62, fontSize: 10 }} options={[
+                                      { value: 'cut', label: '切' },
+                                      { value: 'dissolve', label: '叠化' },
+                                      { value: 'fade', label: '渐黑' },
+                                    ]} />
+                                  <Button size="small" icon={<DeleteOutlined />} danger
+                                    onClick={e => { e.stopPropagation(); setEditingClips(editingClips.filter((_: any, i: number) => i !== ci)) }}
+                                    style={{ fontSize: 10, height: 20, padding: '0 3px' }} />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </Card>
+                <Space style={{ marginTop: 8 }}>
+                  {selectedClipColl && editingClips.length > 0 && (
+                    <Button icon={<RobotOutlined />} loading={agentLoading} onClick={handleAgentEdit}>🤖 智能剪辑</Button>
+                  )}
+                  {selectedClipColl && editingClips.length > 0 && <GenBtn label="合成视频" onClick={() => composeVid(editingClips)} />}
+                </Space>
+              </div>
+            )}
+            {step === 5 && (
+              <div>
+                <Card title="ASR 校准" size="small" style={{ minHeight: 400 }}>
+                  {/* 来自步骤4的合成视频 */}
+                  {state.composed_video ? (
+                    <div style={{ marginBottom: 16, padding: 12, background: '#f6ffed', borderRadius: 4, position: 'relative' }}>
+                      <div style={{ fontWeight: 600, marginBottom: 8 }}>📹 来自视频生成的合成视频
+                        <DeleteOutlined style={{ position: 'absolute', top: 8, right: 8, color: '#ff4d4f', cursor: 'pointer', fontSize: 14 }}
+                          onClick={() => { request.post('/studio/delete-clip', { file_url: stateRef.current.composed_video?.url }).catch(() => {}); saveState({ composed_video: null }) }} />   
+                      </div>
+                      <video src={state.composed_video.url} controls style={{ width: '100%', maxHeight: 200, borderRadius: 4 }} />
+                      <SpeedBar />
+                    </div>
+                  ) : (
+                    <div style={{ color: '#999', marginBottom: 12 }}>先在视频生成步骤合成视频</div>
+                  )}
+                  {/* ASR 操作 */}
+                  {state.composed_video && (
+                    <div style={{ marginBottom: 12 }}>
+                      <Space>
+                        <Button size="small" loading={asrLoadingId === state.composed_video.id}
+                          onClick={async () => {
+                            await runAsr(state.composed_video.id, state.composed_video.url)
+                            setSelectedAsrVideo(state.composed_video.id)
+                          }}>🎤 语音识别</Button>
+                      </Space>
+                    </div>
+                  )}
+                  {/* ASR 结果编辑 */}
+                  {selectedAsrVideo && asrResults[selectedAsrVideo]?.segments?.length > 0 && (
+                    <div>
+                      <div style={{ fontWeight: 600, marginBottom: 8 }}>🎤 ASR 识别结果（点击文本可编辑）</div>
+                      <div style={{ maxHeight: 200, overflow: 'auto', fontSize: 12 }}>
+                        {asrResults[selectedAsrVideo].segments.map((seg: any, i: number) => (
+                          <div key={i} style={{ padding: '4px 0', borderBottom: '1px solid #f0f0f0' }}>
+                            <Tag style={{ fontSize: 10 }}>{seg.start}-{seg.end}s</Tag>
+                            <Input.TextArea value={editedSegments?.[i] ?? seg.text}
+                              onChange={e => { const ne = [...(editedSegments || [])]; ne[i] = e.target.value; setEditedSegments(ne) }}
+                              rows={1} style={{ fontSize: 12 }} />
+                          </div>
+                        ))}
+                      </div>
+                      <Space style={{ marginTop: 12 }}>
+                        <Button type="primary" size="small" loading={burningSub} onClick={async () => {
+                          const vid = stateRef.current.composed_video
+                          if (!vid) return
+                          const segments = asrResults[selectedAsrVideo].segments.map((s: any, i: number) => ({ ...s, text: editedSegments?.[i] ?? s.text }))
+                          setBurningSub(true)
+                          try {
+                            const res: any = await request.post('/studio/burn-subtitles', { video_url: vid.url, segments, session_id: sessionIdRef.current }, { timeout: 600000 })
+                            if (res?.url) {
+                              saveState({ subbed_video: { id: Date.now(), url: res.url } })
+                              message.success('字幕已烧录，前往 BGM 步骤')
+                            }
+                          } catch { message.error('烧录失败') }
+                          setBurningSub(false)
+                        }}>🔥 烧录字幕 → 传给 BGM</Button>
+                        <Button size="small" onClick={() => setEditedSegments(asrResults[selectedAsrVideo]?.segments?.map((s: any) => s.text) || [])}>重置</Button>
+                      </Space>
+                    </div>
+                  )}
+                  {/* 预览已烧录的字幕视频 */}
+                  {state.subbed_video && (
+                    <div style={{ marginTop: 16, padding: 12, background: '#e6f7ff', borderRadius: 4, position: 'relative' }}>
+                      <div style={{ fontWeight: 600, marginBottom: 8, color: '#1890ff' }}>✅ 字幕视频已就绪 → 传给 BGM
+                        <DeleteOutlined style={{ position: 'absolute', top: 8, right: 8, color: '#ff4d4f', cursor: 'pointer', fontSize: 14 }}
+                          onClick={() => { request.post('/studio/delete-clip', { file_url: stateRef.current.subbed_video?.url }).catch(() => {}); saveState({ subbed_video: null }) }} />
+                      </div>
+                      <video src={state.subbed_video.url} controls style={{ width: '100%', maxHeight: 200, borderRadius: 4 }} />
+                      <SpeedBar />
+                    </div>
+                  )}
+                </Card>
+              </div>
+            )}
+            {step === 6 && (
+              <div>
+                <Card title="BGM 选择" size="small" extra={<Button size="small" icon={<CustomerServiceOutlined />} onClick={loadBgmMaterials}>刷新</Button>} style={{ minHeight: 400 }}>
+                  {/* 来自 ASR 的字幕视频 */}
+                  {state.subbed_video ? (
+                    <div style={{ marginBottom: 16, padding: 12, background: '#e6f7ff', borderRadius: 4 }}>
+                      <div style={{ fontWeight: 600, marginBottom: 8, color: '#1890ff' }}>📺 来自 ASR 的字幕视频</div>
+                      <video src={state.subbed_video.url} controls style={{ width: '100%', maxHeight: 200, borderRadius: 4 }} />
+                      <SpeedBar />
+                    </div>
+                  ) : (
+                    <div style={{ color: '#999', marginBottom: 12 }}>先在 ASR 步骤烧录字幕</div>
+                  )}
+                  {/* BGM 列表 */}
+                  <div style={{ fontWeight: 500, fontSize: 12, marginBottom: 4 }}>选择 BGM：</div>
+                  {bgmMaterials.length === 0 ? <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>暂无音频素材</div> : (
+                    <List size="small" dataSource={bgmMaterials} renderItem={(m: any) => (
+                      <List.Item onClick={() => setSelectedBgmId(selectedBgmId === m.id ? null : m.id)}
+                        style={{ cursor: 'pointer', background: selectedBgmId === m.id ? '#fff7e6' : undefined }}>
+                        <Space><SoundOutlined style={{ color: '#fa8c16', fontSize: 20 }} />
+                          <div><div style={{ fontWeight: 500 }}>{m.name || '未命名'}</div><div style={{ color: '#999', fontSize: 11 }}>{m.tags?.join(', ') || ''}</div>
+                          {m.image_url && <audio src={m.image_url} controls style={{ width: 200, height: 28, marginTop: 4 }} />}</div>
+                        </Space>
+                      </List.Item>
+                    )} />
+                  )}
+                </Card>
+                {selectedBgmId && state.subbed_video && (
+                  <div style={{ textAlign: 'center', marginTop: 8 }}>
+                    <Button type="primary" icon={<SoundOutlined />} loading={burningSub}                      onClick={async () => {
+                      const bgm = bgmMaterials.find((m: any) => m.id === selectedBgmId)
+                      if (!bgm) { message.warning('BGM 未找到'); return }
+                      if (!stateRef.current.subbed_video) { message.warning('请先在 ASR 步骤烧录字幕'); return }
+                      setBurningSub(true)
+                      try {
+                        // image_url 可能是相对路径，转成完整 URL
+                        const bgmUrl = bgm.image_url?.startsWith('http') ? bgm.image_url : `http://114.117.242.17:3000${bgm.image_url}`
+                        const res: any = await request.post('/studio/burn-subtitles', {
+                          video_url: stateRef.current.subbed_video.url, segments: [],
+                          session_id: sessionIdRef.current, bgm_url: bgmUrl
+                        }, { timeout: 600000 })
+                        if (res?.url) {
+                          saveState({ bgm_mixed_video: { id: Date.now(), url: res.url } })
+                          message.success('BGM 合成完成！前往导出步骤')
                         }
-                        async with httpx.AsyncClient(timeout=30) as client:
-                            resp = await client.post(
-                                f"{base_url}/chat/completions",
-                                json=payload,
-                                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                            )
-                            if resp.status_code == 200:
-                                result = resp.json()
-                                corrected = result["choices"][0]["message"]["content"].strip().split("\n")
-                                for i, line in enumerate(corrected):
-                                    if i < len(subs):
-                                        subs[i]["text"] = line.strip()
-            except Exception:
-                pass
+                      } catch { message.error('合成失败') }
+                      setBurningSub(false)
+                    }}>🎵 合成 BGM → 传给导出</Button>
+                  </div>
+                )}
+                {/* 预览 BGM 混合结果 */}
+                {state.bgm_mixed_video && (
+                  <div style={{ marginTop: 16, padding: 12, background: '#f6ffed', borderRadius: 4, position: 'relative' }}>
+                    <div style={{ fontWeight: 600, marginBottom: 8, color: '#52c41a' }}>✅ BGM 混合完成 → 前往导出
+                      <DeleteOutlined style={{ position: 'absolute', top: 8, right: 8, color: '#ff4d4f', cursor: 'pointer', fontSize: 14 }}
+                        onClick={() => { request.post('/studio/delete-clip', { file_url: stateRef.current.bgm_mixed_video?.url }).catch(() => {}); saveState({ bgm_mixed_video: null }) }} />
+                    </div>
+                    <video src={state.bgm_mixed_video.url} controls style={{ width: '100%', maxHeight: 200, borderRadius: 4 }} />
+                      <SpeedBar />
+                  </div>
+                )}
+              </div>
+            )}
+            {step === 7 && (
+              <div>
+                <Card title="导出" size="small" style={{ minHeight: 400 }}>
+                  {/* 来自 BGM 的混合视频 */}
+                  {state.bgm_mixed_video ? (
+                    <div style={{ marginBottom: 16, padding: 12, background: '#f6ffed', borderRadius: 4, position: 'relative' }}>
+                      <div style={{ fontWeight: 600, marginBottom: 8, color: '#52c41a' }}>✅ 来自 BGM 的最终视频
+                        <DeleteOutlined style={{ position: 'absolute', top: 8, right: 8, color: '#ff4d4f', cursor: 'pointer', fontSize: 14 }}
+                          onClick={() => { request.post('/studio/delete-clip', { file_url: stateRef.current.bgm_mixed_video?.url }).catch(() => {}); saveState({ bgm_mixed_video: null }) }} />
+                      </div>
+                      <video src={state.bgm_mixed_video.url} controls style={{ width: '100%', maxHeight: 200, borderRadius: 4 }} />
+                      <SpeedBar />
+                      <Space direction="vertical" style={{ width: '100%', marginTop: 12 }}>
+                        <a href={state.bgm_mixed_video.url} target="_blank" rel="noreferrer">
+                          <Button icon={<PlayCircleOutlined />} block>预览视频</Button>
+                        </a>
+                        <Button type="primary" icon={<VideoCameraOutlined />} loading={exporting} onClick={doExport} block>
+                          {selectedBgmId ? '导出（含BGM）' : '导出'}
+                        </Button>
+                      </Space>
+                    </div>
+                  ) : (
+                    <div style={{ color: '#999', marginBottom: 16, padding: 20, textAlign: 'center' }}>先在 BGM 步骤合成最终视频</div>
+                  )}
+                  {/* 已导出的列表 */}
+                  {(state.exports || []).length > 0 && (
+                    <div>
+                      <div style={{ fontWeight: 500, marginBottom: 8, fontSize: 13 }}>📦 已导出记录</div>
+                      <List size="small" dataSource={state.exports} renderItem={(e: any) => (
+                        <List.Item onClick={() => saveState({ selected_export_id: e.id })}
+                          style={{ cursor: 'pointer', background: state.selected_export_id === e.id ? '#e6f4ff' : undefined }}
+                          actions={[
+                            <span key="del" onClick={ev => { ev.stopPropagation(); deleteExport(e.id) }}><DeleteOutlined style={{ color: '#ff4d4f' }} /></span>
+                          ]}>
+                          <Space>
+                            <PlayCircleOutlined />
+                            <span style={{ fontWeight: state.selected_export_id === e.id ? 600 : 400 }}>{e.title}</span>
+                            {e.bgm_name && <Tag color="orange" style={{ fontSize: 10 }}>🎵 {e.bgm_name}</Tag>}
+                            <Tag style={{ fontSize: 10 }}>{e.script_template}</Tag>
+                          </Space>
+                        </List.Item>
+                      )} />
+                      {state.selected_export_id && (() => {
+                        const sel = (state.exports || []).find((x: any) => x.id === state.selected_export_id)
+                        return sel ? (
+                          <div style={{ marginTop: 12 }}>
+                            <Space direction="vertical" style={{ width: '100%' }}>
+                              <a href={sel.video_url} target="_blank" rel="noreferrer" style={{ width: '100%' }}>
+                                <Button icon={<PlayCircleOutlined />} block>查看视频</Button>
+                              </a>
+                              <Button type="primary" icon={<VideoCameraOutlined />} block onClick={() => window.open(sel.video_url, '_blank')}>下载视频</Button>
+                            </Space>
+                          </div>
+                        ) : null
+                      })()}
+                    </div>
+                  )}
+                </Card>
+              </div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16 }}>
+              <Button disabled={step === 0} onClick={() => setStep(s => s - 1)}>← 上一步</Button>
+              <Button disabled={step === 7} type="primary" onClick={() => setStep(s => s + 1)}>下一步 →</Button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#999' }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>📋</div>
+          <div>请选择或新建一个工作流开始</div>
+        </div>
+      )}
 
-        # 保存 ASR 结果到 SessionFile
-        if session_id:
-            from app.agent.models import SessionFile
-            # 删除旧的 ASR 记录
-            from sqlalchemy import delete
-            await db.execute(delete(SessionFile).where(
-                SessionFile.session_id == session_id,
-                SessionFile.file_type == "asr_subtitles",
-            ))
-            sf = SessionFile(
-                session_id=session_id, file_type="asr_subtitles",
-                filename="asr_segments.json",
-                description=json.dumps(subs, ensure_ascii=False),
-            )
-            db.add(sf)
+      <Modal title="新建工作流" open={sessionModal} onOk={createSession} onCancel={() => setSessionModal(false)}>
+        <Input placeholder="工作流名称" value={sessionTitle} onChange={e => setSessionTitle(e.target.value)} onPressEnter={createSession} />
+      </Modal>
+      <Modal title={productEditId ? '编辑产品介绍' : '添加产品介绍'} open={productModal} onOk={addProduct} onCancel={() => { setProductModal(false); setProductEditId(null); setProductTitle(''); setProductContent('') }} width={600}>
+        <Input placeholder="产品名称（选填）" value={productTitle} onChange={e => setProductTitle(e.target.value)} style={{ marginBottom: 8 }} />
+        <TextArea rows={12} placeholder="粘贴完整的产品介绍文案..." value={productContent} onChange={e => setProductContent(e.target.value)} />
+      </Modal>
 
-            # 如果 session_id 还在 body 里，一并保存持续时长
-            sfd = SessionFile(
-                session_id=session_id, file_type="asr_duration",
-                filename="asr_duration.txt",
-                description=str(round(info.duration, 1) if info.duration else 0),
-            )
-            db.add(sfd)
-            await db.commit()
-
-        return {"segments": subs, "duration": round(info.duration, 1) if info.duration else 0}
-
-    except Exception as e:
-        return {"error": str(e)}
-    finally:
-        shutil.rmtree(tmpdir, ignore_errors=True)
-
-
-@router.post("/burn-subtitles")
-async def studio_burn_subtitles(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    """将 ASR 字幕烧录到视频中"""
-    import subprocess, tempfile, os, httpx, shutil, uuid
-    from app.core.signer import generate_signed_url
-
-    video_url = body.get("video_url", "")
-    segments = body.get("segments", [])
-    if not video_url:
-        raise HTTPException(400, "video_url required")
-
-    tmpdir = tempfile.mkdtemp()
-    try:
-        # 从 URL 提取本地路径（绕过 signed URL 过期问题）
-        vid_path = os.path.join(tmpdir, "input.mp4")
-        local_path = None
-        idx = video_url.find("/uploads/")
-        if idx >= 0:
-            local_path = "/app" + video_url[idx:]
-            if not os.path.exists(local_path):
-                local_path = None
-        if not local_path:
-            idx = video_url.find("/signed/")
-            if idx >= 0:
-                rest = video_url[idx + 8:]
-                slash = rest.find("/")
-                if slash >= 0:
-                    local_path = "/app/uploads/" + rest[slash+1:]
-                    if not os.path.exists(local_path):
-                        local_path = None
-        if local_path:
-            with open(local_path, "rb") as src, open(vid_path, "wb") as dst:
-                dst.write(src.read())
-        else:
-            async with httpx.AsyncClient(timeout=300) as client:
-                url = video_url if video_url.startswith("http") else f"http://114.117.242.17:3000{video_url}"
-                resp = await client.get(url)
-                resp.raise_for_status()
-                with open(vid_path, "wb") as f:
-                    f.write(resp.content)
-
-        # 生成 SRT 字幕文件（如果有 segments）
-        srt_path = None
-        if segments:
-            srt_path = os.path.join(tmpdir, "subs.srt")
-            with open(srt_path, "w", encoding="utf-8") as f:
-                for i, seg in enumerate(segments, 1):
-                    s = seg.get("start", 0)
-                    e = seg.get("end", 0)
-                    text = seg.get("text", "")
-                    def fmt(t):
-                        h = int(t // 3600)
-                        m = int((t % 3600) // 60)
-                        sec = t % 60
-                        return f"{h:02d}:{m:02d}:{sec:06.3f}"
-                    f.write(f"{i}\n{fmt(s)} --> {fmt(e)}\n{text}\n\n")
-
-        # BGM 下载
-        bgm_url = body.get("bgm_url", "")
-        bgm_path = None
-        if bgm_url:
-            bgm_path = os.path.join(tmpdir, "bgm.mp3")
-            try:
-                async with httpx.AsyncClient(timeout=30) as client:
-                    bgm_resp = await client.get(bgm_url)
-                    if bgm_resp.status_code == 200:
-                        with open(bgm_path, "wb") as f:
-                            f.write(bgm_resp.content)
-            except Exception as e:
-                print(f"[burn] BGM download failed: {e}")
-                bgm_path = None
-
-        out_name = f"subbed_{uuid.uuid4().hex[:8]}.mp4"
-        out_path = os.path.join(tmpdir, out_name)
-
-        if srt_path and bgm_path and os.path.exists(bgm_path):
-            # 字幕 + BGM 混音
-            result = subprocess.run(
-                ["ffmpeg", "-i", vid_path, "-i", bgm_path,
-                 "-filter_complex", "[1:a]volume=0.15[a1];[0:a][a1]amix=inputs=2:duration=first[aout]",
-                 "-map", "0:v", "-map", "[aout]", "-c:v", "copy",
-                 "-vf", f"subtitles={srt_path}:fontsdir=/app/models/fonts:force_style='FontName=WenQuanYi Micro Hei\\,FontSize=18\\,PrimaryColour=&H00FFFFFF\\,OutlineColour=&H00000000\\,BorderStyle=1\\,Outline=1'",
-                 "-y", out_path],
-             capture_output=True, text=True, timeout=120,
-         )
-        elif srt_path:
-            # 只有字幕（无 BGM）
-            result = subprocess.run(
-                ["ffmpeg", "-i", vid_path, "-vf", f"subtitles={srt_path}:fontsdir=/app/models/fonts:force_style='FontName=WenQuanYi Micro Hei\\,FontSize=18\\,PrimaryColour=&H00FFFFFF\\,OutlineColour=&H00000000\\,BorderStyle=1\\,Outline=1'",
-                 "-c:a", "copy", "-y", out_path],
-                capture_output=True, text=True, timeout=120,
-            )
-        elif bgm_path and os.path.exists(bgm_path):
-            # 只有 BGM 混音（字幕已烧录好）
-            result = subprocess.run(
-                ["ffmpeg", "-i", vid_path, "-i", bgm_path,
-                 "-filter_complex", "[1:a]volume=0.15[a1];[0:a][a1]amix=inputs=2:duration=first[aout]",
-                 "-map", "0:v", "-map", "[aout]", "-c:v", "copy", "-y", out_path],
-                capture_output=True, text=True, timeout=120,
-            )
-        else:
-            raise HTTPException(400, "至少需要字幕或 BGM 其中之一")
-        if result.returncode != 0:
-            return {"error": f"字幕烧录失败: {result.stderr[:200]}"}
-
-        # 保存到 uploads
-        uploads_dir = "/app/uploads/subbed"
-        os.makedirs(uploads_dir, exist_ok=True)
-        dest = os.path.join(uploads_dir, out_name)
-        shutil.copy2(out_path, dest)
-        shutil.rmtree(tmpdir, ignore_errors=True)
-
-        signed = generate_signed_url(dest.replace("/app/uploads", "/uploads"), expire_seconds=86400)
-        url = f"http://114.117.242.17:3000{signed}"
-
-        # 保存到 SessionFile
-        session_id = body.get("session_id")
-        if session_id:
-            from app.agent.models import SessionFile
-            from sqlalchemy import delete
-            await db.execute(delete(SessionFile).where(
-                SessionFile.session_id == session_id,
-                SessionFile.file_type == "subbed_video",
-            ))
-            sf = SessionFile(
-                session_id=session_id, file_type="subbed_video",
-                filename=out_name, file_url=url,
-                description="字幕烧录视频",
-            )
-            db.add(sf)
-            await db.commit()
-
-        return {"url": url}
-
-    except Exception as e:
-        shutil.rmtree(tmpdir, ignore_errors=True)
-        return {"error": str(e)}
-
-
-# ── AI 剧本编辑 ──────────────────────────
-
-AI_EDIT_TOOLS = [
-    {"type": "function", "function": {
-        "name": "read_script",
-        "description": "读取当前剧本内容",
-        "parameters": {"type": "object", "properties": {}, "required": []},
-    }},
-    {"type": "function", "function": {
-        "name": "change_text",
-        "description": "修改剧本中的台词文本。传入旧文本和新文本，系统自动在剧本中查找替换。",
-        "parameters": {"type": "object", "properties": {
-            "old_text": {"type": "string", "description": "当前台词文本（完整匹配）"},
-            "new_text": {"type": "string", "description": "替换后的新文本"},
-        }, "required": ["old_text", "new_text"]},
-    }},
-    {"type": "function", "function": {
-        "name": "change_duration",
-        "description": "修改指定场景的时长",
-        "parameters": {"type": "object", "properties": {
-            "scene_id": {"type": "string", "description": "场景ID（数字）"},
-            "new_duration": {"type": "string", "description": "新时长秒数，限4/8/12"},
-        }, "required": ["scene_id", "new_duration"]},
-    }},
-    {"type": "function", "function": {
-        "name": "change_visual_desc",
-        "description": "修改指定场景的视觉描述",
-        "parameters": {"type": "object", "properties": {
-            "scene_id": {"type": "string", "description": "场景ID（数字）"},
-            "new_desc": {"type": "string", "description": "新的视觉描述文本"},
-        }, "required": ["scene_id", "new_desc"]},
-    }},
-]
-
-AI_EDIT_SYSTEM = "你是短视频剧本编辑助手。根据用户需求修改剧本。\n\n规则：\n1. 先用 read_script 读取剧本\n2. 使用 change_text / change_duration / change_visual_desc 工具进行修改\n3. 每次修改后告知用户改了哪里"
-
-
-@router.post("/ai-edit")
-async def studio_ai_edit(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    """AI 剧本编辑对话"""
-    from app.ai.models import UserAIConfig
-    from sqlalchemy import select as _s
-    import json, httpx
-
-    session_id = body.get("session_id", 0)
-    script_name = body.get("script_name", f"script_{session_id}")
-    messages = body.get("messages", [])
-    template = body.get("template", "default")
-
-    # 获取模板规则（附加到 system prompt）
-    from app.workflow.runners.script_generate import _read_prompt
-    extra_rules = ""
-    for fname in ["rules.md", "output_format.md"]:
-        p = os.path.join(os.path.dirname(__file__), "..", "workflow", "prompts", fname)
-        if os.path.exists(p):
-            with open(p, "r", encoding="utf-8") as f:
-                extra_rules += f"\n\n--- {fname} ---\n" + f.read()
-    template_system = _read_prompt(template, "system.md") if template else ""
-    full_system = AI_EDIT_SYSTEM
-    if template_system:
-        full_system += f"\n\n当前模板《{template}》的角色定义：\n{template_system}"
-    full_system += f"\n\n当前剧本需遵守的规则：{extra_rules}"
-
-    # 获取用户 AI 配置
-    cfg = await db.execute(_s(UserAIConfig).where(UserAIConfig.user_id == user.id))
-    cfg = cfg.scalar_one_or_none()
-    if not cfg or not cfg.api_key:
-        return {"error": "请先在个人中心配置 AI API Key"}
-
-    api_key = cfg.api_key
-    base_url = cfg.base_url or "https://api.deepseek.com/v1"
-    model = cfg.model or "deepseek-v4-flash"
-
-    # 构建消息列表
-    msgs = [{"role": "system", "content": full_system}] + messages
-
-    async def call_llm(_msgs, _tools=None):
-        payload = {"model": model, "messages": _msgs, "temperature": 0.3}
-        if _tools:
-            payload["tools"] = _tools
-        async with httpx.AsyncClient(timeout=60) as client:
-            r = await client.post(
-                f"{base_url.rstrip('/')}/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                json=payload,
-            )
-            if r.status_code != 200:
-                print(f"[ai-edit] LLM {r.status_code}: {r.text[:500]}")
-            r.raise_for_status()
-            return r.json()
-
-    # 工具循环（最多 5 轮）
-    for _ in range(5):
-        data = await call_llm(msgs, AI_EDIT_TOOLS)
-        choice = data["choices"][0]
-        msg = choice["message"]
-        msgs.append({"role": "assistant", "content": msg.get("content", "")})
-        if msg.get("tool_calls"):
-            msgs[-1]["tool_calls"] = msg["tool_calls"]
-
-        if not msg.get("tool_calls"):
-            break
-
-        for tc in msg["tool_calls"]:
-            fn = tc["function"]
-            name = fn["name"]
-            try:
-                args = json.loads(fn.get("arguments", "{}"))
-                print(f"[ai-edit] tool={name} args={json.dumps(args, ensure_ascii=False)[:200]}")
-                args.setdefault("script_name", script_name)
-                if name in ("change_text", "change_duration", "change_visual_desc"):
-                    # 直接修改文件，不走 execute_tool
-                    from app.agent.models import ensure_session_dir
-                    sp = os.path.join(ensure_session_dir(session_id)["scripts"], f"{script_name}.json")
-                    if not os.path.exists(sp):
-                        result = {"error": "剧本文件不存在"}
-                    else:
-                        with open(sp, "r", encoding="utf-8") as f:
-                            sd = json.loads(f.read())
-                        sb = sd.get("script", sd)
-                        if name == "change_text":
-                            old = args.get("old_text", "")
-                            new_t = args.get("new_text", "")
-                            changed = False
-                            for sc in sb.get("scenes", []):
-                                for ln in sc.get("lines", []):
-                                    if old and ln.get("text") == old:
-                                        ln["text"] = new_t
-                                        changed = True
-                            if changed:
-                                with open(sp, "w", encoding="utf-8") as f:
-                                    json.dump(sd, f, ensure_ascii=False, indent=2)
-                                result = {"ok": True, "msg": f"已将「{old}」改为「{new_t}」"}
-                            else:
-                                result = {"error": f"未找到文本「{old}」"}
-                        elif name == "change_duration":
-                            sid = int(args.get("scene_id", 0))
-                            nd = int(args.get("new_duration", 0))
-                            for sc in sb.get("scenes", []):
-                                if sc.get("scene_id") == sid:
-                                    sc["duration"] = nd
-                                    with open(sp, "w", encoding="utf-8") as f:
-                                        json.dump(sd, f, ensure_ascii=False, indent=2)
-                                    result = {"ok": True, "msg": f"场景{sid}时长改为{nd}秒"}
-                                    break
-                            else:
-                                result = {"error": f"未找到场景{sid}"}
-                        elif name == "change_visual_desc":
-                            sid = int(args.get("scene_id", 0))
-                            nd = args.get("new_desc", "")
-                            for sc in sb.get("scenes", []):
-                                if sc.get("scene_id") == sid:
-                                    sc["visual_desc"] = nd
-                                    with open(sp, "w", encoding="utf-8") as f:
-                                        json.dump(sd, f, ensure_ascii=False, indent=2)
-                                    result = {"ok": True, "msg": f"场景{sid}视觉描述已更新"}
-                                    break
-                            else:
-                                result = {"error": f"未找到场景{sid}"}
-                else:
-                    from app.agent.router import execute_tool
-                    result_str = await execute_tool(name, args, db, session_id, user)
-                    result = json.loads(result_str)
-            except Exception as e:
-                result = {"error": str(e)}
-            msgs.append({"role": "tool", "tool_call_id": tc["id"], "content": json.dumps(result, ensure_ascii=False)})
-
-    # 获取最后 assistant 回复
-    last_assistant = ""
-    updated_script = None
-    for m in reversed(msgs):
-        if m["role"] == "assistant" and m.get("content"):
-            last_assistant = m["content"]
-            break
-
-    # 检查是否有编辑工具被调用
-    for m in msgs:
-        if m["role"] == "tool":
-            try:
-                content = json.loads(m["content"])
-                if content.get("ok"):
-                    # 重新读取最新剧本
-                    spath = os.path.join(ensure_session_dir(session_id)["scripts"], f"{script_name}.json")
-                    if os.path.exists(spath):
-                        with open(spath, "r", encoding="utf-8") as f:
-                            updated_script = json.loads(f.read())
-            except Exception:
-                pass
-
-    return {"reply": last_assistant, "script": updated_script, "messages": msgs[1:]}  # 不包括 system
+      <ScriptEditor sessionId={sessionId || 0} visible={scriptEditorOpen} onClose={() => setScriptEditorOpen(false)} />
+      <AiScriptEditor sessionId={sessionId || 0} scriptName={`script_${sessionId}`}
+        visible={aiScriptEditorOpen}
+        onClose={() => setAiScriptEditorOpen(false)}
+        onScriptUpdated={(script) => saveState({ last_script: { script } })}
+        template={state.selected_template}
+      />
+    </div>
+  )
+}
