@@ -67,6 +67,9 @@ export default function StudioPage() {
   // 分镜剪辑
   const [editingClips, setEditingClips] = useState<any[]>([])
   const [agentLoading, setAgentLoading] = useState(false)
+  const [traces, setTraces] = useState<any[]>([])
+  const [traceTotal, setTraceTotal] = useState(0)
+  const [traceDone, setTraceDone] = useState(0)
   const stepIcons = [<PlusOutlined />, <VideoCameraOutlined />, <AppstoreOutlined />, <FileTextOutlined />, <PlayCircleOutlined />, <SoundOutlined />, <CustomerServiceOutlined />, <VideoCameraOutlined />]
   const stepLabels = ['产品介绍', '素材选择', '素材集合', '剧本生成', '视频生成', 'ASR校准', 'BGM选择', '导出']
 
@@ -95,6 +98,23 @@ export default function StudioPage() {
         // 不自动从服务器重建 clip_collections（用户删了就删了）
       }
     }).catch(() => {})
+  }, [sessionId])
+
+  // Trace 轮询
+  const tracePollRef = useRef<any>(null)
+  const loadTraces = async () => {
+    if (!sessionIdRef.current) return
+    try {
+      const r: any = await request.get(`/studio/trace/${sessionIdRef.current}`)
+      if (r?.traces) { setTraces(r.traces); setTraceTotal(r.total || 0); setTraceDone(r.done || 0) }
+    } catch {}
+  }
+  useEffect(() => {
+    if (!sessionId) return
+    loadTraces()
+    if (tracePollRef.current) clearInterval(tracePollRef.current)
+    tracePollRef.current = setInterval(loadTraces, 3000)
+    return () => { if (tracePollRef.current) clearInterval(tracePollRef.current) }
   }, [sessionId])
 
   const loadBgmMaterials = async () => {
@@ -377,6 +397,41 @@ export default function StudioPage() {
           options={templates.map((t: string) => ({ value: t, label: t }))} />
       </div>
 
+      {/* Pipeline 进度条 */}
+      {sessionId && traces.length > 0 && (
+        <div style={{ padding: '6px 12px', background: '#fff', borderBottom: '1px solid #f0f0f0', fontSize: 12 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
+            <span style={{ fontWeight: 600, fontSize: 12 }}>Pipeline</span>
+            <span style={{ color: '#999' }}>{traceDone}/{traceTotal} 步完成</span>
+            <div style={{ flex: 1, height: 4, background: '#f0f0f0', borderRadius: 2 }}>
+              <div style={{ height: '100%', background: traceTotal > 0 ? '#52c41a' : '#f0f0f0', borderRadius: 2, width: `${traceTotal > 0 ? (traceDone / traceTotal) * 100 : 0}%`, transition: 'width 0.5s' }} />
+            </div>
+            {generating && <Tag color="processing" style={{ marginLeft: 8 }}>{generating}</Tag>}
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {traces.map((t: any, i: number) => (
+              <Tag key={i} color={t.status === 'completed' ? 'success' : t.status === 'running' ? 'processing' : t.status === 'failed' ? 'error' : 'default'}
+                style={{ fontSize: 10, margin: 0 }}>
+                {t.status === 'completed' ? '✅' : t.status === 'running' ? '⏳' : t.status === 'failed' ? '❌' : '⬜'} {t.step}
+              </Tag>
+            ))}
+          </div>
+          {/* 详情 */}
+          {traces.filter(t => t.message || t.error).length > 0 && (
+            <div style={{ marginTop: 4, maxHeight: 100, overflow: 'auto', fontSize: 11, color: '#666' }}>
+              {traces.filter(t => t.message || t.error).map((t: any, i: number) => (
+                <div key={i} style={{ padding: '2px 0', borderBottom: '1px solid #f5f5f5' }}>
+                  <Tag color={t.status === 'completed' ? 'success' : t.status === 'running' ? 'processing' : t.status === 'failed' ? 'error' : 'default'} style={{ fontSize: 10, marginRight: 4 }}>
+                    {t.status === 'completed' ? '✅' : t.status === 'running' ? '⏳' : t.status === 'failed' ? '❌' : '⬜'}
+                  </Tag>
+                  {t.message || t.step}
+                  {t.error && <span style={{ color: '#ff4d4f' }}> — {t.error}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {/* 工作流步骤 - 侧栏导航 */}
       {sessionId ? (
         <div style={{ display: 'flex', gap: 16, flex: 1, overflow: 'hidden' }}>
