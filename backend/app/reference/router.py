@@ -48,7 +48,7 @@ async def upload_and_analyze(
         os.makedirs(os.path.dirname(fpath), exist_ok=True)
         with open(fpath, "wb") as f:
             shutil.copyfileobj(file.file, f)
-        saved_url = generate_signed_url(fpath.replace("/app/uploads", "/uploads"), expire_seconds=86400)
+        saved_url = generate_signed_url(fpath.replace("/app/uploads", "/uploads"), expire_seconds=31536000)
         saved_url = f"http://114.117.242.17:3000{saved_url}"
 
     video_url = saved_url or source_url or ""
@@ -74,7 +74,7 @@ async def upload_and_analyze(
             )
             if os.path.exists(compressed):
                 # 用压缩版 URL 给 Coze
-                signed2 = generate_signed_url(compressed.replace("/app/uploads", "/uploads"), expire_seconds=86400)
+                signed2 = generate_signed_url(compressed.replace("/app/uploads", "/uploads"), expire_seconds=31536000)
                 embed_video_url = f"http://114.117.242.17:3000{signed2}"
                 print(f"[upload-analyze] compressed for Coze: {size_mb:.1f}MB -> {os.path.getsize(compressed)/(1024*1024):.1f}MB")
 

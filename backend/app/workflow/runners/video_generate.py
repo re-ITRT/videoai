@@ -115,7 +115,7 @@ async def run_video_generate(api_key: str, params: dict) -> dict:
                 canvas.save(comp_path, "JPEG", quality=92)
                 signed = generate_signed_url(
                     comp_path.replace("/app/uploads", "/uploads"),
-                    expire_seconds=86400
+                    expire_seconds=31536000
                 )
                 content_items.append({
                     "type": "image_url",

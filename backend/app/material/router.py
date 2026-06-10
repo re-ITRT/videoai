@@ -77,7 +77,7 @@ async def upload_material_file(
         with open(filepath, "wb") as f:
             shutil.copyfileobj(file.file, f)
         image_url = f"/uploads/{filename}"
-        signed_url = generate_signed_url(image_url, expire_seconds=7200)
+        signed_url = generate_signed_url(image_url, expire_seconds=31536000)
 
     material = await svc.create_material(
         db=db,

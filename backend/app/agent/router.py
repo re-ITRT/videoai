@@ -470,7 +470,7 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
             with open(script_path, "w", encoding="utf-8") as f:
                 f.write(script_json)
             from app.core.signer import generate_signed_url
-            signed = generate_signed_url(script_path.replace("/app/uploads", "/uploads"), expire_seconds=86400)
+            signed = generate_signed_url(script_path.replace("/app/uploads", "/uploads"), expire_seconds=31536000)
             sf = SessionFile(
                 session_id=session_id, file_type="script",
                 filename=script_filename,
@@ -519,7 +519,7 @@ async def execute_tool(tool_name: str, args: dict, db: AsyncSession, session_id:
                 )
                 for m in mat_result.scalars().all():
                     if m.image_url:
-                        signed = generate_signed_url(m.image_url, expire_seconds=86400)
+                        signed = generate_signed_url(m.image_url, expire_seconds=31536000)
                         material_urls[m.id] = f"http://114.117.242.17:3000{signed}"
 
             # 2. 构建 reference_images

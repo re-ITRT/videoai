@@ -8,13 +8,13 @@ import base64
 from app.config import settings
 
 
-def generate_signed_url(filepath: str, expire_seconds: int = 3600) -> str:
+def generate_signed_url(filepath: str, expire_seconds: int = 31536000) -> str:
     """
     生成临时签名URL
     
     Args:
         filepath: 文件路径，如 /uploads/abc.jpg 或 /uploads/agent_sessions/1/scripts/script_1.json
-        expire_seconds: 过期时间（秒），默认1小时
+        expire_seconds: 过期时间（秒），默认1年
     
     Returns:
         签名后的URL路径: /signed/{token}/{relpath}

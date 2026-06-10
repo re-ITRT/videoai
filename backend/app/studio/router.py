@@ -102,7 +102,7 @@ async def get_signed_url(path: str = ""):
         idx = path.find("/uploads/")
         if idx >= 0:
             path = path[idx:]
-    signed = generate_signed_url(path, expire_seconds=3600)
+    signed = generate_signed_url(path, expire_seconds=31536000)
     full_url = f"http://114.117.242.17:3000{signed}"
     return {"url": full_url}
 
@@ -152,7 +152,7 @@ async def get_signed_video_url(clip_id: int, db: AsyncSession = Depends(get_db),
     else:
         path = url
     # 生成新鲜签名
-    signed = generate_signed_url(path, expire_seconds=3600)
+    signed = generate_signed_url(path, expire_seconds=31536000)
     full_url = f"http://114.117.242.17:3000{signed}"
     return {"url": full_url}
 
@@ -350,7 +350,7 @@ async def studio_generate_video(body: dict, db: AsyncSession = Depends(get_db), 
                                 if _os.path.exists(out_path):  # pragma: no cover
                                     signed = generate_signed_url(  # pragma: no cover
                                         out_path.replace("/app/uploads", "/uploads"),  # pragma: no cover
-                                        expire_seconds=86400)  # pragma: no cover
+                                        expire_seconds=31536000)  # pragma: no cover
                                     url = f"http://114.117.242.17:3000{signed}"  # pragma: no cover
                                     frames.append(url)  # pragma: no cover
                             if frames:  # pragma: no cover
@@ -363,10 +363,10 @@ async def studio_generate_video(body: dict, db: AsyncSession = Depends(get_db), 
                     print(f"[generate-video] video frame extract failed for {m.id}: {_e}")  # pragma: no cover
                 # 也保留原 image_url 作为兜底  # pragma: no cover
                 if m.image_url:  # pragma: no cover
-                    signed = generate_signed_url(m.image_url, expire_seconds=86400)  # pragma: no cover
+                    signed = generate_signed_url(m.image_url, expire_seconds=31536000)  # pragma: no cover
                     material_urls[m.id] = f"http://114.117.242.17:3000{signed}"  # pragma: no cover
             elif m.image_url:  # pragma: no cover
-                signed = generate_signed_url(m.image_url, expire_seconds=86400)  # pragma: no cover
+                signed = generate_signed_url(m.image_url, expire_seconds=31536000)  # pragma: no cover
                 material_urls[m.id] = f"http://114.117.242.17:3000{signed}"  # pragma: no cover
 
     # 3. 构建 reference_images
@@ -685,7 +685,7 @@ async def studio_compose_video(body: dict, db: AsyncSession = Depends(get_db), u
     shutil.copy2(out_path, dest)
     shutil.rmtree(tmpdir, ignore_errors=True)
 
-    signed = generate_signed_url(dest.replace("/app/uploads", "/uploads"), expire_seconds=86400)
+    signed = generate_signed_url(dest.replace("/app/uploads", "/uploads"), expire_seconds=31536000)
     url = f"http://114.117.242.17:3000{signed}"
 
     sf = SessionFile(
@@ -1090,7 +1090,7 @@ async def studio_burn_subtitles(body: dict, db: AsyncSession = Depends(get_db), 
         shutil.copy2(out_path, dest)
         shutil.rmtree(tmpdir, ignore_errors=True)
 
-        signed = generate_signed_url(dest.replace("/app/uploads", "/uploads"), expire_seconds=86400)
+        signed = generate_signed_url(dest.replace("/app/uploads", "/uploads"), expire_seconds=31536000)
         url = f"http://114.117.242.17:3000{signed}"
 
         # 保存到 SessionFile
