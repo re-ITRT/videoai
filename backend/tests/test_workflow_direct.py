@@ -78,7 +78,7 @@ class TestWorkflowCallDirect:
                 for name in WORKFLOW_URLS:
                     await call_workflow(name, {"p": name})
 
-        assert len(called) == 7
+        assert len(called) == 8
         for name, url in WORKFLOW_URLS.items():
             assert any(url in str(u) for u in called), f"{name}: {url} not called"
 

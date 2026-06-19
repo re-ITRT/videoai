@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, UniqueConstraint, Float
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import func
 from app.core.database import Base
@@ -18,6 +18,16 @@ class ReferenceVideo(Base):
     storyboard = Column(JSONB, default=[])  # 分镜拆解
     style = Column(String(64))  # 风格
     analysis_report = Column(JSONB, default={})  # 完整结构化拆解报告
+    # material-embed 数据
+    tags = Column(JSONB, default=[])  # 标签
+    text_content = Column(Text, default="")  # 商品描述文本
+    text_embedding = Column(JSONB, default=[])  # 文本向量
+    image_embedding = Column(JSONB, default=[])  # 图片向量
+    scenes = Column(JSONB, default=[])  # scenes 列表（从 material-embed 提取）
+    cover_url = Column(Text, default="")  # 视频封面截帧
+    rhythm = Column(Float, default=0.0)  # 平均场景时长（秒），用于判断剪辑节奏
+    play_count = Column(Integer, default=2000)  # 播放量
+    audio_features = Column(JSONB, default={})  # Librosa 音频分析结果
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -32,6 +42,25 @@ class InspirationTemplate(Base):
     reference_video_ids = Column(JSONB, default=[])  # 聚类来源视频
     category = Column(String(64))
     tags = Column(JSONB, default=[])
+    attribution_score = Column(Float, default=0.0)  # 归因评分
+    predicted_play_count = Column(Integer, default=2000)  # 预测播放量
+    bgm_preference = Column(String(32), default="")  # BGM偏好：轻快/中性/稳重
+    bgm_lightness_target = Column(Integer, default=0)  # BGM轻快度目标值 0-100
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class StrategyFactor(Base):
+    __tablename__ = "strategy_factors"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String(64), nullable=False)
+    name = Column(String(128), nullable=False)  # 因子名称：痛点开场/场景化展示/产品特写
+    factor_type = Column(String(32), nullable=False)  # hook / scene / narration / visual / ending
+    description = Column(Text)  # 因子描述
+    content = Column(JSONB, nullable=False)  # 因子具体内容：文案/画面描述/台词等
+    category = Column(String(64))
+    tags = Column(JSONB, default=[])
+    usage_count = Column(Integer, default=0)  # 使用次数
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 

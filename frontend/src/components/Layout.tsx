@@ -4,12 +4,11 @@ import {
   DashboardOutlined,
   VideoCameraOutlined,
   FileTextOutlined,
-  ThunderboltOutlined,
   PlayCircleOutlined,
-  BookOutlined,
   UserOutlined,
   TeamOutlined,
   LogoutOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../hooks/useAuth'
 
@@ -18,10 +17,9 @@ const { Sider, Content, Header } = AntLayout
 const menuItems = [
   { key: '/', icon: <DashboardOutlined />, label: '工作台' },
   { key: '/material', icon: <VideoCameraOutlined />, label: '素材管理' },
-  { key: '/script', icon: <FileTextOutlined />, label: '剧本中心' },
-  { key: '/creation', icon: <ThunderboltOutlined />, label: '视频创作' },
+  { key: '/script', icon: <FileTextOutlined />, label: '模板' },
   { key: '/reference', icon: <PlayCircleOutlined />, label: '参考视频' },
-  { key: '/templates', icon: <BookOutlined />, label: '灵感模板' },
+  { key: '/attribution', icon: <ThunderboltOutlined />, label: '归因分析' },
   { key: '/profile', icon: <UserOutlined />, label: '个人中心' },
 ]
 

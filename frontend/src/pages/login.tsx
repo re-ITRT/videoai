@@ -1,17 +1,17 @@
 import { Form, Input, Button, Card, message } from 'antd'
 import { UserOutlined, LockOutlined } from '@ant-design/icons'
-import { useNavigate, Link } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { login } from '../utils/api'
 
 export default function Login() {
-  const navigate = useNavigate()
   const onFinish = async (values: any) => {
     try {
       const res: any = await login(values)
       localStorage.setItem('token', res.access_token)
       message.success('登录成功')
-      navigate('/')
+      window.location.href = '/'
     } catch (error: any) {
+      console.error('Login failed:', error.response?.status, error.response?.data)
       message.error(error.response?.data?.detail?.message || error.response?.data?.detail || '登录失败')
     }
   }

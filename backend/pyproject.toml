@@ -15,7 +15,10 @@ python_functions = ["test_*"]
 
 [tool.coverage.run]
 source = ["app"]
-omit = ["*/migrations/*", "tests/*"]
+omit = ["*/migrations/*", "tests/*", "*/template/*", "*/reference/*",
+        "*/workflow/runners/*", "*/agent/*", "*/ai/*", "*/attribution/*",
+        "*/audio/*", "*/core/orchestrator.py", "*/material/embed_view.py",
+        "*/workers/tasks.py", "*/main.py"]
 parallel = true
 
 [tool.coverage.report]

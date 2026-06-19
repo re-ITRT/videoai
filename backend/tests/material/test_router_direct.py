@@ -89,10 +89,15 @@ class TestMaterialRouterDirect:
     async def test_search_returns_empty(self, db_session, dummy_user):
         from app.material.router import search_materials
         from app.material.schemas import MaterialSearchRequest
-        resp = await search_materials(
-            request=MaterialSearchRequest(query="test"),
-            db=db_session, current_user=dummy_user,
-        )
+
+        with pytest.MonkeyPatch.context() as mp:
+            async def mock_workflow(name, payload):
+                return {"product_embeddings": []}
+            mp.setattr("app.material.search.call_workflow", mock_workflow)
+            resp = await search_materials(
+                request=MaterialSearchRequest(query="test"),
+                db=db_session, current_user=dummy_user,
+            )
         assert resp == []
 
     @pytest.mark.asyncio

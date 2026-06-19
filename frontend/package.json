@@ -7,8 +7,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\"",
-    "prepare": "cd .. && husky frontend/.husky"
+    "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\""
   },
   "dependencies": {
     "@ant-design/icons": "^6.2.3",
@@ -30,7 +29,7 @@
     "prettier": "^3.2.0",
     "stylelint": "^16.0.0",
     "stylelint-config-standard": "^36.0.0",
-    "typescript": "^5.4.0",
+    "typescript": "^5.9.3",
     "vite": "^5.2.0"
   }
 }

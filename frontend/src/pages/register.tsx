@@ -1,16 +1,15 @@
 import { Form, Input, Button, Card, message } from 'antd'
 import { UserOutlined, LockOutlined } from '@ant-design/icons'
-import { useNavigate, Link } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { register } from '../utils/api'
 
 export default function Register() {
-  const navigate = useNavigate()
   const onFinish = async (values: any) => {
     try {
       const res: any = await register(values)
       localStorage.setItem('token', res.access_token)
       message.success('注册成功')
-      navigate('/')
+      window.location.href = '/'
     } catch (error: any) {
       message.error(error.response?.data?.detail?.message || error.response?.data?.detail || '注册失败')
     }

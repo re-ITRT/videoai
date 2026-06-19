@@ -41,8 +41,8 @@ export const deleteProduct = (id: number) => request.delete(`/products/${id}`)
 // Materials
 // ==============================
 export const getMaterials = (params?: any) => request.get('/materials', { params })
-export const uploadMaterial = (data: FormData) =>
-  request.post('/materials/upload', data, { headers: { 'Content-Type': 'multipart/form-data' } })
+export const uploadMaterial = (data: any) =>
+  request.post(data instanceof FormData ? '/materials/upload/file' : '/materials/upload', data)
 export const deleteMaterial = (id: number) => request.delete(`/materials/${id}`)
 export const searchMaterials = (params: any) => request.get('/materials/search', { params })
 
@@ -67,3 +67,28 @@ export const getTaskLogs = (id: number) => request.get(`/tasks/${id}/logs`)
 export const approveScript = (id: number) => request.post(`/tasks/${id}/approve-script`)
 export const regenerateScene = (taskId: number, sceneId: number) =>
   request.post(`/tasks/${taskId}/regenerate-scene/${sceneId}`)
+
+// ==============================
+// AI Config
+// ==============================
+export const getAIConfig = () => request.get('/users/me/ai-config')
+export const updateAIConfig = (data: any) => request.put('/users/me/ai-config', data)
+export const scanModels = (data?: any) => request.post('/users/me/ai-config/scan-models', data)
+
+// ==============================
+// Workflow Configs
+// ==============================
+export const getWorkflowConfigs = () => request.get('/workflows/configs')
+export const getWorkflowConfig = (name: string) => request.get(`/workflows/configs/${name}`)
+export const updateWorkflowConfig = (name: string, data: any) =>
+  request.put(`/workflows/configs/${name}`, data)
+export const getAvailableWorkflows = () => request.get('/workflows/available')
+export const scanWorkflowModels = (name: string, data: any) =>
+  request.post(`/workflows/configs/${name}/scan-models`, data)
+
+// ==============================
+// Agent Script Editor
+// ==============================
+export const getSessionScript = (sessionId: number) => request.get(`/agent/sessions/${sessionId}/script`)
+export const updateSessionScript = (sessionId: number, data: any) =>
+  request.put(`/agent/sessions/${sessionId}/script`, data)

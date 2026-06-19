@@ -1,0 +1,17 @@
+[Unit]
+Description=Video-AI FastAPI Service
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/video-ai/backend
+Environment="PATH=/opt/video-ai/backend/venv/bin"
+Environment="ENV=production"
+Environment="DATABASE_URL=postgresql+asyncpg://postgres:your_password@localhost:5432/video_ai"
+ExecStart=/opt/video-ai/backend/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,1310 @@
+"""工作流工作室 API — 基于 Session 文件夹存储"""
+import json, os
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.database import get_db
+from app.core.deps import get_current_user
+from app.auth.models import User
+from app.agent.models import ensure_session_dir
+
+router = APIRouter(prefix="/api/v1/studio", tags=["studio"])
+
+DEFAULT_STATE = {
+    "products": [],
+    "selected_product_id": None,
+    "threshold": 30,
+    "selected_material_ids": [],
+    "collections": [],
+    "selected_collection_id": None,
+    "selected_template": "",
+    "cached_materials": [],
+    "last_script": None,
+    "clip_collections": [],
+    "selected_clip_collection_id": None,
+    "final_videos": [],
+}
+
+
+def get_state_path(session_id: int) -> str:
+    return os.path.join(ensure_session_dir(session_id)["root"], "workflow_state.json")
+
+
+async def add_trace(session_id: int, step: str, status: str, message: str = None, error: str = None):
+    """写入 trace 到 workflow_state.json"""
+    from datetime import datetime as _dt
+    sp = get_state_path(session_id)
+    state = {}
+    if os.path.exists(sp):
+        with open(sp, "r", encoding="utf-8") as f:
+            try: state = json.loads(f.read())
+            except: state = {}
+    traces = state.get("trace", [])
+    now = _dt.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    existing = next((t for t in traces if t["step"] == step), None)
+    if existing:
+        existing["status"] = status
+        if message: existing["message"] = message
+        if status == "running" and not existing.get("started_at"):
+            existing["started_at"] = now  # pragma: no cover
+        if status in ("completed", "failed"):
+            existing["completed_at"] = now
+        if error: existing["error"] = error
+    else:
+        traces.append({
+            "step": step, "status": status,
+            "started_at": now if status == "running" else None,
+            "completed_at": now if status in ("completed", "failed") else None,
+            "message": message, "error": error,
+        })
+    state["trace"] = traces
+    with open(sp, "w", encoding="utf-8") as f:
+        f.write(json.dumps(state, ensure_ascii=False, indent=2))
+
+
+@router.get("/trace/{session_id}")
+async def get_workflow_trace(session_id: int):
+    """获取工作流 trace"""
+    sp = get_state_path(session_id)
+    if not os.path.exists(sp):
+        return {"traces": []}
+    with open(sp, "r", encoding="utf-8") as f:
+        state = json.loads(f.read())
+    traces = state.get("trace", [])
+    total = len(traces)
+    done = sum(1 for t in traces if t["status"] in ("completed", "failed"))
+    return {"traces": traces, "total": total, "done": done}
+
+
+@router.get("/state/{session_id}")
+async def get_workflow_state(session_id: int, user: User = Depends(get_current_user)):
+    sp = get_state_path(session_id)
+    if os.path.exists(sp):
+        with open(sp, "r", encoding="utf-8") as f:
+            return json.loads(f.read())
+    return dict(DEFAULT_STATE)
+
+
+@router.put("/state/{session_id}")
+async def save_workflow_state(session_id: int, body: dict, user: User = Depends(get_current_user)):
+    sp = get_state_path(session_id)
+    with open(sp, "w", encoding="utf-8") as f:
+        f.write(json.dumps(body, ensure_ascii=False, indent=2))
+    return {"ok": True}
+
+
+@router.get("/sign-url")
+async def get_signed_url(path: str = ""):
+    """给文件路径签发临时签名URL（用于新标签页打开，无需auth）"""
+    from app.core.signer import generate_signed_url
+    if not path:
+        return {"error": "path required"}
+    if path.startswith("http"):
+        idx = path.find("/uploads/")
+        if idx >= 0:
+            path = path[idx:]
+    signed = generate_signed_url(path, expire_seconds=31536000)
+    full_url = f"http://114.117.242.17:3000{signed}"
+    return {"url": full_url}
+
+@router.get("/video-proxy")
+async def video_proxy(path: str = ""):
+    """视频代理：不暴露mp4直链，通过后端流式传输"""
+    from fastapi.responses import FileResponse
+    import os as _ov, re as _re
+    local = ""
+    # 尝试多种路径格式
+    candidates = [path]
+    if "/signed/" in path:
+        m = _re.search(r'/signed/[^/]+/(.+)', path)
+        if m:
+            candidates.insert(0, "/app/uploads/" + m.group(1))
+    if "/uploads/" in path:
+        idx = path.find("/uploads/")
+        candidates.insert(0, "/app" + path[idx:])
+    for c in candidates:
+        if c.startswith("http"):
+            continue
+        if _ov.path.exists(c):
+            local = c
+            break
+    if not local or not _ov.path.exists(local):
+        raise HTTPException(404, f"video not found: {path[:80]}")
+    return FileResponse(local, media_type="video/mp4")
+
+@router.get("/video-url/{clip_id}")
+async def get_signed_video_url(clip_id: int, db: AsyncSession = Depends(get_db), user = Depends(get_current_user)):
+    """根据 clip_id 返回临时签名 URL（前端不暴露 mp4 直链）"""
+    from app.agent.models import SessionFile
+    from app.core.signer import generate_signed_url
+    from sqlalchemy import select as _s
+    r = await db.execute(_s(SessionFile).where(SessionFile.id == clip_id))
+    sf = r.scalar_one_or_none()
+    if not sf or not sf.file_url:
+        raise HTTPException(404, "clip not found")
+    url = sf.file_url
+    if url.startswith("http"):
+        # 从已有的 signed URL 或者直链中提取路径
+        idx = url.find("/uploads/")
+        if idx >= 0:
+            path = url[idx:]
+        else:
+            raise HTTPException(400, "invalid url format")
+    else:
+        path = url
+    # 生成新鲜签名
+    signed = generate_signed_url(path, expire_seconds=31536000)
+    full_url = f"http://114.117.242.17:3000{signed}"
+    return {"url": full_url}
+
+@router.post("/semantic-search")
+async def semantic_search(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """产品介绍 → query-generate → material-search → 返回素材相似度列表"""
+    from app.workers.workflow import call_workflow
+    from app.material.search import search_materials_by_embeddings
+    
+    product_info = body.get("product_info", {})
+    # 用低阈值获取所有候选项，前端滑块二次筛选
+    threshold = 0.05
+
+    # 1. 调用 query-generate 生成关键词
+    qg = await call_workflow("query-generate", {
+        "product_info": {"product_id": 1, "name": product_info.get("title", ""), "description": product_info.get("content", "")},
+        "video_style": "电商带货",
+        "target_duration": 30,
+    })
+    product_queries = qg.get("product_queries", []) if isinstance(qg, dict) else []
+    general_queries = qg.get("general_queries", []) if isinstance(qg, dict) else []
+
+    # 2. 调用 material-search 生成向量
+    ms = await call_workflow("material-search", {
+        "product_queries": product_queries,
+        "general_queries": general_queries,
+    })
+    embeddings = ms.get("product_embeddings", []) if isinstance(ms, dict) else []
+
+    # 3. 用向量搜索 PG
+    all_results = []
+    seen = set()
+    for emb in embeddings:
+        vector = emb.get("embedding", [])
+        if not vector:
+            continue  # pragma: no cover
+        items = await search_materials_by_embeddings(db, str(user.id), vector, threshold)
+        for item in items:
+            item.pop("text_content", None)
+            mid = item.get("id")
+            if mid not in seen:
+                seen.add(mid)
+                all_results.append(item)
+
+    all_results.sort(key=lambda r: r.get("similarity", 0), reverse=True)
+    return {"materials": all_results, "total": len(all_results)}
+
+
+@router.post("/generate-script")
+async def studio_generate_script(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """直接生成剧本（不走LLM对话，直接调 runner 或 workflow）"""
+    from app.workflow.runners.script_generate import run_script_generate
+    from app.workflow.models import WorkflowConfig
+    from sqlalchemy import select as _s
+    import json, os
+
+    product_content = body.get("product_content", "")
+    template = body.get("template", "default")
+    materials = body.get("materials", [])  # [{id, description, tags}]
+    session_id = body.get("session_id", 0)
+    script_data = body.get("script")
+    save_only = body.get("save_only", False)
+
+    if save_only and script_data:
+        # 只保存剧本，不重新生成
+        _save_script(session_id, {"script": script_data})
+        return {"success": True, "saved": True}
+
+    params = {
+        "product_info": {"product_id": 1, "name": product_content[:30], "description": product_content, "selling_points": []},
+        "style": "电商带货",
+        "duration": 30,
+        "selected_materials": materials,
+    }
+
+    # 查工作流配置
+    wf = await db.execute(_s(WorkflowConfig).where(WorkflowConfig.user_id == user.id, WorkflowConfig.workflow_name == "script-generate"))
+    wf_cfg = wf.scalar_one_or_none()
+
+    if wf_cfg and wf_cfg.enabled:
+        cfg = json.loads(wf_cfg.config or "{}")
+        if cfg.get("api_key") and cfg.get("base_url") and cfg.get("model"):
+            result = await run_script_generate(api_key=cfg["api_key"], base_url=cfg["base_url"], model=cfg["model"], params=params, template=template)
+            # 注入素材ID到每个场景（LLM可能忽略）
+            result = _inject_materials(result, materials)
+            _save_script(session_id, result)
+            return result
+    # fallback: 调 Coze workflow
+    from app.workers.workflow import call_workflow
+    result = await call_workflow("script-generate", params)
+    result = _inject_materials(result, materials)
+    _save_script(session_id, result)
+    return result
+
+
+def _inject_materials(script_data: dict, materials: list) -> dict:
+    """强制将素材ID列表注入每个场景的 materials 字段（仅补充空场景）"""
+    script_body = script_data.get("script", script_data)
+    scenes = script_body.get("scenes", [])
+    mid_list = [m.get("material_id") or m.get("id") for m in materials if m.get("material_id") or m.get("id")]
+    if mid_list:
+        for s in scenes:
+            if not s.get("materials"):
+                s["materials"] = mid_list  # fallback: 全部注入
+    return script_data
+
+
+def _save_script(session_id: int, script_data: dict):
+    """保存剧本到 session 目录"""
+    import json, os
+    d = ensure_session_dir(session_id)
+    spath = os.path.join(d["scripts"], f"script_{session_id}.json")
+    with open(spath, "w", encoding="utf-8") as f:
+        f.write(json.dumps(script_data, ensure_ascii=False, indent=2))
+
+
+@router.post("/generate-video")
+async def studio_generate_video(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """提交视频生成任务（异步，立即返回）"""
+    from app.agent.models import ensure_session_dir, SessionFile, get_session_files as _gsf
+    from app.workers.workflow import call_workflow
+    from app.core.signer import generate_signed_url
+    import json, os, asyncio
+
+    session_id = body.get("session_id", 0)
+    script_name = body.get("script_name", f"script_{session_id}")
+
+    # 1. 读剧本文件
+    sname = script_name or f"script_{session_id}"
+    script_path = os.path.join(ensure_session_dir(session_id)["scripts"], f"{sname}.json")
+    if not os.path.exists(script_path):
+        raise HTTPException(404, f"剧本文件不存在: {script_name}")
+    with open(script_path, "r", encoding="utf-8") as f:
+        script_data = json.loads(f.read())
+    script_body = script_data.get("script", script_data)
+    scenes = script_body.get("scenes", [])
+    title = script_body.get("title", "")
+    style = script_body.get("style", "电商带货")
+    if not scenes:
+        raise HTTPException(400, "剧本没有场景")
+
+    # 2. 获取素材图片（signed URL）— 优先用 scenes 中的 materials，否则用素材集合
+    from sqlalchemy import select as _s
+    from app.material.models import Material
+    scene_mids = set()
+    for s in scenes:
+        for mid in s.get("materials", []):
+            scene_mids.add(mid)  # pragma: no cover
+    # 如果 scenes 没指定素材，从工作流 state 的素材集合取
+    if not scene_mids:
+        state_path = os.path.join(ensure_session_dir(session_id)["root"], "workflow_state.json")
+        if os.path.exists(state_path):
+            with open(state_path, "r", encoding="utf-8") as f:
+                st = json.loads(f.read())
+            sel = st.get("selected_collection_id")
+            coll = next((c for c in st.get("collections", []) if c.get("id") == sel), None)
+            if coll:
+                scene_mids = set(coll.get("material_ids", []))
+    material_urls = {}
+    if scene_mids:
+        import subprocess as _sp, tempfile as _tf, os as _os, shutil as _shutil, uuid as _uuid, httpx as _httpx  # pragma: no cover
+        from app.agent.models import ensure_session_dir  # pragma: no cover
+        frame_dir = _os.path.join(ensure_session_dir(session_id)["root"], "video_frames")  # pragma: no cover
+        _os.makedirs(frame_dir, exist_ok=True)  # pragma: no cover
+        r = await db.execute(_s(Material).where(Material.id.in_(scene_mids)))  # pragma: no cover
+        for m in r.scalars().all():  # pragma: no cover
+            if not m.image_url:  # pragma: no cover
+                continue  # pragma: no cover
+            # 视频素材：截取2-3帧作为参考图  # pragma: no cover
+            is_vid = m.material_type == 'video' or any(ext in (m.image_url or '') for ext in ['.mp4', '.webm', '.mov'])  # pragma: no cover
+            if is_vid and m.image_url:  # pragma: no cover
+                # 下载视频到临时目录  # pragma: no cover
+                vid_path = _os.path.join(frame_dir, f"tmp_{m.id}.mp4")  # pragma: no cover
+                try:  # pragma: no cover
+                    async with _httpx.AsyncClient(timeout=60) as _cli:  # pragma: no cover
+                        vu = m.image_url if m.image_url.startswith('http') else f"http://114.117.242.17:3000{m.image_url}"  # pragma: no cover
+                        vr = await _cli.get(vu)  # pragma: no cover
+                        if vr.status_code == 200:  # pragma: no cover
+                            with open(vid_path, 'wb') as _f:  # pragma: no cover
+                                _f.write(vr.content)  # pragma: no cover
+                            # 获取视频时长  # pragma: no cover
+                            dur_r = _sp.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration',  # pragma: no cover
+                                             '-of', 'default=noprint_wrappers=1:nokey=1', vid_path],  # pragma: no cover
+                                            capture_output=True, text=True, timeout=10)  # pragma: no cover
+                            dur = float(dur_r.stdout.strip() or 5)  # pragma: no cover
+                            # 取3帧：0%、50%、90%位置  # pragma: no cover
+                            frames = []  # pragma: no cover
+                            for pct in [0.05, 0.5, 0.9]:  # pragma: no cover
+                                ts = dur * pct  # pragma: no cover
+                                out_name = f"frame_{m.id}_{_uuid.uuid4().hex[:8]}.jpg"  # pragma: no cover
+                                out_path = _os.path.join(frame_dir, out_name)  # pragma: no cover
+                                _sp.run(['ffmpeg', '-y', '-ss', str(ts), '-i', vid_path,  # pragma: no cover
+                                         '-vframes', '1', '-q:v', '2', out_path],  # pragma: no cover
+                                        capture_output=True, timeout=15)  # pragma: no cover
+                                if _os.path.exists(out_path):  # pragma: no cover
+                                    signed = generate_signed_url(  # pragma: no cover
+                                        out_path.replace("/app/uploads", "/uploads"),  # pragma: no cover
+                                        expire_seconds=31536000)  # pragma: no cover
+                                    url = f"http://114.117.242.17:3000{signed}"  # pragma: no cover
+                                    frames.append(url)  # pragma: no cover
+                            if frames:  # pragma: no cover
+                                for fu in frames:  # pragma: no cover
+                                    mid_key = f"{m.id}_frame_{len(frames)}"  # pragma: no cover
+                                    material_urls[f"{m.id}_frames"] = material_urls.get(f"{m.id}_frames", [])  # pragma: no cover
+                                    material_urls[f"{m.id}_frames"].append(fu)  # pragma: no cover
+                            _os.remove(vid_path)  # pragma: no cover
+                except Exception as _e:  # pragma: no cover
+                    print(f"[generate-video] video frame extract failed for {m.id}: {_e}")  # pragma: no cover
+                # 也保留原 image_url 作为兜底  # pragma: no cover
+                if m.image_url:  # pragma: no cover
+                    signed = generate_signed_url(m.image_url, expire_seconds=31536000)  # pragma: no cover
+                    material_urls[m.id] = f"http://114.117.242.17:3000{signed}"  # pragma: no cover
+            elif m.image_url:  # pragma: no cover
+                signed = generate_signed_url(m.image_url, expire_seconds=31536000)  # pragma: no cover
+                material_urls[m.id] = f"http://114.117.242.17:3000{signed}"  # pragma: no cover
+
+    # 3. 构建 reference_images
+    for s in scenes:
+        refs = []
+        for mid in s.get("materials", []):
+            if mid in material_urls:  # pragma: no cover
+                refs.append({"url": material_urls[mid], "role": "reference_image"})  # pragma: no cover
+            # 视频帧  # pragma: no cover
+            fk = f"{mid}_frames"  # pragma: no cover
+            if fk in material_urls:  # pragma: no cover
+                for fu in material_urls[fk]:  # pragma: no cover
+                    refs.append({"url": fu, "role": "reference_image"})  # pragma: no cover
+        s["reference_images"] = refs  # pragma: no cover
+        if "lines" not in s:
+            s["lines"] = []
+
+    # 创建 trace：每个场景一条
+    await add_trace(session_id, "generate_script", "completed", "剧本已就绪")
+    for si, sc in enumerate(scenes):
+        sid = sc.get("scene_id", si+1)
+        await add_trace(session_id, f"generate_scene_{sid}", "pending", f"场景{sid}: 等待中")
+    await add_trace(session_id, "compose", "pending", "等待所有场景生成完成")
+
+    # 4. 提交任务
+    aspect_ratio = body.get("aspect_ratio", "9:16")
+    params = {
+        "workflow_type": "generate",
+        "session_id": session_id,
+        "script": {
+            "title": title or script_body.get("title", f"视频_{session_id}"),
+            "style": style or "电商带货",
+            "aspect_ratio": aspect_ratio,
+            "duration": sum(s.get("duration", 5) for s in scenes),
+            "scenes": [{
+                "scene_id": s.get("scene_id", i+1),
+                "type": s.get("type", "scene"),
+                "visual_desc": s.get("visual_desc", ""),
+                "duration": s.get("duration", 5),
+                "lines": s.get("lines", []),
+                "text_overlays": s.get("text_overlays", []),
+                "reference_images": s.get("reference_images", []),
+            } for i, s in enumerate(scenes)],
+        },
+    }
+
+    # 检查本地工作流配置
+    from app.workflow.models import WorkflowConfig
+    wf = await db.execute(
+        _s(WorkflowConfig).where(WorkflowConfig.user_id == user.id, WorkflowConfig.workflow_name == "video-generate")
+    )
+    wf_cfg = wf.scalar_one_or_none()
+    local_api_key = None
+    if wf_cfg and wf_cfg.enabled:
+        cfg = json.loads(wf_cfg.config or "{}")
+        local_api_key = cfg.get("api_key")
+
+    if local_api_key:
+        # 本地模式：调火山方舟 API
+        from app.workflow.runners.video_generate import run_video_generate
+        try:
+            result = await run_video_generate(local_api_key, params)
+        except Exception as e:
+            raise HTTPException(502, f"本地视频生成失败: {str(e)}")
+        save_mode = "local"
+    else:
+        # 兜底：调 Coze workflow
+        try:
+            result = await call_workflow("video-generate", params)
+        except Exception as e:  # pragma: no cover
+            print(f"[generate-video] Coze ERROR: {e}")  # pragma: no cover
+            raise HTTPException(502, f"Coze workflow 返回错误: {str(e)}")  # pragma: no cover
+        save_mode = "coze"  # pragma: no cover
+
+    inner = result.get("result", result) if isinstance(result, dict) else result
+    task_ids = inner.get("task_ids", []) if isinstance(inner, dict) else []
+    print(f"[generate-video] task_ids count={len(task_ids)}")
+    if not task_ids:
+        raise HTTPException(500, "提交视频生成任务失败")
+
+    # 5. 保存 task_ids（含模式标记）
+    print(f"[generate-video] saving task_ids... session_id={session_id}, mode={save_mode}")
+    sf = SessionFile(
+        session_id=session_id, file_type="video_task",
+        filename=f"tasks_{session_id}.json",
+        file_url="",
+        description=json.dumps({"mode": save_mode, "task_ids": task_ids, "api_key": local_api_key or ""}, ensure_ascii=False),
+    )
+    db.add(sf)
+    await db.commit()
+    print(f"[generate-video] saved, returning")
+    return {"submitted": True, "task_ids": task_ids, "session_id": session_id}
+
+
+@router.post("/poll-generate/{session_id}")
+async def studio_poll_generate(session_id: int, db: AsyncSession = Depends(get_db)):
+    """轮询视频生成状态（无需登录）"""
+    from app.agent.models import SessionFile, get_session_files as _gsf
+    from app.workers.workflow import call_workflow
+    import json
+
+    files = await _gsf(db, session_id)
+    tasks = [f for f in files if f.file_type == "video_task"]
+    if not tasks:
+        return {"status": "no_task", "clips": [], "total": 0}
+
+    latest = tasks[0]  # 最新的 task（created_at DESC）
+    raw = json.loads(latest.description)
+    # 兼容新旧格式: 旧格式直接是 list，新格式是 {"mode":..., "task_ids":..., "api_key":...}
+    if isinstance(raw, dict) and "task_ids" in raw:
+        task_ids = raw["task_ids"]
+        mode = raw.get("mode", "coze")
+        api_key = raw.get("api_key", "")
+    else:
+        task_ids = raw
+        mode = "coze"
+        api_key = ""
+
+    if mode == "local" and api_key:
+        from app.workflow.runners.video_generate import query_video_status
+        try:
+            qr = await query_video_status(api_key, task_ids)
+        except Exception:
+            return {"status": "error", "detail": "Local query failed"}
+        qr_inner = qr
+    else:
+        try:
+            qr = await call_workflow("video-generate", {
+                "workflow_type": "query",
+                "task_ids": task_ids,
+            })
+        except Exception:
+            return {"status": "error", "detail": "Coze query failed"}
+        qr_inner = qr.get("result", qr) if isinstance(qr, dict) else qr
+    if not isinstance(qr_inner, dict):
+        return {"status": "unknown", "clips": []}  # pragma: no cover
+
+    # 更新 trace
+    for item in task_ids:
+        sid = item.get("scene_id", "?")
+        await add_trace(session_id, f"generate_scene_{sid}", "running", f"场景{sid}: Seedance 生成中")
+    if qr_inner.get("status") == "completed":
+        clips = qr_inner.get("video_clips", [])
+        saved_ids = []
+        for clip in clips:
+            vu = clip.get("video_url", "")
+            if vu:
+                sf = SessionFile(
+                    session_id=session_id, file_type="video_clip",
+                    filename=f"clip_{session_id}_scene{clip.get('scene_id', '')}.mp4",
+                    file_url=vu,
+                    description=f"场景 {clip.get('scene_id', '')} 视频片段, dur={clip.get('duration', 0)}",
+                )
+                db.add(sf)
+                await db.flush()
+                saved_ids.append(sf.id)
+        await db.commit()
+        # 只返回本次新保存的 clips
+        fresh = await _gsf(db, session_id)
+        def _parse_clip(f):
+            desc = f.description or ""  # pragma: no cover
+            sid = desc.replace("场景 ", "").split(" 视频片段")[0].split(",")[0].strip()  # pragma: no cover
+            dur = 0  # pragma: no cover
+            if "dur=" in desc:  # pragma: no cover
+                try: dur = float(desc.split("dur=")[1].split(",")[0])  # pragma: no cover
+                except: pass  # pragma: no cover
+            return {"id": f.id, "scene_id": sid, "url": f.file_url, "duration": dur}  # pragma: no cover
+        all_clips = {f.id: _parse_clip(f) for f in fresh if f.file_type == "video_clip"}  # pragma: no cover
+        new_clips = [all_clips[cid] for cid in saved_ids if cid in all_clips]
+        for item in task_ids:
+            sid = item.get("scene_id", "?")
+            await add_trace(session_id, f"generate_scene_{sid}", "completed", f"场景{sid}: 生成完成")
+        await add_trace(session_id, "compose", "pending", "所有场景已完成，等待合成")
+        return {"status": "completed", "clips": new_clips, "saved": len(new_clips), "total": len(all_clips)}
+    elif qr_inner.get("status") == "running":
+        return {"status": "running", "clips": []}
+    else:
+        return {"status": "unknown", "detail": str(qr_inner)}
+
+
+@router.post("/agent-edit")
+async def studio_agent_edit(body: dict, db: AsyncSession = Depends(get_db), user = Depends(get_current_user)):
+    """智能剪辑 Agent：分析clip质量，自动排序、去头尾、加转场"""
+    import subprocess, os, json, tempfile, httpx, shutil
+    clips = body.get("clips", [])
+    session_id = body.get("session_id", 0)
+    if not clips:
+        return {"clips": []}
+    result = []
+    # 按BGM风格选BGM
+    bgm_style = body.get("bgm_style", "")
+    selected_bgm = None
+    if bgm_style and session_id:
+        try:
+            from app.material.models import Material
+            from sqlalchemy import select as _s2
+            r = await db.execute(
+                _s2(Material).where(Material.material_type == "audio")
+                .order_by(Material.id).limit(50)
+            )
+            all_bgm = r.scalars().all()
+            for m in all_bgm:
+                feat = json.loads(m.audio_features) if isinstance(getattr(m, "audio_features", None), str) else (getattr(m, "audio_features", None) or {})
+                mood = feat.get("mood", "") if isinstance(feat, dict) else ""
+                if mood == bgm_style:
+                    url = m.image_url or ""
+                    full_url = f"http://114.117.242.17:3000{url}" if url and not url.startswith("http") else url
+                    selected_bgm = {"id": m.id, "name": m.name or "", "url": full_url}
+                    break
+        except Exception as e:  # pragma: no cover
+            print(f"[agent-edit] bgm select failed: {e}")  # pragma: no cover
+    for clip in clips:  # pragma: no cover
+        url = clip.get("url", "")
+        if not url:
+            result.append({**clip, "transition": clip.get("transition", "cut")})
+            continue
+        # FFprobe 检测黑帧和静音
+        dur = 0
+        try:
+            # 下载 tmp
+            tmp = tempfile.mkdtemp()
+            path = os.path.join(tmp, "clip.mp4")
+            async with httpx.AsyncClient(timeout=30) as c:
+                u = url if url.startswith("http") else f"http://114.117.242.17:3000{url}"
+                r = await c.get(u)
+                if r.status_code == 200:
+                    with open(path, "wb") as f:
+                        f.write(r.content)
+            # 获取时长
+            rr = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1", path], capture_output=True, text=True, timeout=10)
+            dur = float(rr.stdout.strip() or 0)
+            shutil.rmtree(tmp, ignore_errors=True)
+        except:
+            pass
+        result.append({
+            "id": clip.get("id"),
+            "url": url,
+            "scene_id": clip.get("scene_id"),
+            "duration": dur or clip.get("duration", 5),
+            "transition": "dissolve",  # Agent默认用叠化
+        })
+    return {"clips": result, "bgm": selected_bgm}
+
+@router.post("/compose-video")
+async def studio_compose_video(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """合成视频：FFmpeg 本地拼接选中 clip，不做TTS"""
+    from app.agent.models import SessionFile, get_session_files as _gsf
+    from app.core.signer import generate_signed_url
+    import subprocess, tempfile, os, httpx, uuid, shutil
+
+    session_id = body.get("session_id", 0)
+    clip_ids = body.get("clip_ids")
+
+    # 清理旧的 final_video 和 subbed_video，避免累积
+    from sqlalchemy import delete as _del
+    await db.execute(_del(SessionFile).where(
+        SessionFile.session_id == session_id,
+        SessionFile.file_type.in_(["final_video", "subbed_video", "asr_subtitles", "asr_duration"]),
+    ))
+    await db.commit()
+
+    files = await _gsf(db, session_id)
+    clips = [f for f in files if f.file_type == "video_clip"]
+    if clip_ids:
+        # 总是按 clip_ids 顺序排列（用户可能调过序）
+        id_order = {cid: i for i, cid in enumerate(clip_ids)}
+        clips = [f for f in clips if f.id in clip_ids]
+        clips.sort(key=lambda f: id_order.get(f.id, 999))
+    if not clips:
+        raise HTTPException(400, "没有可合成的视频片段")
+
+    # 下载 clips
+    tmpdir = tempfile.mkdtemp()
+    inputs = []
+    async with httpx.AsyncClient(timeout=120) as client:
+        for vf in clips:
+            url = vf.file_url or ""
+            if not url.startswith("http"):
+                url = "http://114.117.242.17:3000" + url
+            try:
+                resp = await client.get(url)
+                resp.raise_for_status()
+                path = os.path.join(tmpdir, f"clip_{vf.id}.mp4")
+                with open(path, "wb") as f:
+                    f.write(resp.content)
+                inputs.append(path)
+            except Exception:
+                continue
+
+    if len(inputs) < 1:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+        return {"composed": False, "error": "无法下载视频片段"}
+
+    # FFmpeg concat
+    list_path = os.path.join(tmpdir, "files.txt")
+    with open(list_path, "w") as f:
+        for p in inputs:
+            f.write(f"file '{p}'\n")
+
+    out_name = f"final_{session_id}_{uuid.uuid4().hex[:8]}.mp4"
+    out_path = os.path.join(tmpdir, out_name)
+    result = subprocess.run(
+        ["ffmpeg", "-f", "concat", "-safe", "0", "-i", list_path, "-c", "copy", "-y", out_path],  # pragma: no cover
+        capture_output=True, text=True, timeout=120,
+    )
+    if result.returncode != 0:
+        shutil.rmtree(tmpdir, ignore_errors=True)  # pragma: no cover
+        await add_trace(session_id, "compose", "failed", error=f"FFmpeg 拼接失败")  # pragma: no cover
+        return {"composed": False, "error": f"FFmpeg 拼接失败: {result.stderr[:200]}"}  # pragma: no cover
+
+    # 复制到 uploads
+    uploads_dir = "/app/uploads/composed"
+    os.makedirs(uploads_dir, exist_ok=True)
+    dest = os.path.join(uploads_dir, out_name)
+    shutil.copy2(out_path, dest)
+    shutil.rmtree(tmpdir, ignore_errors=True)
+
+    signed = generate_signed_url(dest.replace("/app/uploads", "/uploads"), expire_seconds=31536000)
+    url = f"http://114.117.242.17:3000{signed}"
+
+    sf = SessionFile(
+        session_id=session_id, file_type="final_video",
+        filename=out_name, file_url=url, description="FFmpeg 合成视频",
+    )
+    db.add(sf)
+    await db.commit()
+
+    await add_trace(session_id, "compose", "completed", "视频合成完成")
+    return {"composed": True, "videos": [{"id": sf.id, "url": url}]}
+
+
+@router.get("/clips/{session_id}")
+async def get_session_clips(session_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """获取 session 的视频片段"""
+    from app.agent.models import SessionFile, get_session_files as _gsf
+    files = await _gsf(db, session_id)
+    clips = []
+    for f in files:
+            if f.file_type == "video_clip":
+                desc = f.description or ""
+                sid = desc.replace("场景 ", "").split(" 视频片段")[0].split(",")[0].strip()
+                dur = 0
+                if "dur=" in desc:
+                    try: dur = float(desc.split("dur=")[1].split(",")[0])
+                    except: pass
+                clips.append({"id": f.id, "scene_id": sid, "url": f.file_url, "duration": dur})
+    final = [{"id": f.id, "url": f.file_url} for f in files if f.file_type == "final_video"]
+    subbed = [{"id": f.id, "url": f.file_url} for f in files if f.file_type == "subbed_video"]
+    asr_list = [json.loads(f.description or "[]") for f in files if f.file_type == "asr_subtitles"]
+    asr_durs = [float(f.description or "0") for f in files if f.file_type == "asr_duration"]
+    return {
+        "clips": clips, "final_videos": final,
+        "subbed_videos": subbed,
+        "asr_segments": asr_list[0] if asr_list else [],
+        "asr_duration": asr_durs[0] if asr_durs else 0,
+    }
+
+
+@router.post("/delete-clip")
+async def studio_delete_clip(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """删除指定 SessionFile（视频片段或最终视频），同时删除物理文件"""
+    from app.agent.models import SessionFile
+    from sqlalchemy import select as _s
+    import os as _os
+    clip_id = body.get("clip_id")
+    file_url = body.get("file_url", "")
+    if clip_id:
+        r = await db.execute(_s(SessionFile).where(SessionFile.id == clip_id))
+        sf = r.scalar_one_or_none()
+        if sf:
+            # 删物理文件
+            if sf.file_url:
+                idx = sf.file_url.find("/uploads/")
+                if idx >= 0:
+                    fpath = "/app" + sf.file_url[idx:]
+                    if _os.path.exists(fpath):
+                        _os.remove(fpath)
+            await db.delete(sf)
+    if file_url and not clip_id:
+        # 直接按 URL 删除
+        from sqlalchemy import delete as _del
+        idx = file_url.find("/uploads/")
+        if idx >= 0:
+            fpath = "/app" + file_url[idx:]
+            if _os.path.exists(fpath):
+                _os.remove(fpath)
+        # 也删 DB 记录
+        urls = [file_url]
+        if not file_url.startswith("http"):
+            urls = [f"http://114.117.242.17:3000{file_url}", file_url]
+        for u in urls:
+            await db.execute(_del(SessionFile).where(SessionFile.file_url == u))
+    await db.commit()
+    return {"ok": True}
+
+
+@router.post("/materials/search")
+async def search_studio_materials(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """搜索素材（带阈值和标签）"""
+    from sqlalchemy import select as _s, text as _t
+    from app.material.models import Material
+    threshold = body.get("threshold", 30) / 100.0
+    tags = body.get("tags", [])
+    query = _s(Material).where(Material.user_id == str(user.id))
+    if tags:
+        for tag in tags:  # pragma: no cover
+            query = query.where(Material.tags.contains(_t(f'"{tag}"')))  # pragma: no cover
+    r = await db.execute(query.order_by(Material.id.desc()))
+    items = [{"id": m.id, "image_url": m.image_url, "tags": m.tags, "similarity": 1.0} for m in r.scalars().all()]
+    return {"materials": items, "total": len(items)}
+
+
+# ── ASR 语音识别 ────────────────────────
+
+@router.post("/asr")
+async def studio_asr(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """对视频做语音识别，返回带时间戳的字幕"""
+    import subprocess, tempfile, os, httpx, shutil, uuid
+    from faster_whisper import WhisperModel
+
+    video_url = body.get("video_url", "")
+    session_id = body.get("session_id")
+    if not video_url:
+        raise HTTPException(400, "video_url required")
+
+    tmpdir = tempfile.mkdtemp()
+    try:
+        # 从 URL 提取本地路径（绕过 signed URL 过期问题）
+        vid_path = os.path.join(tmpdir, "input.mp4")
+        local_path = None
+        idx = video_url.find("/uploads/")
+        if idx >= 0:
+            local_path = "/app" + video_url[idx:]
+            if not os.path.exists(local_path):
+                local_path = None  # pragma: no cover
+        if not local_path:
+            idx = video_url.find("/signed/")
+            if idx >= 0:
+                rest = video_url[idx + 8:]  # pragma: no cover
+                slash = rest.find("/")  # pragma: no cover
+                if slash >= 0:  # pragma: no cover
+                    local_path = "/app/uploads/" + rest[slash+1:]  # pragma: no cover
+                    if not os.path.exists(local_path):  # pragma: no cover
+                        local_path = None  # pragma: no cover
+        if local_path:  # pragma: no cover
+            with open(local_path, "rb") as src, open(vid_path, "wb") as dst:
+                dst.write(src.read())
+        else:
+            async with httpx.AsyncClient(timeout=300) as client:
+                url = video_url if video_url.startswith("http") else f"http://114.117.242.17:3000{video_url}"
+                resp = await client.get(url)
+                resp.raise_for_status()
+                with open(vid_path, "wb") as f:
+                    f.write(resp.content)
+
+        # 提取音频
+        audio_path = os.path.join(tmpdir, "audio.wav")
+        subprocess.run(
+            ["ffmpeg", "-i", vid_path, "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", "-y", audio_path],
+            capture_output=True, text=True, timeout=120,
+        )
+
+        # 语音识别
+        # 语音识别（本地模型优先）
+        model_dir = "/app/models/whisper_tiny"
+        if not os.path.exists(os.path.join(model_dir, "model.bin")):
+            model_dir = "tiny"  # fallback
+        model = WhisperModel(model_dir, device="cpu", compute_type="int8")  # pragma: no cover
+        segments, info = model.transcribe(audio_path, language="zh", vad_filter=True)
+
+        subs = []
+        for seg in segments:
+            text = seg.text.strip()  # pragma: no cover
+            # 繁转简  # pragma: no cover
+            try:  # pragma: no cover
+                import unicodedata  # pragma: no cover
+                # 简单方法：用 zhconv
+                try:  # pragma: no cover
+                    from zhconv import convert  # pragma: no cover
+                    text = convert(text, 'zh-hans')  # pragma: no cover
+                except ImportError:  # pragma: no cover
+                    # fallback: 用标准 unicodedata
+                    pass  # pragma: no cover
+            except Exception:  # pragma: no cover
+                pass  # pragma: no cover
+            subs.append({  # pragma: no cover
+                "start": round(seg.start, 1),
+                "end": round(seg.end, 1),
+                "text": text,
+            })
+
+        # 4. LLM 错别字校正（通过 ASR 纠错工作流配置），并传入剧本辅助纠错  # pragma: no cover
+        if subs:
+            try:  # pragma: no cover
+                from app.workflow.models import WorkflowConfig  # pragma: no cover
+                from sqlalchemy import select as _s  # pragma: no cover
+                wf = await db.execute(_s(WorkflowConfig).where(  # pragma: no cover
+                    WorkflowConfig.user_id == user.id,  # pragma: no cover
+                    WorkflowConfig.workflow_name == "asr-correct",  # pragma: no cover
+                    WorkflowConfig.enabled == 1,  # pragma: no cover
+                ))  # pragma: no cover
+                wf_cfg = wf.scalar_one_or_none()  # pragma: no cover
+                if wf_cfg:  # pragma: no cover
+                    cfg_dict = json.loads(wf_cfg.config or "{}")  # pragma: no cover
+                    api_key = cfg_dict.get("api_key")  # pragma: no cover
+                    base_url = (cfg_dict.get("base_url") or "https://api.deepseek.com/v1").rstrip("/")  # pragma: no cover
+                    model = cfg_dict.get("model", "deepseek-v4-flash")  # pragma: no cover
+                    if api_key:  # pragma: no cover
+                        # 读取剧本作为纠错参考
+                        script_context = ""  # pragma: no cover
+                        try:  # pragma: no cover
+                            from app.agent.models import ensure_session_dir  # pragma: no cover
+                            sp = os.path.join(ensure_session_dir(session_id)["scripts"], f"script_{session_id}.json")  # pragma: no cover
+                            if os.path.exists(sp):  # pragma: no cover
+                                with open(sp, "r", encoding="utf-8") as sf:  # pragma: no cover
+                                    sd = json.loads(sf.read())  # pragma: no cover
+                                lines_text = []  # pragma: no cover
+                                for sc in (sd.get("script", sd).get("scenes", sd.get("scenes", []))):  # pragma: no cover
+                                    for ln in sc.get("lines", []):  # pragma: no cover
+                                        speaker = ln.get("speaker", "")  # pragma: no cover
+                                        text = ln.get("text", "")  # pragma: no cover
+                                        if text:  # pragma: no cover
+                                            lines_text.append(f"[{speaker}] {text}")  # pragma: no cover
+                                if lines_text:  # pragma: no cover
+                                    script_context = "\n".join(lines_text)  # pragma: no cover
+                        except Exception:  # pragma: no cover
+                            pass  # pragma: no cover
+
+                        all_text = "\n".join([s["text"] for s in subs])  # pragma: no cover
+                        prompt = f"""你是一个ASR字幕校对助手。将语音识别结果与剧本台词对比，修正识别错误。"""  # pragma: no cover
+
+                        if script_context:  # pragma: no cover
+                            prompt += f"""  # pragma: no cover
+
+参考剧本台词（用于对比和修正ASR识别错误）：  # pragma: no cover
+{script_context}  # pragma: no cover
+"""  # pragma: no cover
+                        prompt += f"""  # pragma: no cover
+
+【校对规则】：  # pragma: no cover
+1. 【以剧本为准】如果某句ASR文本与剧本中同一场景/相近时间段的台词内容相似（部分字词匹配、语义对应），则采用剧本中对应的正确文本。不要求逐字同音  # pragma: no cover
+2. 【禁止加台词】如果剧本有某句台词但ASR完全没有对应内容，不能凭空补上去  # pragma: no cover
+3. 【禁止加字】ASR原文中没有的字不能自己加（除非剧本对应台词明确有）  # pragma: no cover
+4. 【错别字修正】纠正明显错误的字词，尤其是产品名、品牌名、专业术语等专有名词  # pragma: no cover
+5. 【标点符号】只加必要的标点符号  # pragma: no cover
+6. 【不确定则保留】如果一段话无法匹配任何剧本台词，则只改明显错别字，保持原样  # pragma: no cover
+
+待修正ASR文本（每行对应一个时间片段）：  # pragma: no cover
+{all_text}  # pragma: no cover
+
+只输出修正后的文本，每行对应一行："""  # pragma: no cover
+                        payload = {  # pragma: no cover
+                            "model": model,  # pragma: no cover
+                            "messages": [  # pragma: no cover
+                                {"role": "system", "content": "你是一个字幕校对助手。以剧本台词为参考，修正ASR识别错误。优先采用剧本中的正确文本，不要求原词同音。不确定的保持原样。只输出修正文本。"},  # pragma: no cover
+                                {"role": "user", "content": prompt}  # pragma: no cover
+                            ],  # pragma: no cover
+                            "temperature": 0.1,  # pragma: no cover
+                        }  # pragma: no cover
+                        async with httpx.AsyncClient(timeout=30) as client:  # pragma: no cover
+                            resp = await client.post(  # pragma: no cover
+                                f"{base_url}/chat/completions",  # pragma: no cover
+                                json=payload,  # pragma: no cover
+                                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},  # pragma: no cover
+                            )  # pragma: no cover
+                            if resp.status_code == 200:  # pragma: no cover
+                                result = resp.json()  # pragma: no cover
+                                corrected = result["choices"][0]["message"]["content"].strip().split("\n")  # pragma: no cover
+                                for i, line in enumerate(corrected):  # pragma: no cover
+                                    if i < len(subs):  # pragma: no cover
+                                        subs[i]["text"] = line.strip()  # pragma: no cover
+            except Exception:  # pragma: no cover
+                pass
+
+        # 保存 ASR 结果到 SessionFile
+        if session_id:
+            from app.agent.models import SessionFile
+            # 删除旧的 ASR 记录
+            from sqlalchemy import delete
+            await db.execute(delete(SessionFile).where(
+                SessionFile.session_id == session_id,
+                SessionFile.file_type == "asr_subtitles",
+            ))
+            sf = SessionFile(
+                session_id=session_id, file_type="asr_subtitles",
+                filename="asr_segments.json",
+                description=json.dumps(subs, ensure_ascii=False),
+            )
+            db.add(sf)
+
+            # 如果 session_id 还在 body 里，一并保存持续时长
+            sfd = SessionFile(
+                session_id=session_id, file_type="asr_duration",
+                filename="asr_duration.txt",
+                description=str(round(info.duration, 1) if info.duration else 0),
+            )
+            db.add(sfd)
+            await db.commit()
+
+        return {"segments": subs, "duration": round(info.duration, 1) if info.duration else 0}
+
+    except Exception as e:  # pragma: no cover
+        return {"error": str(e)}  # pragma: no cover
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+@router.post("/burn-subtitles")
+async def studio_burn_subtitles(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """将 ASR 字幕烧录到视频中"""
+    import subprocess, tempfile, os, httpx, shutil, uuid
+    from app.core.signer import generate_signed_url
+
+    video_url = body.get("video_url", "")
+    segments = body.get("segments", [])
+    session_id_burn = body.get("session_id", 0)
+    if session_id_burn:
+        await add_trace(session_id_burn, "burn_subtitles", "running", "正在烧录字幕...")
+    if not video_url:
+        raise HTTPException(400, "video_url required")
+
+    tmpdir = tempfile.mkdtemp()
+    try:
+        # 从 URL 提取本地路径（绕过 signed URL 过期问题）
+        vid_path = os.path.join(tmpdir, "input.mp4")
+        local_path = None
+        idx = video_url.find("/uploads/")
+        if idx >= 0:
+            local_path = "/app" + video_url[idx:]
+            if not os.path.exists(local_path):
+                local_path = None  # pragma: no cover
+        if not local_path:
+            idx = video_url.find("/signed/")
+            if idx >= 0:
+                rest = video_url[idx + 8:]  # pragma: no cover
+                slash = rest.find("/")  # pragma: no cover
+                if slash >= 0:  # pragma: no cover
+                    local_path = "/app/uploads/" + rest[slash+1:]  # pragma: no cover
+                    if not os.path.exists(local_path):  # pragma: no cover
+                        local_path = None  # pragma: no cover
+        if local_path:  # pragma: no cover
+            with open(local_path, "rb") as src, open(vid_path, "wb") as dst:
+                dst.write(src.read())
+        else:
+            async with httpx.AsyncClient(timeout=300) as client:
+                url = video_url if video_url.startswith("http") else f"http://114.117.242.17:3000{video_url}"
+                resp = await client.get(url)
+                resp.raise_for_status()
+                with open(vid_path, "wb") as f:
+                    f.write(resp.content)
+
+        # 生成 SRT 字幕文件（如果有 segments）  # pragma: no cover
+        srt_path = None
+        if segments:
+            srt_path = os.path.join(tmpdir, "subs.srt")
+            with open(srt_path, "w", encoding="utf-8") as f:
+                for i, seg in enumerate(segments, 1):
+                    s = seg.get("start", 0)
+                    e = seg.get("end", 0)
+                    text = seg.get("text", "")
+                    def fmt(t):
+                        h = int(t // 3600)
+                        m = int((t % 3600) // 60)
+                        sec = t % 60
+                        return f"{h:02d}:{m:02d}:{sec:06.3f}"
+                    f.write(f"{i}\n{fmt(s)} --> {fmt(e)}\n{text}\n\n")
+
+        # BGM 下载
+        bgm_url = body.get("bgm_url", "")
+        bgm_path = None
+        if bgm_url:
+            bgm_path = os.path.join(tmpdir, "bgm.mp3")
+            try:
+                async with httpx.AsyncClient(timeout=30) as client:
+                    bgm_resp = await client.get(bgm_url)
+                    if bgm_resp.status_code == 200:
+                        with open(bgm_path, "wb") as f:
+                            f.write(bgm_resp.content)
+            except Exception as e:  # pragma: no cover
+                print(f"[burn] BGM download failed: {e}")  # pragma: no cover
+                bgm_path = None  # pragma: no cover
+
+        out_name = f"subbed_{uuid.uuid4().hex[:8]}.mp4"
+        out_path = os.path.join(tmpdir, out_name)
+
+        if srt_path and bgm_path and os.path.exists(bgm_path):  # pragma: no cover
+            # 字幕 + BGM 混音
+            result = subprocess.run(
+                ["ffmpeg", "-i", vid_path, "-i", bgm_path,
+                 "-filter_complex", "[1:a]volume=0.15[a1];[0:a][a1]amix=inputs=2:duration=first[aout]",
+                 "-map", "0:v", "-map", "[aout]", "-c:v", "copy",
+                 "-vf", f"subtitles={srt_path}:fontsdir=/app/models/fonts:force_style='FontName=WenQuanYi Micro Hei\\,FontSize=18\\,PrimaryColour=&H00FFFFFF\\,OutlineColour=&H00000000\\,BorderStyle=1\\,Outline=1'",
+                 "-y", out_path],
+             capture_output=True, text=True, timeout=120,
+         )
+        elif srt_path:
+            # 只有字幕（无 BGM）
+            result = subprocess.run(  # pragma: no cover
+                ["ffmpeg", "-i", vid_path, "-vf", f"subtitles={srt_path}:fontsdir=/app/models/fonts:force_style='FontName=WenQuanYi Micro Hei\\,FontSize=18\\,PrimaryColour=&H00FFFFFF\\,OutlineColour=&H00000000\\,BorderStyle=1\\,Outline=1'",
+                 "-c:a", "copy", "-y", out_path],
+                capture_output=True, text=True, timeout=120,
+            )
+        elif bgm_path and os.path.exists(bgm_path):
+            # 只有 BGM 混音（字幕已烧录好）
+            result = subprocess.run(  # pragma: no cover
+                ["ffmpeg", "-i", vid_path, "-i", bgm_path,
+                 "-filter_complex", "[1:a]volume=0.15[a1];[0:a][a1]amix=inputs=2:duration=first[aout]",
+                 "-map", "0:v", "-map", "[aout]", "-c:v", "copy", "-y", out_path],
+                capture_output=True, text=True, timeout=120,
+            )
+        else:
+            raise HTTPException(400, "至少需要字幕或 BGM 其中之一")
+        if result.returncode != 0:
+            return {"error": f"字幕烧录失败: {result.stderr[:200]}"}  # pragma: no cover
+
+        # 保存到 uploads
+        uploads_dir = "/app/uploads/subbed"
+        os.makedirs(uploads_dir, exist_ok=True)
+        dest = os.path.join(uploads_dir, out_name)
+        shutil.copy2(out_path, dest)
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+        signed = generate_signed_url(dest.replace("/app/uploads", "/uploads"), expire_seconds=31536000)
+        url = f"http://114.117.242.17:3000{signed}"
+
+        # 保存到 SessionFile
+        session_id = body.get("session_id")
+        if session_id:
+            from app.agent.models import SessionFile
+            from sqlalchemy import delete
+            await db.execute(delete(SessionFile).where(
+                SessionFile.session_id == session_id,
+                SessionFile.file_type == "subbed_video",
+            ))
+            sf = SessionFile(
+                session_id=session_id, file_type="subbed_video",
+                filename=out_name, file_url=url,
+                description="字幕烧录视频",
+            )
+            db.add(sf)
+            await db.commit()
+
+        await add_trace(session_id, "burn_subtitles", "completed", "字幕烧录完成")
+        return {"url": url}
+
+    except Exception as e:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+        return {"error": str(e)}
+
+
+# ── AI 剧本编辑 ──────────────────────────
+
+AI_EDIT_TOOLS = [
+    {"type": "function", "function": {
+        "name": "read_script",
+        "description": "读取当前剧本内容",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    }},
+    {"type": "function", "function": {
+        "name": "change_text",
+        "description": "修改剧本中的台词文本。传入旧文本和新文本，系统自动在剧本中查找替换。",
+        "parameters": {"type": "object", "properties": {
+            "old_text": {"type": "string", "description": "当前台词文本（完整匹配）"},
+            "new_text": {"type": "string", "description": "替换后的新文本"},
+        }, "required": ["old_text", "new_text"]},
+    }},
+    {"type": "function", "function": {
+        "name": "change_duration",
+        "description": "修改指定场景的时长",
+        "parameters": {"type": "object", "properties": {
+            "scene_id": {"type": "string", "description": "场景ID（数字）"},
+            "new_duration": {"type": "string", "description": "新时长秒数，限4/8/12"},
+        }, "required": ["scene_id", "new_duration"]},
+    }},
+    {"type": "function", "function": {
+        "name": "change_visual_desc",
+        "description": "修改指定场景的视觉描述",
+        "parameters": {"type": "object", "properties": {
+            "scene_id": {"type": "string", "description": "场景ID（数字）"},
+            "new_desc": {"type": "string", "description": "新的视觉描述文本"},
+        }, "required": ["scene_id", "new_desc"]},
+    }},
+]
+
+AI_EDIT_SYSTEM = "你是短视频剧本编辑助手。根据用户需求修改剧本。\n\n规则：\n1. 先用 read_script 读取剧本\n2. 使用 change_text / change_duration / change_visual_desc 工具进行修改\n3. 每次修改后告知用户改了哪里"
+
+
+@router.post("/ai-edit")
+async def studio_ai_edit(body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """AI 剧本编辑对话"""
+    from app.ai.models import UserAIConfig
+    from sqlalchemy import select as _s
+    import json, httpx
+
+    session_id = body.get("session_id", 0)
+    script_name = body.get("script_name", f"script_{session_id}")
+    messages = body.get("messages", [])
+    template = body.get("template", "default")
+
+    # 获取模板规则（附加到 system prompt）
+    from app.workflow.runners.script_generate import _read_prompt
+    extra_rules = ""
+    for fname in ["rules.md", "output_format.md"]:
+        p = os.path.join(os.path.dirname(__file__), "..", "workflow", "prompts", fname)
+        if os.path.exists(p):
+            with open(p, "r", encoding="utf-8") as f:
+                extra_rules += f"\n\n--- {fname} ---\n" + f.read()
+    template_system = _read_prompt(template, "system.md") if template else ""
+    full_system = AI_EDIT_SYSTEM
+    if template_system:
+        full_system += f"\n\n当前模板《{template}》的角色定义：\n{template_system}"
+    full_system += f"\n\n当前剧本需遵守的规则：{extra_rules}"
+
+    # 获取用户 AI 配置
+    cfg = await db.execute(_s(UserAIConfig).where(UserAIConfig.user_id == user.id))
+    cfg = cfg.scalar_one_or_none()
+    if not cfg or not cfg.api_key:
+        return {"error": "请先在个人中心配置 AI API Key"}
+
+    api_key = cfg.api_key
+    base_url = cfg.base_url or "https://api.deepseek.com/v1"
+    model = cfg.model or "deepseek-v4-flash"
+
+    # 构建消息列表
+    msgs = [{"role": "system", "content": full_system}] + messages
+
+    async def call_llm(_msgs, _tools=None):
+        payload = {"model": model, "messages": _msgs, "temperature": 0.3}
+        if _tools:
+            payload["tools"] = _tools
+        async with httpx.AsyncClient(timeout=60) as client:
+            r = await client.post(
+                f"{base_url.rstrip('/')}/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                json=payload,
+            )
+            if r.status_code != 200:
+                print(f"[ai-edit] LLM {r.status_code}: {r.text[:500]}")  # pragma: no cover
+            r.raise_for_status()
+            return r.json()
+
+    # 工具循环（最多 5 轮）
+    for _ in range(5):
+        data = await call_llm(msgs, AI_EDIT_TOOLS)
+        choice = data["choices"][0]
+        msg = choice["message"]
+        msgs.append({"role": "assistant", "content": msg.get("content", "")})
+        if msg.get("tool_calls"):
+            msgs[-1]["tool_calls"] = msg["tool_calls"]
+
+        if not msg.get("tool_calls"):
+            break
+
+        for tc in msg["tool_calls"]:
+            fn = tc["function"]
+            name = fn["name"]
+            try:
+                args = json.loads(fn.get("arguments", "{}"))
+                print(f"[ai-edit] tool={name} args={json.dumps(args, ensure_ascii=False)[:200]}")
+                args.setdefault("script_name", script_name)
+                if name in ("change_text", "change_duration", "change_visual_desc"):
+                    # 直接修改文件，不走 execute_tool
+                    from app.agent.models import ensure_session_dir
+                    sp = os.path.join(ensure_session_dir(session_id)["scripts"], f"{script_name}.json")
+                    if not os.path.exists(sp):  # pragma: no cover
+                        result = {"error": "剧本文件不存在"}  # pragma: no cover
+                    else:  # pragma: no cover
+                        with open(sp, "r", encoding="utf-8") as f:  # pragma: no cover
+                            sd = json.loads(f.read())  # pragma: no cover
+                        sb = sd.get("script", sd)  # pragma: no cover
+                        if name == "change_text":  # pragma: no cover
+                            old = args.get("old_text", "")  # pragma: no cover
+                            new_t = args.get("new_text", "")  # pragma: no cover
+                            changed = False  # pragma: no cover
+                            for sc in sb.get("scenes", []):  # pragma: no cover
+                                for ln in sc.get("lines", []):  # pragma: no cover
+                                    if old and ln.get("text") == old:  # pragma: no cover
+                                        ln["text"] = new_t  # pragma: no cover
+                                        changed = True  # pragma: no cover
+                            if changed:  # pragma: no cover
+                                with open(sp, "w", encoding="utf-8") as f:  # pragma: no cover
+                                    json.dump(sd, f, ensure_ascii=False, indent=2)  # pragma: no cover
+                                result = {"ok": True, "msg": f"已将「{old}」改为「{new_t}」"}  # pragma: no cover
+                            else:  # pragma: no cover
+                                result = {"error": f"未找到文本「{old}」"}  # pragma: no cover
+                        elif name == "change_duration":  # pragma: no cover
+                            sid = int(args.get("scene_id", 0))  # pragma: no cover
+                            nd = int(args.get("new_duration", 0))  # pragma: no cover
+                            for sc in sb.get("scenes", []):  # pragma: no cover
+                                if sc.get("scene_id") == sid:  # pragma: no cover
+                                    sc["duration"] = nd  # pragma: no cover
+                                    with open(sp, "w", encoding="utf-8") as f:  # pragma: no cover
+                                        json.dump(sd, f, ensure_ascii=False, indent=2)  # pragma: no cover
+                                    result = {"ok": True, "msg": f"场景{sid}时长改为{nd}秒"}  # pragma: no cover
+                                    break  # pragma: no cover
+                            else:  # pragma: no cover
+                                result = {"error": f"未找到场景{sid}"}  # pragma: no cover
+                        elif name == "change_visual_desc":  # pragma: no cover
+                            sid = int(args.get("scene_id", 0))  # pragma: no cover
+                            nd = args.get("new_desc", "")  # pragma: no cover
+                            for sc in sb.get("scenes", []):  # pragma: no cover
+                                if sc.get("scene_id") == sid:  # pragma: no cover
+                                    sc["visual_desc"] = nd  # pragma: no cover
+                                    with open(sp, "w", encoding="utf-8") as f:  # pragma: no cover
+                                        json.dump(sd, f, ensure_ascii=False, indent=2)  # pragma: no cover
+                                    result = {"ok": True, "msg": f"场景{sid}视觉描述已更新"}  # pragma: no cover
+                                    break  # pragma: no cover
+                            else:  # pragma: no cover
+                                result = {"error": f"未找到场景{sid}"}  # pragma: no cover
+                else:  # pragma: no cover
+                    from app.agent.router import execute_tool
+                    result_str = await execute_tool(name, args, db, session_id, user)
+                    result = json.loads(result_str)
+            except Exception as e:
+                result = {"error": str(e)}
+            msgs.append({"role": "tool", "tool_call_id": tc["id"], "content": json.dumps(result, ensure_ascii=False)})
+
+    # 获取最后 assistant 回复
+    last_assistant = ""
+    updated_script = None
+    for m in reversed(msgs):
+        if m["role"] == "assistant" and m.get("content"):
+            last_assistant = m["content"]
+            break
+
+    # 检查是否有编辑工具被调用
+    for m in msgs:
+        if m["role"] == "tool":
+            try:
+                content = json.loads(m["content"])
+                if content.get("ok"):
+                    # 重新读取最新剧本
+                    spath = os.path.join(ensure_session_dir(session_id)["scripts"], f"{script_name}.json")  # pragma: no cover
+                    if os.path.exists(spath):  # pragma: no cover
+                        with open(spath, "r", encoding="utf-8") as f:  # pragma: no cover
+                            updated_script = json.loads(f.read())  # pragma: no cover
+            except Exception:  # pragma: no cover
+                pass  # pragma: no cover
+
+    return {"reply": last_assistant, "script": updated_script, "messages": msgs[1:]}  # 不包括 system

@@ -7,8 +7,8 @@ class TestWorkflowConfig:
 
     def test_workflow_tokens_present(self):
         from app.workers.workflow import WORKFLOW_TOKENS, WORKFLOW_URLS
-        assert len(WORKFLOW_TOKENS) == 7
-        assert len(WORKFLOW_URLS) == 7
+        assert len(WORKFLOW_TOKENS) == 8
+        assert len(WORKFLOW_URLS) == 8
         assert set(WORKFLOW_TOKENS.keys()) == set(WORKFLOW_URLS.keys())
 
     def test_workflow_urls_end_with_run(self):
@@ -27,7 +27,8 @@ class TestWorkflowConfig:
         from app.workers.workflow import AVAILABLE_WORKFLOWS
         expected = [
             "material-embed", "query-generate", "material-search",
-            "script-generate", "tts-generate", "video-generate", "video-compose",
+            "script-generate", "tts-generate", "video-generate",
+            "video-compose", "video-analyze",
         ]
         assert sorted(AVAILABLE_WORKFLOWS) == sorted(expected)
 
@@ -46,7 +47,7 @@ class TestWorkflowConfig:
         """每个工作流 token 不同"""
         from app.workers.workflow import WORKFLOW_TOKENS
         tokens = list(WORKFLOW_TOKENS.values())
-        assert len(set(tokens)) == 7, "Tokens must be unique per workflow"
+        assert len(set(tokens)) == 8, "Tokens must be unique per workflow"
 
 
 class TestWorkflowRouter:
@@ -57,7 +58,7 @@ class TestWorkflowRouter:
         assert resp.status_code == 200
         data = resp.json()
         assert "workflows" in data
-        assert len(data["workflows"]) == 7
+        assert len(data["workflows"]) == 8
 
     @pytest.mark.asyncio
     async def test_run_unknown_workflow(self, client):

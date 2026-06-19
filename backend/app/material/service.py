@@ -29,6 +29,7 @@ async def create_material(
     product_id: int | None = None,
     image_url: str | None = None,
     text_content: str | None = None,
+    name: str = "",
     source: str | None = "upload",
 ) -> Material:
     material = Material(
@@ -38,6 +39,7 @@ async def create_material(
         product_id=product_id,
         image_url=image_url,
         text_content=text_content,
+        name=name,
         source=source,
     )
     db.add(material)

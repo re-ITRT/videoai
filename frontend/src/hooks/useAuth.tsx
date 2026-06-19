@@ -23,7 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (token) {
-      getMe().then((res: any) => setUser(res)).catch(() => localStorage.removeItem('token')).finally(() => setLoading(false))
+      getMe().then((res: any) => {console.log('AuthProvider: got user', res); setUser(res)}).catch((e) => {console.error('AuthProvider: getMe failed', e); localStorage.removeItem('token')}).finally(() => setLoading(false))
     } else {
       setLoading(false)
     }

@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 from sqlalchemy.sql import func
+from pgvector.sqlalchemy import Vector
 from app.core.database import Base
 
 
@@ -33,8 +34,10 @@ class Material(Base):
     image_url = Column(Text)
     video_url = Column(Text)
     text_content = Column(Text)
-    # embedding stored via pgvector, not in SQLAlchemy model directly
+    name = Column(String(256), default="")  # 素材名称
+    embedding = Column(Vector(1024))  # 1024维向量
     tags = Column(JSONB, default=[])
+    audio_features = Column(JSONB, default={})  # Librosa 分析结果
     source = Column(String(64))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -51,6 +54,6 @@ class MaterialSlice(Base):
     description = Column(Text)
     script = Column(Text)
     image_url = Column(Text)
-    # embedding via pgvector
+    embedding = Column(Vector(1024))
     tags = Column(JSONB, default=[])
     created_at = Column(DateTime(timezone=True), server_default=func.now())
