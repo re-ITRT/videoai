@@ -584,7 +584,7 @@ export default function StudioPage() {
             {step === 4 && (
               <div>
                 <Card title="视频生成" size="small" extra={state.clip_collections?.length > 0 ? <Tag color="green">{state.clip_collections.length} 次运行</Tag> : undefined} style={{ minHeight: 400 }}>
-                  {!state.last_script?.script?.title ? <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>生成剧本后点击生成</div> : (
+                  {(!state.last_script?.script?.title && (!state.clip_collections || state.clip_collections.length === 0)) ? <div style={{ color: '#999', textAlign: 'center', padding: 20 }}>生成剧本后点击生成</div> : (
                     <div>
                       <List size="small" dataSource={state.clip_collections} renderItem={(c: any) => (
                         <List.Item onClick={async () => { saveState({ selected_clip_collection_id: c.id }); try { const r: any = await request.get(`/studio/clips/${sessionIdRef.current}`); const clipMap = new Map(); (r?.clips || []).forEach((x: any) => clipMap.set(x.id, x)); const merged = (c.clips || []).map((clip: any) => ({ ...clip, transition: 'cut', duration: (clipMap.get(clip.id) || {}).duration || clip.duration })); setEditingClips(merged) } catch { setEditingClips((c.clips || []).map((clip: any) => ({ ...clip, transition: 'cut' }))) } }}
